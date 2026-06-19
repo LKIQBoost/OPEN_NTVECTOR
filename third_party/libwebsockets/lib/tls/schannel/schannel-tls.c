@@ -1,0 +1,365 @@
+/*
+ * libwebsockets - small server side websockets and web server implementation
+ *
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
+#include "private-lib-core.h"
+#include "private-lib-tls.h"
+#include "private.h"
+
+int
+lws_context_init_ssl_library(struct lws_context *cx,
+			     const struct lws_context_creation_info *info)
+{
+	cx->tls_ops = &tls_ops_schannel;
+	return 0;
+}
+
+void
+lws_context_deinit_ssl_library(struct lws_context *context)
+{
+}
+
+int
+lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
+			  const char *cert, const char *private_key,
+			  const char *mem_cert, size_t len_mem_cert,
+			  const char *mem_privkey, size_t mem_privkey_len)
+{
+    PCCERT_CONTEXT pCertCtx = NULL;
+    LWS_SCH_CREDENTIALS schannel_cred = { 0 };
+    SECURITY_STATUS status;
+    TimeStamp tsExpiry;
+
+    if (!cert && !mem_cert)
+        return 0;
+
+    if (!vhost->tls.ssl_ctx)
+        return 1;
+
+    if (lws_tls_schannel_cert_info_load(vhost->context, cert, private_key,
+                                        mem_cert, len_mem_cert,
+                                        mem_privkey, mem_privkey_len, &pCertCtx,
+                                        &vhost->tls.ssl_ctx->store,
+                                        (void **)&vhost->tls.ssl_ctx->u.key_prov,
+                                        &vhost->tls.ssl_ctx->key_type,
+                                        vhost->tls.ssl_ctx->key_container_name)) {
+        lwsl_err("%s: Failed to load server certs\n", __func__);
+        lws_free(vhost->tls.ssl_ctx);
+        vhost->tls.ssl_ctx = NULL;
+        return 1;
+    }
+
+    schannel_cred.dwVersion = SCH_CREDENTIALS_VERSION;
+    schannel_cred.cCreds = 1;
+    schannel_cred.paCred = &pCertCtx;
+#ifndef SCH_USE_STRONG_CRYPTO
+#define SCH_USE_STRONG_CRYPTO 0x00400000
+#endif
+#ifndef SP_PROT_TLS1_3_SERVER
+#define SP_PROT_TLS1_3_SERVER 0x00001000
+#endif
+    LWS_TLS_PARAMETERS tls_params = { 0 };
+    tls_params.grbitDisabledProtocols = (DWORD)~SP_PROT_TLS1_3_SERVER;
+
+    schannel_cred.dwFlags = SCH_CRED_NO_DEFAULT_CREDS | SCH_CRED_NO_SYSTEM_MAPPER | SCH_USE_STRONG_CRYPTO;
+    schannel_cred.cTlsParameters = 1;
+    schannel_cred.pTlsParameters = &tls_params;
+
+    status = AcquireCredentialsHandleA(NULL, UNISP_NAME_A, SECPKG_CRED_INBOUND, NULL,
+                                      &schannel_cred, NULL, NULL,
+                                      &vhost->tls.ssl_ctx->cred, &tsExpiry);
+
+    if (status == SEC_E_UNKNOWN_CREDENTIALS || status == SEC_E_INVALID_PARAMETER) {
+        SCHANNEL_CRED old_cred = { 0 };
+        old_cred.dwVersion = SCHANNEL_CRED_VERSION;
+        old_cred.cCreds = 1;
+        old_cred.paCred = &pCertCtx;
+        old_cred.dwFlags = SCH_CRED_NO_DEFAULT_CREDS | SCH_CRED_NO_SYSTEM_MAPPER | SCH_USE_STRONG_CRYPTO;
+        status = AcquireCredentialsHandleA(NULL, UNISP_NAME_A, SECPKG_CRED_INBOUND, NULL,
+                                          &old_cred, NULL, NULL,
+                                          &vhost->tls.ssl_ctx->cred, &tsExpiry);
+    }
+
+    CertFreeCertificateContext(pCertCtx);
+
+    if (status != SEC_E_OK) {
+        lwsl_err("%s: AcquireCredentialsHandle failed 0x%x\n", __func__, (int)status);
+        lws_free(vhost->tls.ssl_ctx);
+        vhost->tls.ssl_ctx = NULL;
+        return 1;
+    }
+
+    vhost->tls.ssl_ctx->initialized = 1;
+    lwsl_vhost_notice(vhost, "vhost %p: server ctx %p created", vhost, vhost->tls.ssl_ctx);
+
+	return 0;
+}
+
+void
+lws_tls_acme_sni_cert_destroy(struct lws_vhost *vhost)
+{
+}
+
+void
+lws_ssl_destroy(struct lws_vhost *vhost)
+{
+    if (vhost->tls.ssl_ctx) {
+        lws_tls_vhost_backend_free_ctx(vhost->tls.ssl_ctx);
+        vhost->tls.ssl_ctx = NULL;
+    }
+    if (vhost->tls.ssl_client_ctx) {
+        if (vhost->tls.ssl_client_ctx->initialized)
+            FreeCredentialsHandle(&vhost->tls.ssl_client_ctx->cred);
+        /* Client context might not have key_prov set if we passed NULL, but if it does (future use), use CryptReleaseContext if it was CAPI?
+           Wait, lws_tls_client_create_vhost_context passes NULL for phProv currently.
+           But if it passed a pointer, it would get an HCRYPTPROV.
+           Let's assume CAPI.
+        */
+        if (vhost->tls.ssl_client_ctx->key_type == 0) {
+             if (vhost->tls.ssl_client_ctx->u.key_prov)
+                 CryptReleaseContext(vhost->tls.ssl_client_ctx->u.key_prov, 0);
+        } else {
+             if (vhost->tls.ssl_client_ctx->u.key_cng)
+                 NCryptFreeObject(vhost->tls.ssl_client_ctx->u.key_cng);
+        }
+
+        if (vhost->tls.ssl_client_ctx->store)
+            CertCloseStore(vhost->tls.ssl_client_ctx->store, 0);
+        lws_free(vhost->tls.ssl_client_ctx);
+        vhost->tls.ssl_client_ctx = NULL;
+    }
+}
+
+void
+lws_ssl_SSL_CTX_destroy(struct lws_vhost *vhost)
+{
+    lws_ssl_destroy(vhost);
+}
+
+void
+lws_ssl_context_destroy(struct lws_context *context)
+{
+}
+
+lws_tls_ctx *
+lws_tls_ctx_from_wsi(struct lws *wsi)
+{
+    if (!wsi) return NULL;
+    if (wsi->a.vhost) return wsi->a.vhost->tls.ssl_ctx;
+	return NULL;
+}
+
+int
+lws_tls_client_create_vhost_context(struct lws_vhost *vh,
+				    const struct lws_context_creation_info *info,
+				    const char *cipher_list,
+				    const char *ca_filepath,
+				    const void *ca_mem,
+				    unsigned int ca_mem_len,
+				    const char *cert_filepath,
+				    const void *cert_mem,
+				    unsigned int cert_mem_len,
+				    const char *private_key_filepath,
+				    const void *key_mem,
+				    unsigned int key_mem_len)
+{
+    LWS_SCH_CREDENTIALS schannel_cred = { 0 };
+    SECURITY_STATUS status;
+    TimeStamp tsExpiry;
+    PCCERT_CONTEXT pCertCtx = NULL;
+
+    vh->tls.ssl_client_ctx = lws_zalloc(sizeof(*vh->tls.ssl_client_ctx), "schannel_client_ctx");
+    if (!vh->tls.ssl_client_ctx) return 1;
+
+    schannel_cred.dwVersion = SCH_CREDENTIALS_VERSION;
+#ifndef SCH_USE_STRONG_CRYPTO
+#define SCH_USE_STRONG_CRYPTO 0x00400000
+#endif
+#ifndef SP_PROT_TLS1_3_CLIENT
+#define SP_PROT_TLS1_3_CLIENT 0x00002000
+#endif
+
+    LWS_TLS_PARAMETERS tls_params = { 0 };
+    tls_params.grbitDisabledProtocols = (DWORD)~SP_PROT_TLS1_3_CLIENT;
+
+    schannel_cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS | SCH_USE_STRONG_CRYPTO;
+    schannel_cred.cTlsParameters = 1;
+    schannel_cred.pTlsParameters = &tls_params;
+
+    if (cert_filepath || cert_mem) {
+        if (lws_tls_schannel_cert_info_load(vh->context, cert_filepath, private_key_filepath,
+                                            cert_mem, cert_mem_len,
+                                            key_mem, key_mem_len, &pCertCtx,
+                                            &vh->tls.ssl_client_ctx->store,
+                                            (void **)&vh->tls.ssl_client_ctx->u.key_prov,
+                                            &vh->tls.ssl_client_ctx->key_type,
+                                            NULL) == 0) {
+            schannel_cred.cCreds = 1;
+            schannel_cred.paCred = &pCertCtx;
+        }
+    }
+
+    status = AcquireCredentialsHandleW(NULL, (SEC_WCHAR*)UNISP_NAME_W, SECPKG_CRED_OUTBOUND, NULL,
+                                      &schannel_cred, NULL, NULL,
+                                      &vh->tls.ssl_client_ctx->cred, &tsExpiry);
+
+    if (status == SEC_E_UNKNOWN_CREDENTIALS || status == SEC_E_INVALID_PARAMETER) {
+        lwsl_err("%s: SCH_CREDENTIALS failed with 0x%x! Falling back to SCHANNEL_CRED (QUIC will fail!)\n", __func__, (int)status);
+        SCHANNEL_CRED old_cred = { 0 };
+        old_cred.dwVersion = SCHANNEL_CRED_VERSION;
+        old_cred.dwFlags = schannel_cred.dwFlags;
+        old_cred.cCreds = schannel_cred.cCreds;
+        old_cred.paCred = schannel_cred.paCred;
+        status = AcquireCredentialsHandleW(NULL, (SEC_WCHAR*)UNISP_NAME_W, SECPKG_CRED_OUTBOUND, NULL,
+                                          &old_cred, NULL, NULL,
+                                          &vh->tls.ssl_client_ctx->cred, &tsExpiry);
+    }
+
+    if (status == SEC_E_NO_CREDENTIALS && schannel_cred.cCreds > 0) {
+        lwsl_warn("%s: client cert rejected by SChannel, retrying without\n", __func__);
+        schannel_cred.cCreds = 0;
+        schannel_cred.paCred = NULL;
+        schannel_cred.dwFlags &= ~SCH_CRED_NO_DEFAULT_CREDS;
+        status = AcquireCredentialsHandleW(NULL, (SEC_WCHAR*)UNISP_NAME_W, SECPKG_CRED_OUTBOUND, NULL,
+                                          &schannel_cred, NULL, NULL,
+                                          &vh->tls.ssl_client_ctx->cred, &tsExpiry);
+        if (status == SEC_E_UNKNOWN_CREDENTIALS || status == SEC_E_INVALID_PARAMETER) {
+            SCHANNEL_CRED old_cred = { 0 };
+            old_cred.dwVersion = SCHANNEL_CRED_VERSION;
+            old_cred.dwFlags = schannel_cred.dwFlags;
+            status = AcquireCredentialsHandleW(NULL, (SEC_WCHAR*)UNISP_NAME_W, SECPKG_CRED_OUTBOUND, NULL,
+                                              &old_cred, NULL, NULL,
+                                              &vh->tls.ssl_client_ctx->cred, &tsExpiry);
+        }
+    }
+
+    if (pCertCtx) CertFreeCertificateContext(pCertCtx);
+
+    if (status != SEC_E_OK) {
+        lwsl_err("%s: AcquireCredentialsHandle failed 0x%x\n", __func__, (int)status);
+        lws_free(vh->tls.ssl_client_ctx);
+        vh->tls.ssl_client_ctx = NULL;
+        return 1;
+    }
+
+    vh->tls.ssl_client_ctx->initialized = 1;
+    return 0;
+}
+
+void
+lws_ssl_info_callback(const lws_tls_conn *ssl, int where, int ret)
+{
+}
+
+void
+lws_tls_vhost_backend_free_ctx(lws_tls_ctx *ctx)
+{
+    if (!ctx)
+        return;
+
+    if (ctx->initialized)
+        FreeCredentialsHandle(&ctx->cred);
+
+    if (ctx->key_type == 0) {
+        if (ctx->u.key_prov) {
+            CryptReleaseContext(ctx->u.key_prov, 0);
+            if (ctx->key_container_name[0]) {
+                 HCRYPTPROV hProv;
+                 if (CryptAcquireContext(&hProv, ctx->key_container_name, MS_ENH_RSA_AES_PROV, PROV_RSA_AES, CRYPT_DELETEKEYSET | CRYPT_SILENT)) {
+                 }
+            }
+        }
+    } else {
+        if (ctx->u.key_cng) {
+             NCryptFreeObject(ctx->u.key_cng);
+        }
+        if (ctx->key_container_name[0]) {
+             NCRYPT_PROV_HANDLE hProv = 0;
+             if (NCryptOpenStorageProvider(&hProv, MS_KEY_STORAGE_PROVIDER, 0) == ERROR_SUCCESS) {
+                  NCRYPT_KEY_HANDLE hKey = 0;
+                  WCHAR wName[128];
+                  if (MultiByteToWideChar(CP_UTF8, 0, ctx->key_container_name, -1, wName, 128)) {
+                       if (NCryptOpenKey(hProv, &hKey, wName, 0, 0) == ERROR_SUCCESS) {
+                            NCryptDeleteKey(hKey, 0);
+                       }
+                  }
+                  NCryptFreeObject(hProv);
+             }
+        }
+    }
+
+    if (ctx->store)
+        CertCloseStore(ctx->store, 0);
+    lws_free(ctx);
+}
+
+int
+lws_tls_vhost_backend_create_ctx(struct lws_vhost *vhost)
+{
+    vhost->tls.ssl_ctx = lws_zalloc(sizeof(*vhost->tls.ssl_ctx), "schannel_ctx");
+    if (!vhost->tls.ssl_ctx)
+        return 1;
+
+    lws_snprintf(vhost->tls.ssl_ctx->key_container_name, sizeof(vhost->tls.ssl_ctx->key_container_name),
+                 "lws_vhost_%p_%lu", vhost, (unsigned long)lws_now_usecs());
+
+    return 0;
+}
+
+int
+lws_tls_server_vhost_backend_init(const struct lws_context_creation_info *info,
+				  struct lws_vhost *vhost, struct lws *wsi)
+{
+    int n;
+
+    if (lws_tls_vhost_backend_create_ctx(vhost))
+        return 1;
+
+    if (!vhost->tls.use_ssl ||
+        (!info->ssl_cert_filepath && !info->server_ssl_cert_mem))
+        return 0;
+
+    n = (int)lws_tls_generic_cert_checks(vhost, info->ssl_cert_filepath,
+                                         info->ssl_private_key_filepath);
+
+    if (n == LWS_TLS_EXTANT_NO &&
+        (vhost->options & LWS_SERVER_OPTION_IGNORE_MISSING_CERT)) {
+        lwsl_notice("No certs found, continuing without SSL_CTX\n");
+        lws_free_set_NULL(vhost->tls.ssl_ctx);
+        return 0;
+    }
+
+    n = lws_tls_server_certs_load(vhost, wsi,
+                                     info->ssl_cert_filepath,
+                                     info->ssl_private_key_filepath,
+                                     info->server_ssl_cert_mem,
+                                     info->server_ssl_cert_mem_len,
+                                     info->server_ssl_private_key_mem,
+                                     info->server_ssl_private_key_mem_len);
+    if (n) {
+        lwsl_err("%s: failed to load certs\n", __func__);
+        return 1;
+    }
+
+    return 0;
+}

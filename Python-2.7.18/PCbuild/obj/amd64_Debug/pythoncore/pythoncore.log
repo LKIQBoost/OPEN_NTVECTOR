@@ -1,0 +1,470 @@
+﻿  Killing any running python_d.exe instances...
+  Getting build info from git
+  fatal: not a git repository (or any of the parent directories): .git
+L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\pythoncore.vcxproj(426,5): warning MSB3073: 命令“git name-rev --name-only HEAD > "L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\obj\amd64_Debug\pythoncore\gitbranch.txt"”已退出，代码为 128。
+  fatal: not a git repository (or any of the parent directories): .git
+L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\pythoncore.vcxproj(427,5): warning MSB3073: 命令“git rev-parse --short HEAD > "L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\obj\amd64_Debug\pythoncore\gitversion.txt"”已退出，代码为 128。
+  fatal: not a git repository (or any of the parent directories): .git
+L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\pythoncore.vcxproj(428,5): warning MSB3073: 命令“git describe --all --always --dirty > "L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\obj\amd64_Debug\pythoncore\gittag.txt"”已退出，代码为 128。
+  Building : 
+L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\pythoncore.vcxproj(442,5): warning : Toolset v143 is not used for official builds. Your build may have errors or incompatibilities.
+  _bisectmodule.c
+  _codecsmodule.c
+  _collectionsmodule.c
+  _csv.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_collectionsmodule.c(1321,29): warning C4244: “函数”: 从“Py_ssize_t”转换到“long”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_csv.c(810,19): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_csv.c(1137,22): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_csv.c(1169,11): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  _functoolsmodule.c
+  _heapqmodule.c
+  _hotshot.c
+  _json.c
+  _localemodule.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_localemodule.c(310,36): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_localemodule.c(319,36): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  _lsprof.c
+  _math.c
+  _randommodule.c
+  _sre.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(1956,18): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(1959,18): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(2000,18): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(2003,18): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(2153,22): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(2156,22): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(2304,22): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(2307,22): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(2456,22): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(2459,22): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(3878,18): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(3881,18): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(3918,18): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\_sre.c(3921,18): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  _struct.c
+  _weakref.c
+  arraymodule.c
+  audioop.c
+  binascii.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\binascii.c(658,36): warning C4244: “=”: 从“Py_ssize_t”转换到“unsigned char”，可能丢失数据
+  cmathmodule.c
+  cPickle.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(841,38): warning C4244: “函数”: 从“Py_ssize_t”转换到“long”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(870,24): warning C4244: “=”: 从“Py_ssize_t”转换到“char”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(1107,21): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(1164,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(1166,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(1281,24): warning C4244: “=”: 从“Py_ssize_t”转换到“char”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(1570,46): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(1595,42): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(2116,28): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(2117,26): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(2216,24): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(2217,22): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(3834,57): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(3900,16): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(4368,12): warning C4244: “return”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(4389,12): warning C4244: “return”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(4414,36): warning C4244: “函数”: 从“Py_ssize_t”转换到“long”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(4418,12): warning C4244: “return”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(4441,20): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(4444,16): warning C4244: “return”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(4534,12): warning C4244: “return”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(4543,12): warning C4244: “return”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\cPickle.c(4711,13): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  正在生成代码...
+  正在编译...
+  cStringIO.c
+  datetimemodule.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\datetimemodule.c(4246,50): warning C4267: “函数”: 从“size_t”转换到“int”，可能丢失数据
+  errnomodule.c
+  future_builtins.c
+  gcmodule.c
+  imageop.c
+  itertoolsmodule.c
+  main.c
+  mathmodule.c
+  md5.c
+  md5module.c
+  mmapmodule.c
+  operator.c
+  parsermodule.c
+  posixmodule.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\posixmodule.c(587,46): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\posixmodule.c(5411,13): warning C4996: 'GetVersion': 被声明为已否决
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\posixmodule.c(6301,47): warning C4244: “函数”: 从“Py_intptr_t”转换到“long”，可能丢失数据
+  rotatingtree.c
+  sha256module.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\sha256module.c(488,34): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\sha256module.c(636,37): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\sha256module.c(671,37): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  sha512module.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\sha512module.c(554,37): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\sha512module.c(702,40): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\sha512module.c(737,40): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  shamodule.c
+  signalmodule.c
+  正在生成代码...
+  正在编译...
+  stropmodule.c
+  symtablemodule.c
+  threadmodule.c
+  timemodule.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\timemodule.c(811,44): error C2065: “timezone”: 未声明的标识符
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\timemodule.c(819,43): error C2065: “timezone”: 未声明的标识符
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\timemodule.c(822,44): error C2065: “daylight”: 未声明的标识符
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\timemodule.c(824,46): error C2065: “tzname”: 未声明的标识符
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\timemodule.c(824,52): error C2109: 下标要求数组或指针类型
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\timemodule.c(824,57): error C2065: “tzname”: 未声明的标识符
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\timemodule.c(824,63): error C2109: 下标要求数组或指针类型
+  xxsubtype.c
+  zipimport.c
+  zlibmodule.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlibmodule.c(139,25): warning C4244: “=”: 从“Py_ssize_t”转换到“uInt”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlibmodule.c(178,33): warning C4244: “=”: 从“Py_ssize_t”转换到“uInt”，可能丢失数据
+  adler32.c
+  compress.c
+  crc32.c
+  deflate.c
+  gzclose.c
+  gzlib.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzlib.c(245,9): warning C4996: 'open': The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name: _open. See online help for details.
+  gzread.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzread.c(35,15): warning C4996: 'read': The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name: _read. See online help for details.
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzread.c(319,17): warning C4267: “=”: 从“size_t”转换到“unsigned int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzread.c(400,11): warning C4267: “=”: 从“size_t”转换到“unsigned int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzread.c(472,11): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzread.c(651,11): warning C4996: 'close': The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name: _close. See online help for details.
+  gzwrite.c
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzwrite.c(89,20): warning C4996: 'write': The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name: _write. See online help for details.
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzwrite.c(110,24): warning C4996: 'write': The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name: _write. See online help for details.
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzwrite.c(212,24): warning C4267: “=”: 从“size_t”转换到“unsigned int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzwrite.c(232,21): warning C4267: “=”: 从“size_t”转换到“unsigned int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzwrite.c(371,11): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Modules\zlib\gzwrite.c(661,9): warning C4996: 'close': The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name: _close. See online help for details.
+  infback.c
+  inffast.c
+  inflate.c
+  inftrees.c
+  trees.c
+  正在生成代码...
+  正在编译...
+  uncompr.c
+  zutil.c
+  _codecs_cn.c
+  _codecs_hk.c
+  _codecs_iso2022.c
+  _codecs_jp.c
+  _codecs_kr.c
+  _codecs_tw.c
+  multibytecodec.c
+  _iomodule.c
+  bufferedio.c
+  bytesio.c
+  fileio.c
+  iobase.c
+  stringio.c
+  textio.c
+  abstract.c
+  boolobject.c
+  bufferobject.c
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\bufferobject.c(416,5): warning C4018: “<=”: 有符号/无符号不匹配
+  bytes_methods.c
+  正在生成代码...
+  正在编译...
+  bytearrayobject.c
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\bytearrayobject.c(1312,15): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\bytearrayobject.c(1322,48): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  capsule.c
+  cellobject.c
+  classobject.c
+  cobject.c
+  codeobject.c
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\codeobject.c(701,45): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\codeobject.c(723,45): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  complexobject.c
+  descrobject.c
+  dictobject.c
+  enumobject.c
+  exceptions.c
+  fileobject.c
+  floatobject.c
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\floatobject.c(1186,22): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  frameobject.c
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\frameobject.c(547,78): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\frameobject.c(580,78): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\frameobject.c(937,14): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\frameobject.c(938,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\frameobject.c(984,14): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\frameobject.c(985,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  funcobject.c
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\funcobject.c(526,36): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\funcobject.c(527,12): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\funcobject.c(527,19): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  genobject.c
+  intobject.c
+  iterobject.c
+  listobject.c
+  longobject.c
+  正在生成代码...
+  正在编译...
+  memoryobject.c
+  methodobject.c
+  moduleobject.c
+  object.c
+  obmalloc.c
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\obmalloc.c(961,42): warning C4244: “=”: 从“__int64”转换到“unsigned int”，可能丢失数据
+  rangeobject.c
+  setobject.c
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\setobject.c(756,27): warning C4244: “=”: 从“Py_ssize_t”转换到“long”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\setobject.c(785,34): warning C4244: “*=”: 从“Py_ssize_t”转换到“long”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\setobject.c(834,27): warning C4244: “函数”: 从“Py_ssize_t”转换到“long”，可能丢失数据
+  sliceobject.c
+  stringobject.c
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\stringobject.c(2883,16): warning C4244: “return”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  structseq.c
+  tupleobject.c
+  typeobject.c
+  unicodectype.c
+  unicodeobject.c
+  weakrefobject.c
+  acceler.c
+  bitset.c
+  firstsets.c
+  grammar.c
+L:\Working\Python-2.7.18\Python-2.7.18\Parser\grammar.c(88,14): warning C4244: “return”: 从“__int64”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Parser\grammar.c(130,15): warning C4244: “return”: 从“__int64”转换到“int”，可能丢失数据
+  grammar1.c
+  正在生成代码...
+  正在编译...
+  listnode.c
+  metagrammar.c
+  myreadline.c
+  node.c
+  parser.c
+  parsetok.c
+L:\Working\Python-2.7.18\Python-2.7.18\Parser\parsetok.c(193,28): warning C4244: “=”: 从“__int64”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Parser\parsetok.c(233,53): warning C4267: “函数”: 从“size_t”转换到“int”，可能丢失数据
+  tokenizer.c
+L:\Working\Python-2.7.18\Python-2.7.18\Parser\tokenizer.c(658,34): warning C4244: “=”: 从“__int64”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Parser\tokenizer.c(627,53): warning C4267: “初始化”: 从“size_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Parser\tokenizer.c(1749,56): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Parser\tokenizer.c(1734,27): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  _subprocess.c
+L:\Working\Python-2.7.18\Python-2.7.18\PC\_subprocess.c(341,15): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\PC\_subprocess.c(592,33): warning C4996: 'GetVersion': 被声明为已否决
+  _winreg.c
+L:\Working\Python-2.7.18\Python-2.7.18\PC\_winreg.c(791,34): warning C4267: “=”: 从“size_t”转换到“DWORD”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\PC\_winreg.c(842,31): warning C4267: “+=”: 从“size_t”转换到“DWORD”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\PC\_winreg.c(899,36): warning C4244: “=”: 从“Py_ssize_t”转换到“DWORD”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\PC\_winreg.c(1069,50): warning C4311: “类型强制转换”: 从“void *”到“DWORD”的指针截断
+L:\Working\Python-2.7.18\Python-2.7.18\PC\_winreg.c(1579,11): warning C4244: “=”: 从“Py_ssize_t”转换到“DWORD”，可能丢失数据
+  config.c
+  dl_nt.c
+  getpathp.c
+  import_nt.c
+  msvcrtmodule.c
+L:\Working\Python-2.7.18\Python-2.7.18\PC\msvcrtmodule.c(400,9): warning C4101: “st”: 未引用的局部变量
+  _warnings.c
+  asdl.c
+  ast.c
+  bltinmodule.c
+  ceval.c
+L:\Working\Python-2.7.18\Python-2.7.18\Python\ceval.c(4469,14): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\ceval.c(4659,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\ceval.c(5044,15): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  codecs.c
+  正在生成代码...
+  正在编译...
+  compile.c
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(335,28): warning C4244: “函数”: 从“Py_ssize_t”转换到“long”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(395,53): warning C4244: “函数”: 从“Py_ssize_t”转换到“long”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(423,9): warning C4312: “类型强制转换”: 从“unsigned int”转换到更大的“void *”
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(424,9): warning C4312: “类型强制转换”: 从“unsigned int”转换到更大的“void *”
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(425,9): warning C4312: “类型强制转换”: 从“unsigned int”转换到更大的“void *”
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(492,32): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(546,37): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(955,28): warning C4244: “函数”: 从“Py_ssize_t”转换到“long”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(970,12): warning C4244: “return”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(1271,19): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(3569,15): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(3595,15): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(3621,11): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(3789,9): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(3793,13): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(3833,52): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\compile.c(3840,15): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  dtoa.c
+  dynload_win.c
+  errors.c
+  formatter_string.c
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\stringlib\formatter.h(1001,50): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  (编译源文件“../Python/formatter_string.c”)
+  
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\stringlib\formatter.h(1181,52): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  (编译源文件“../Python/formatter_string.c”)
+  
+L:\Working\Python-2.7.18\Python-2.7.18\Objects\stringlib\formatter.h(1185,52): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  (编译源文件“../Python/formatter_string.c”)
+  
+  formatter_unicode.c
+  frozen.c
+  future.c
+  getargs.c
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(349,23): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(461,14): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(888,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(897,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(905,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(974,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(983,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(991,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(1019,21): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(1219,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(1349,17): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(1388,13): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(1449,16): warning C4244: “return”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(1609,13): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\getargs.c(1610,36): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  getcompiler.c
+  getcopyright.c
+  getopt.c
+  getplatform.c
+  getversion.c
+  graminit.c
+  import.c
+  importdl.c
+  marshal.c
+L:\Working\Python-2.7.18\Python-2.7.18\Python\marshal.c(1042,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  modsupport.c
+  mysnprintf.c
+  正在生成代码...
+  正在编译...
+  mystrtoul.c
+  peephole.c
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(73,5): warning C4244: “=”: 从“Py_ssize_t”转换到“unsigned char”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(185,5): warning C4244: “=”: 从“Py_ssize_t”转换到“unsigned char”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(238,5): warning C4244: “=”: 从“Py_ssize_t”转换到“unsigned char”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(320,14): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(373,17): warning C4244: “=”: 从“Py_ssize_t”转换到“unsigned char”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(388,17): warning C4244: “=”: 从“Py_ssize_t”转换到“unsigned char”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(410,17): warning C4244: “=”: 从“Py_ssize_t”转换到“unsigned char”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(436,23): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(521,23): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(531,38): warning C4244: “=”: 从“Py_ssize_t”转换到“unsigned char”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(560,23): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(574,33): warning C4244: “-=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(601,24): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(630,17): warning C4244: “=”: 从“Py_ssize_t”转换到“unsigned char”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\peephole.c(640,17): warning C4244: “=”: 从“Py_ssize_t”转换到“unsigned char”，可能丢失数据
+  pyarena.c
+  pyctype.c
+  pyfpe.c
+  pymath.c
+  pystate.c
+  pystrcmp.c
+  pystrtod.c
+L:\Working\Python-2.7.18\Python-2.7.18\Python\pystrtod.c(953,35): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\pystrtod.c(1072,21): warning C4244: “=”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  Python-ast.c
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3348,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3388,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3451,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3358,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3398,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3461,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3564,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3593,55): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3649,46): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3678,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3707,55): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3770,48): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3811,48): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3925,47): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4004,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4033,47): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4088,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4117,47): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4171,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4200,47): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4265,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4354,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4383,49): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4412,47): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4454,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4483,50): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4558,46): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4611,46): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4710,46): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3574,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3603,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3659,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3688,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3717,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3780,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3821,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(3935,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4014,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4043,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4098,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4127,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4181,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4210,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4275,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4364,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4393,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4422,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4464,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4493,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4568,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4621,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4720,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4862,47): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5073,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5102,47): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5142,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5195,51): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5248,51): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5314,51): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5368,51): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5444,48): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5473,52): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5530,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5559,49): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5826,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5879,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(4872,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5083,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5112,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5152,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5205,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5258,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5324,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5378,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5454,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5483,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5540,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5569,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5836,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(5889,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(6070,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(6080,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(6451,36): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(6461,25): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(6555,45): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(6565,33): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(6607,37): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(6658,41): warning C4244: “函数”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(6617,25): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+L:\Working\Python-2.7.18\Python-2.7.18\Python\Python-ast.c(6668,25): warning C4244: “初始化”: 从“Py_ssize_t”转换到“int”，可能丢失数据
+  pythonrun.c
+L:\Working\Python-2.7.18\Python-2.7.18\Python\pythonrun.c(942,11): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据
+  random.c
+L:\Working\Python-2.7.18\Python-2.7.18\Python\random.c(83,42): warning C4244: “函数”: 从“Py_ssize_t”转换到“DWORD”，可能丢失数据
+  structmember.c
+  symtable.c
+  sysmodule.c
+L:\Working\Python-2.7.18\Python-2.7.18\Python\sysmodule.c(601,10): warning C4996: 'GetVersionExA': 被声明为已否决
+  thread.c
+  traceback.c
+  正在生成代码...

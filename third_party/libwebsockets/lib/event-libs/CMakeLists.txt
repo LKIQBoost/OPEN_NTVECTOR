@@ -1,0 +1,170 @@
+#
+# libwebsockets - small server side websockets and web server implementation
+#
+# Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+# IN THE SOFTWARE.
+#
+
+include_directories(.)
+
+macro(create_evlib_plugin PLUGIN_NAME MAIN_SRC PLUGIN_HDR EVLIB)
+
+	set(PLUGIN_SRCS ${MAIN_SRC})
+
+	source_group("Headers Private"   FILES ${PLUGIN_HDR})
+	source_group("Sources"   FILES ${MAIN_SRC})
+	add_library(websockets-${PLUGIN_NAME} SHARED ${MAIN_SRC} ${PLUGIN_HDR})
+	if (LWS_HAVE_VISIBILITY)
+		set_target_properties(websockets-${PLUGIN_NAME} PROPERTIES
+			C_VISIBILITY_PRESET default)
+	endif()
+
+	if (APPLE)
+		set_property(TARGET websockets-${PLUGIN_NAME} PROPERTY MACOSX_RPATH YES)
+	endif()
+
+
+	set(STRIPPED_EVLIB "")
+	foreach(lib_path ${EVLIB})
+		if(IS_ABSOLUTE "${lib_path}" AND NOT "${lib_path}" MATCHES "^-")
+			if (APPLE)
+				list(APPEND STRIPPED_EVLIB "${lib_path}")
+			else()
+				get_filename_component(lib_name "${lib_path}" NAME)
+				string(REGEX REPLACE "^lib" "" lib_name "${lib_name}")
+				string(REGEX REPLACE "\\.so.*$" "" lib_name "${lib_name}")
+				string(REGEX REPLACE "\\.dylib.*$" "" lib_name "${lib_name}")
+				string(REGEX REPLACE "\\.a$" "" lib_name "${lib_name}")
+				list(APPEND STRIPPED_EVLIB "-l${lib_name}")
+				get_filename_component(lib_dir "${lib_path}" DIRECTORY)
+				target_link_directories(websockets-${PLUGIN_NAME} PRIVATE "${lib_dir}")
+			endif()
+		else()
+			list(APPEND STRIPPED_EVLIB "${lib_path}")
+		endif()
+	endforeach()
+
+	target_link_libraries(websockets-${PLUGIN_NAME} websockets_shared ${STRIPPED_EVLIB})
+	add_dependencies(websockets-${PLUGIN_NAME} websockets_shared)
+	target_compile_definitions(websockets-${PLUGIN_NAME} PRIVATE ${LWS_BUILDING_SHARED})
+
+	target_include_directories(websockets-${PLUGIN_NAME} PRIVATE
+			${PLUGIN_INCLUDE} ${LWS_LIB_BUILD_INC_PATHS}
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../core"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/http"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/h1"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/h2"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/http/compression"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/ws"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/cgi"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/listen"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/dbus"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/mqtt"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/raw-skt"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/raw-file"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../roles/raw-proxy"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../core-net"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../tls"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../system/smd"
+			"${CMAKE_CURRENT_SOURCE_DIR}/../../system/metrics")
+
+
+
+	if (UNIX)
+		target_include_directories(websockets-${PLUGIN_NAME} PRIVATE
+					"${CMAKE_CURRENT_SOURCE_DIR}/../../plat/unix")
+	endif()
+	if (WINDOWS)
+		target_include_directories(websockets-${PLUGIN_NAME} PRIVATE
+					"${CMAKE_CURRENT_SOURCE_DIR}/../../plat/windows")
+	endif()
+
+
+
+	# Set test app specific defines.
+	#	set_property(TARGET ${PLUGIN_NAME}
+	#	     PROPERTY COMPILE_DEFINITIONS
+	#	     INSTALL_DATADIR="${CMAKE_INSTALL_PREFIX}/evlib-plugins"
+	#)
+
+	set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+	install(TARGETS websockets-${PLUGIN_NAME}
+		EXPORT LibwebsocketsTargets
+		LIBRARY DESTINATION "${LWS_INSTALL_LIB_DIR}"
+		COMPONENT ${PLUGIN_NAME})
+		
+	list(APPEND EVLIB_PLUGINS_LIST websockets-${PLUGIN_NAME})
+
+endmacro()
+
+#
+# poll support gets built into the lib as the default
+#
+
+if (LWS_WITH_POLL)
+	add_subdir_include_directories_local(poll)
+endif()
+
+if (LWS_WITH_NETWORK AND (LWS_WITH_LIBUV OR LWS_WITH_LIBUV_INTERNAL))
+	list(APPEND _CMAKE_INC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/../core")
+	add_subdir_include_directories_local(libuv)
+	set(LWS_HAVE_UV_VERSION_H ${LWS_HAVE_UV_VERSION_H} PARENT_SCOPE)
+	set(LWS_HAVE_NEW_UV_VERSION_H ${LWS_HAVE_NEW_UV_VERSION_H} PARENT_SCOPE)
+endif()
+
+if (LWS_WITH_NETWORK AND LWS_WITH_LIBEVENT)
+	add_subdir_include_directories_local(libevent)
+endif()
+
+if (LWS_WITH_NETWORK AND LWS_WITH_GLIB)
+	add_subdir_include_directories_local(glib)
+endif()
+
+if (LWS_WITH_NETWORK AND LWS_WITH_LIBEV)
+	add_subdir_include_directories_local(libev)
+	set(LWS_HAVE_EVBACKEND_LINUXAIO ${LWS_HAVE_EVBACKEND_LINUXAIO} PARENT_SCOPE)
+	set(LWS_HAVE_EVBACKEND_IOURING ${LWS_HAVE_EVBACKEND_IOURING} PARENT_SCOPE)
+endif()
+
+if (LWS_WITH_NETWORK AND LWS_WITH_SDEVENT)
+	add_subdir_include_directories_local(sdevent)
+endif()
+
+if (LWS_WITH_NETWORK AND LWS_WITH_ULOOP)
+	add_subdir_include_directories_local(uloop)
+endif()
+
+add_subdir_include_directories_local_end()
+
+#
+# Keep explicit parent scope exports at end
+#
+
+export_to_parent_intermediate()
+if (LIBUV_INCLUDE_DIRS)
+	set(LWS_PUBLIC_INCLUDES ${LWS_PUBLIC_INCLUDES} "${LIBUV_INCLUDE_DIRS}")
+endif()
+if (LWS_PUBLIC_INCLUDES)
+	set(LWS_PUBLIC_INCLUDES ${LWS_PUBLIC_INCLUDES} PARENT_SCOPE)
+endif()
+set(EVLIB_PLUGINS_LIST ${EVLIB_PLUGINS_LIST} PARENT_SCOPE)
+

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNSSEC Monitor</title>
+    <!-- Strict CSP prevents inline styles, and using external font CDNs without explicit whitelist, so we use system fonts -->
+    <link rel="stylesheet" href="monitor.css?v=3">
+    <script src="lws-login.js"></script>
+</head>
+<body>
+    <div id="reconnect-overlay" class="reconnect-overlay">
+        <div class="reconnect-box">
+            <div class="spinner"></div>
+            <h2>Reconnecting...</h2>
+            <p>Connection to DNSSEC Monitor lost.</p>
+        </div>
+    </div>
+    <div class="app-container">
+        <header>
+            <div class="header-content">
+                <h1>DNSSEC Monitor</h1>
+            </div>
+            <div class="header-status">
+                <div id="user-info" class="user-info"></div>
+                <div id="extip-status" class="extip-container"></div>
+                <div class="extip-override-box">
+                    <label for="input-ipv6-suffix" class="extip-label">IPv6 Suffix:</label>
+                    <input type="text" id="input-ipv6-suffix" placeholder="" class="extip-input" maxlength="4">
+                    <button id="btn-save-suffix" class="btn secondary btn-extip">Apply</button>
+                </div>
+                <span id="ws-status" class="status-badge connecting hide"></span>
+            </div>
+        </header>
+
+        <main>
+            <div class="tabs-header">
+                <button id="tab-btn-domains" class="tab-link active" data-tab="tab-domains">Domains</button>
+                <button id="tab-btn-tls" class="tab-link" data-tab="tab-tls">TLS</button>
+                <button id="tab-btn-acme" class="tab-link" data-tab="tab-acme">Global Settings</button>
+                <button id="tab-btn-dist" class="tab-link" data-tab="tab-dist">Distribution</button>
+            </div>
+
+            <div id="tab-domains" class="tab-content active">
+                <section class="panel domain-panel" id="domain-panel">
+                    <div class="panel-header">
+                        <h2>Domains</h2>
+                        <button id="btn-add-domain" class="btn primary">Add Domain</button>
+                    </div>
+                <div class="table-container">
+                    <table id="table-domains">
+                        <thead>
+                            <tr>
+                                <th>Domain Name</th>
+                                <th>Expiry</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="3" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="panel detail-panel hidden-panel" id="detail-panel">
+                <div class="panel-header">
+                    <div class="title-group"><table><tr><td>
+                        <button id="btn-back-domains" class="btn secondary">&larr; Back</button>
+			</td></tr><tr><td>
+                        <h2 id="detail-title"><span>---</span></h2>
+			</td></tr></table>
+                    </div>
+                    <div id="whois-header" class="whois-header"></div>
+                    <div class="actions-group">
+                        <table id="actions-table" class="actions-table">
+                            <tr><td class="actions-cell"><div id="dnssec-status"></div></td></tr>
+                            <tr><td class="actions-cell"><button id="btn-save-zonefile" class="btn primary" disabled>Save<br>Zonefile</button></td></tr>
+                            <tr><td class="actions-cell">
+                                <label class="domain-acme-label" title="Enable Let's Encrypt automated certificate fetching for this domain">
+                                    <input type="checkbox" id="cb-domain-acme-enable"> ACME Enabled
+                                </label>
+                            </td></tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="ext-raw-editor raw-editor-container">
+                    <div id="raw-zone-backdrop" aria-hidden="true"></div>
+                    <textarea id="raw-zone-editor" spellcheck="false" placeholder="; Raw zone file contents..."></textarea>
+                </div>
+
+
+                <div class="table-container">
+                    <table id="table-zone">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>TTL</th>
+                                <th>Type</th>
+                                <th>Value</th>
+                                <th>TLS Port</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Populated dynamically -->
+                            <tr><td colspan="5" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                    <button id="btn-add-record" class="btn secondary ext-add-record">+ Add Record</button>
+                </div>
+
+                <div id="record-editor" class="hidden-panel ext-editor">
+                    <h3 id="editor-title" class="ext-title">Edit Record</h3>
+                    <div id="editor-form" class="ext-form-box"></div>
+                    <div class="ext-actions">
+                        <button id="btn-cancel-edit" class="btn hollow">Discard</button>
+                        <button id="btn-apply-record" class="btn primary">Apply Changes</button>
+                    </div>
+                </div>
+            </section>
+            </div>
+
+            <div id="tab-tls" class="tab-content">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Cross-Domain TLS Certificates</h2>
+                    </div>
+                    <div class="table-container table-responsive">
+                        <table id="table-all-tls" class="table-striped table-bordered table-nowrap">
+                            <thead>
+                                <tr>
+                                    <th>FQDN:Port</th>
+                                    <th>Local Expiry</th>
+                                    <th>Remote Expiry</th>
+                                    <th>Issuer</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="5" class="loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-acme" class="tab-content">
+                <div class="panel">
+                    <div class="acme-global-config">
+                        <h2>Global Settings</h2>
+                        <div class="acme-form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="cb-acme-enable"> Enable Let's Encrypt Certificate Fetching
+                            </label>
+                        </div>
+                        <div class="acme-form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="cb-acme-prod"> Use Production Let's Encrypt CA
+                            </label>
+                        </div>
+                        <div class="acme-form-inputs">
+                            <div class="form-group">
+                                <label for="acme-email">Email</label>
+                                <input type="email" id="acme-email" placeholder="admin@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="acme-org">Organization</label>
+                                <input type="text" id="acme-org" placeholder="My Company">
+                            </div>
+                            <div class="form-group">
+                                <label for="acme-country">Country (2 letters)</label>
+                                <input type="text" id="acme-country" placeholder="UK" maxlength="2">
+                            </div>
+                            <div class="form-group">
+                                <label for="acme-state">State / Province</label>
+                                <input type="text" id="acme-state" placeholder="Cambs">
+                            </div>
+                            <div class="form-group">
+                                <label for="acme-locality">Locality / City</label>
+                                <input type="text" id="acme-locality" placeholder="Cambridge">
+                            </div>
+                            <div class="form-group">
+                                <label for="acme-profile">Certificate Profile</label>
+                                <select id="acme-profile" class="ext-select">
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="acme-sign-validity">Signature Validity (Days)</label>
+                                <input type="number" id="acme-sign-validity" min="1" max="365" placeholder="21">
+                            </div>
+                        </div>
+                        <div class="acme-actions">
+                            <button id="btn-acme-save" class="btn primary">Save Global Settings</button>
+                        </div>
+                        <div class="acme-log-container">
+                            <label>Recent ACME Log</label>
+                            <textarea id="acme-log" readonly rows="8"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-dist" class="tab-content">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Distribution PKI Management</h2>
+                    </div>
+                    <div class="dist-pki-row">
+                        <div class="dist-pki-section">
+                            <h3>Distribution Root CA</h3>
+                            <p class="help-text">The root CA used to sign client and server certificates for the distribution service.</p>
+                            <button id="btn-dist-download-ca" class="btn primary">Download CA Public Cert</button>
+                        </div>
+                        <div class="dist-pki-section">
+                            <h3>Reset Distribution PKI</h3>
+                            <p class="help-text">In case of a security leak, securely wipe and regenerate the entire Distribution PKI.</p>
+                            <button id="btn-dist-reset" class="btn primary btn-replace-danger">Wipe and Regenerate PKI</button>
+                        </div>
+                        <div class="dist-pki-section">
+                            <h3>Distribution Server Certificate</h3>
+                            <p class="help-text">The TLS certificate and private key used by the distribution server.</p>
+                            <div class="input-group mb-10">
+                                <input type="text" id="dist-server-domain" placeholder="e.g., dist.example.com" class="form-input">
+                            </div>
+                            <button id="btn-dist-download-server" class="btn primary">Download Server Cert + Key</button>
+                        </div>
+                    </div>
+                    <div class="dist-pki-section">
+                        <h3>Client Certificates</h3>
+                        <p class="help-text">Generate and download client certificates for your provisioned TLS endpoints.</p>
+                        <div class="table-container">
+                            <table id="table-dist-clients">
+                                <thead>
+                                    <tr>
+                                        <th>Domain</th>
+                                        <th>Endpoint</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="3" class="loading">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Modals for legacy TLS endpoints remain here hidden/inactive -->
+
+    <div id="modal-new-domain" class="modal">
+        <div class="modal-content">
+            <h3>Add New Domain</h3>
+            <div class="form-group">
+                <label for="input-new-domain">Domain Name</label>
+                <input type="text" id="input-new-domain" placeholder="example.com">
+            </div>
+            <div class="modal-actions">
+                <button id="btn-nd-cancel" class="btn hollow">Cancel</button>
+                <button id="btn-nd-save" class="btn primary" disabled>Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-regen-keys" class="modal">
+        <div class="modal-content">
+            <h3>Replace DNSSEC Keys</h3>
+            <div class="form-group">
+                <label for="select-regen-key-type">Cryptographic Suite</label>
+                <select id="select-regen-key-type" class="ext-select">
+                    <option value="ES256" selected>ES256 (ECDSA P-256)</option>
+                    <option value="ES384">ES384 (ECDSA P-384)</option>
+                    <option value="R1024">R1024 (RSA 1024-bit)</option>
+                    <option value="R2048">R2048 (RSA 2048-bit)</option>
+                </select>
+                <div class="modal-warning-text">Warning: Selecting Replace will permanently overwrite your existing private keys and force a zone resign.</div>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-regen-cancel" class="btn hollow">Cancel</button>
+                <button id="btn-regen-replace" class="btn primary btn-replace-danger">Replace</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-dnssec-info" class="modal">
+        <div class="modal-content modal-content-medium">
+            <h3>Registrar DNSSEC Info</h3>
+            <p class="modal-help-text">Copy this information to your domain registrar's DNSSEC configuration panel.</p>
+            <div class="form-group">
+                <textarea id="textarea-dnssec-info" rows="5" readonly class="dnssec-info-textarea"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-dnssec-info-close" class="btn hollow">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script src="monitor.js?v=15"></script>
+</body>
+</html>

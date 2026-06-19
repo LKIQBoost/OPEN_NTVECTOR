@@ -1,0 +1,343 @@
+/*
+ * libwebsockets - small server side websockets and web server implementation
+ *
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
+#ifndef __LWS_GENHASH_H__
+#define __LWS_GENHASH_H__
+
+/*! \defgroup generichash Generic Hash
+ * ## Generic Hash related functions
+ *
+ * Lws provides generic hash / digest accessors that abstract the ones
+ * provided by whatever tls library you are linking against.
+ *
+ * It lets you use the same code if you build against mbedtls or OpenSSL
+ * for example.
+ */
+///@{
+
+#if defined(LWS_WITH_AWSLC) || defined(LWS_WITH_BORINGSSL)
+#include <openssl/hmac.h>
+#endif
+
+#if defined(LWS_HAVE_MBEDTLS_V4)
+#include <psa/crypto.h>
+#endif
+
+#if defined(LWS_WITH_OPENHITLS)
+#include <crypt_eal_md.h>
+#include <crypt_eal_mac.h>
+#endif
+
+
+enum lws_genhash_types {
+	LWS_GENHASH_TYPE_UNKNOWN,
+	LWS_GENHASH_TYPE_MD5,
+	LWS_GENHASH_TYPE_SHA1,
+	LWS_GENHASH_TYPE_SHA256,
+	LWS_GENHASH_TYPE_SHA384,
+	LWS_GENHASH_TYPE_SHA512,
+};
+
+enum lws_genhmac_types {
+	LWS_GENHMAC_TYPE_UNKNOWN,
+	LWS_GENHMAC_TYPE_SHA1,
+	LWS_GENHMAC_TYPE_SHA256,
+	LWS_GENHMAC_TYPE_SHA384,
+	LWS_GENHMAC_TYPE_SHA512,
+};
+
+#define LWS_GENHASH_LARGEST 64
+
+#if defined(LWS_WITH_TLS) && defined(LWS_WITH_GENCRYPTO)
+
+struct lws_genhash_ctx {
+        uint8_t type;
+#if defined(LWS_WITH_MBEDTLS)
+#if defined(LWS_HAVE_MBEDTLS_V4)
+	psa_hash_operation_t hash_ctx;
+#else
+        union {
+		mbedtls_md5_context md5;
+        	mbedtls_sha1_context sha1;
+		mbedtls_sha256_context sha256;
+		mbedtls_sha512_context sha512; /* 384 also uses this */
+		const mbedtls_md_info_t *hmac;
+        } u;
+#endif
+#elif defined(LWS_WITH_SCHANNEL)
+	struct {
+		void *hAlg;
+		void *hHash;
+	} u;
+#elif defined(LWS_WITH_GNUTLS)
+	union {
+		void *hash; /* gnutls_hash_hd_t */
+	} u;
+#elif defined(LWS_WITH_BEARSSL)
+	union {
+		br_md5_context md5;
+		br_sha1_context sha1;
+		br_sha256_context sha256;
+		br_sha384_context sha384;
+		br_sha512_context sha512;
+	} u;
+#elif defined(LWS_WITH_OPENHITLS)
+	CRYPT_EAL_MdCTX *ctx;
+#else
+        const EVP_MD *evp_type;
+        EVP_MD_CTX *mdctx;
+#endif
+};
+
+struct lws_genhmac_ctx {
+        uint8_t type;
+#if defined(LWS_WITH_MBEDTLS)
+#if defined(LWS_HAVE_MBEDTLS_V4)
+	psa_mac_operation_t mac_ctx;
+	psa_key_id_t key_id;
+#else
+	const mbedtls_md_info_t *hmac;
+	mbedtls_md_context_t ctx;
+#endif
+#elif defined(LWS_WITH_SCHANNEL)
+	struct {
+		void *hAlg;
+		void *hHash;
+	} u;
+#elif defined(LWS_WITH_GNUTLS)
+	union {
+		void *hash; /* gnutls_hash_hd_t */
+	} u;
+#elif defined(LWS_WITH_BEARSSL)
+	br_hmac_key_context hmac_key;
+	br_hmac_context ctx;
+#elif defined(LWS_WITH_OPENHITLS)
+	CRYPT_EAL_MacCtx *ctx;
+#else
+	const EVP_MD *evp_type;
+
+#if defined(LWS_HAVE_EVP_PKEY_new_raw_private_key) && !defined(LWS_WITH_BORINGSSL) && !defined(LWS_WITH_AWSLC)
+	EVP_MD_CTX *ctx;
+	EVP_PKEY *key;
+#else
+#if defined(LWS_HAVE_HMAC_CTX_new) || defined(LWS_WITH_BORINGSSL) || defined(LWS_WITH_AWSLC)
+        HMAC_CTX *ctx;
+#else
+        HMAC_CTX ctx;
+#endif
+#endif
+
+#endif
+};
+
+/** lws_genhash_size() - get hash size in bytes
+ *
+ * \param type:	one of LWS_GENHASH_TYPE_...
+ *
+ * Returns number of bytes in this type of hash, if the hash type is unknown, it
+ * will return 0.
+ */
+LWS_VISIBLE LWS_EXTERN size_t LWS_WARN_UNUSED_RESULT
+lws_genhash_size(enum lws_genhash_types type);
+
+/** lws_genhmac_size() - get hash size in bytes
+ *
+ * \param type:	one of LWS_GENHASH_TYPE_...
+ *
+ * Returns number of bytes in this type of hmac, if the hmac type is unknown, it
+ * will return 0.
+ */
+LWS_VISIBLE LWS_EXTERN size_t LWS_WARN_UNUSED_RESULT
+lws_genhmac_size(enum lws_genhmac_types type);
+
+/** lws_genhash_init() - prepare your struct lws_genhash_ctx for use
+ *
+ * \param ctx: your struct lws_genhash_ctx
+ * \param type:	one of LWS_GENHASH_TYPE_...
+ *
+ * Initializes the hash context for the type you requested
+ */
+LWS_VISIBLE LWS_EXTERN int LWS_WARN_UNUSED_RESULT
+lws_genhash_init(struct lws_genhash_ctx *ctx, enum lws_genhash_types type);
+
+/** lws_genhash_update() - digest len bytes of the buffer starting at in
+ *
+ * \param ctx: your struct lws_genhash_ctx
+ * \param in: start of the bytes to digest
+ * \param len: count of bytes to digest
+ *
+ * Updates the state of your hash context to reflect digesting len bytes from in
+ */
+LWS_VISIBLE LWS_EXTERN int LWS_WARN_UNUSED_RESULT
+lws_genhash_update(struct lws_genhash_ctx *ctx, const void *in, size_t len);
+
+/** lws_genhash_destroy() - copy out the result digest and destroy the ctx
+ *
+ * \param ctx: your struct lws_genhash_ctx
+ * \param result: NULL, or where to copy the result hash
+ *
+ * Finalizes the hash and copies out the digest.  Destroys any allocations such
+ * that ctx can safely go out of scope after calling this.
+ *
+ * NULL result is supported so that you can destroy the ctx cleanly on error
+ * conditions, where there is no valid result.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_genhash_destroy(struct lws_genhash_ctx *ctx, void *result);
+
+/**
+ * lws_genhash_render() - render a hash into a hex string
+ *
+ * \param type: one of LWS_GENHASH_TYPE_...
+ * \param hash: pointer to the binary hash
+ * \param out: buffer to receive the hex string
+ * \param out_len: length of the out buffer
+ *
+ * Renders the binary hash into a hex string in the out buffer. If the buffer
+ * is too small, it will truncate with an ellipsis '...' and ensure NUL
+ * termination.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_genhash_render(enum lws_genhash_types type, const uint8_t *hash, char *out, size_t out_len);
+
+/**
+ * lws_genhash_render_prefixed() - render a hash into a hex string with type prefix
+ *
+ * \param type: one of LWS_GENHASH_TYPE_...
+ * \param hash: pointer to the binary hash
+ * \param out: buffer to receive the hex string
+ * \param out_len: length of the out buffer
+ *
+ * Renders the binary hash into a hex string in the out buffer, prepending
+ * the hash type (e.g., "SHA256:hex...").
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_genhash_render_prefixed(enum lws_genhash_types type, const uint8_t *hash, char *out, size_t out_len);
+
+/** lws_genhmac_init() - prepare your struct lws_genhmac_ctx for use
+ *
+ * \param ctx: your struct lws_genhmac_ctx
+ * \param type:	one of LWS_GENHMAC_TYPE_...
+ * \param key: pointer to the start of the HMAC key
+ * \param key_len: length of the HMAC key
+ *
+ * Initializes the hash context for the type you requested
+ *
+ * If the return is nonzero, it failed and there is nothing needing to be
+ * destroyed.
+ */
+LWS_VISIBLE LWS_EXTERN int LWS_WARN_UNUSED_RESULT
+lws_genhmac_init(struct lws_genhmac_ctx *ctx, enum lws_genhmac_types type,
+		 const uint8_t *key, size_t key_len);
+
+/** lws_genhmac_update() - digest len bytes of the buffer starting at in
+ *
+ * \param ctx: your struct lws_genhmac_ctx
+ * \param in: start of the bytes to digest
+ * \param len: count of bytes to digest
+ *
+ * Updates the state of your hash context to reflect digesting len bytes from in
+ *
+ * If the return is nonzero, it failed and needs destroying.
+ */
+LWS_VISIBLE LWS_EXTERN int LWS_WARN_UNUSED_RESULT
+lws_genhmac_update(struct lws_genhmac_ctx *ctx, const void *in, size_t len);
+
+/** lws_genhmac_destroy() - copy out the result digest and destroy the ctx
+ *
+ * \param ctx: your struct lws_genhmac_ctx
+ * \param result: NULL, or where to copy the result hash
+ *
+ * Finalizes the hash and copies out the digest.  Destroys any allocations such
+ * that ctx can safely go out of scope after calling this.
+ *
+ * NULL result is supported so that you can destroy the ctx cleanly on error
+ * conditions, where there is no valid result.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_genhmac_destroy(struct lws_genhmac_ctx *ctx, void *result);
+
+/**
+ * lws_genhkdf_extract() - HKDF-Extract (RFC 5869)
+ *
+ * \param type: one of LWS_GENHMAC_TYPE_...
+ * \param salt: optional salt (can be NULL)
+ * \param salt_len: length of salt
+ * \param ikm: Input Keying Material
+ * \param ikm_len: length of ikm
+ * \param prk: Buffer to receive the Pseudorandom Key (must be at least hash length)
+ *
+ * Extracts a fixed-length PRK from the input keying material.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_genhkdf_extract(enum lws_genhmac_types type, const uint8_t *salt,
+                    size_t salt_len, const uint8_t *ikm, size_t ikm_len,
+                    uint8_t *prk);
+
+/**
+ * lws_genhkdf_expand() - HKDF-Expand (RFC 5869)
+ *
+ * \param type: one of LWS_GENHMAC_TYPE_...
+ * \param prk: Pseudorandom Key (from HKDF-Extract)
+ * \param prk_len: length of prk (usually hash length)
+ * \param info: optional Context/Application specific info (can be NULL)
+ * \param info_len: length of info
+ * \param okm: Buffer to receive Output Keying Material
+ * \param okm_len: Length of okm requested
+ *
+ * Expands the PRK into the requested length of output keying material.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_genhkdf_expand(enum lws_genhmac_types type, const uint8_t *prk,
+                   size_t prk_len, const uint8_t *info, size_t info_len,
+                   uint8_t *okm, size_t okm_len);
+
+/**
+ * lws_genhkdf_expand_label() - TLS 1.3 HKDF-Expand-Label (RFC 8446)
+ *
+ * \param type: one of LWS_GENHMAC_TYPE_...
+ * \param prk: Pseudorandom Key (from HKDF-Extract)
+ * \param prk_len: length of prk (usually hash length)
+ * \param label: The ascii label (e.g., "quic iv", "quic key")
+ * \param context: Optional context (can be NULL)
+ * \param context_len: length of context
+ * \param okm: Buffer to receive Output Keying Material
+ * \param okm_len: Length of okm requested
+ *
+ * This internally constructs the TLS 1.3 HkdfLabel struct:
+ *    uint16 length = okm_len;
+ *    opaque label<7..255> = "tls13 " + label;
+ *    opaque context<0..255> = context;
+ * And then automatically calls lws_genhkdf_expand() with it.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_genhkdf_expand_label(enum lws_genhmac_types type, const uint8_t *prk,
+                         size_t prk_len, const char *label,
+                         const uint8_t *context, size_t context_len,
+                         uint8_t *okm, size_t okm_len);
+
+#endif
+///@}
+
+#endif /* __LWS_GENHASH_H__ */

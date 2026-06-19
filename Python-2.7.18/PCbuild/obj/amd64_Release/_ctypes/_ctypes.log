@@ -1,0 +1,12 @@
+﻿  Killing any running python.exe instances...
+  Getting build info from git
+  fatal: not a git repository (or any of the parent directories): .git
+L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\pythoncore.vcxproj(429,5): warning MSB3073: 命令“git name-rev --name-only HEAD > "L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\obj\amd64_Release\pythoncore\gitbranch.txt"”已退出，代码为 128。
+  fatal: not a git repository (or any of the parent directories): .git
+L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\pythoncore.vcxproj(430,5): warning MSB3073: 命令“git rev-parse --short HEAD > "L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\obj\amd64_Release\pythoncore\gitversion.txt"”已退出，代码为 128。
+  fatal: not a git repository (or any of the parent directories): .git
+L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\pythoncore.vcxproj(431,5): warning MSB3073: 命令“git describe --all --always --dirty > "L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\obj\amd64_Release\pythoncore\gittag.txt"”已退出，代码为 128。
+  Building : 
+L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\pythoncore.vcxproj(445,5): warning : Toolset v143 is not used for official builds. Your build may have errors or incompatibilities.
+  callbacks.c
+  _ctypes.vcxproj -> L:\Working\Python-2.7.18\Python-2.7.18\PCBuild\amd64\_ctypes.lib

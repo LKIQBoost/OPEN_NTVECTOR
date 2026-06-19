@@ -1,0 +1,1728 @@
+let ws;
+let currentDomain = '';
+let currentDomainObj = null;
+let currentZone = null;
+let certCheckQueue = [];
+let certCheckTimers = {};
+let concurrentChecks = 0;
+const MAX_CONCURRENT = 5;
+
+window.activeTls = [];
+window.allTlsCache = {};
+window.certStatusCache = {};
+
+function processCertQueue() {
+    while (concurrentChecks < MAX_CONCURRENT && certCheckQueue.length > 0) {
+        let task = certCheckQueue.shift();
+        concurrentChecks++;
+        let span = document.getElementById(`cert-status-${task.fqdn}`);
+        if (span) span.innerText = 'Checking...';
+        let reqDomain = task.domain || currentDomain;
+        sendReq({ req: 'check_cert', domain: reqDomain, subdomain: task.fqdn, port: task.port });
+
+        certCheckTimers[task.fqdn] = setTimeout(() => {
+            console.log('[INSTRUMENT] TIMER FIRED for:', task.fqdn, 'port:', task.port);
+            let cacheKey = task.fqdn + ':' + task.port;
+            let prev = window.certStatusCache[cacheKey];
+            window.certStatusCache[cacheKey] = {
+                status: 'error',
+                msg: 'Connection Timeout',
+                local_msg: 'Unknown',
+                issuer: 'Unknown',
+                fqdn: task.fqdn,
+                port: task.port
+            };
+
+            let s = document.getElementById(`cert-status-${task.fqdn}`);
+            if (s) {
+                s.innerText = 'Timeout';
+                s.classList.remove('text-green', 'text-gray');
+                s.classList.add('text-red');
+            }
+            if (certCheckTimers[task.fqdn]) delete certCheckTimers[task.fqdn];
+            concurrentChecks = Math.max(0, concurrentChecks - 1);
+
+            updateGlobalTlsTable();
+            if (typeof renderDomainDetails === 'function') renderDomainDetails();
+            processCertQueue();
+        }, 20000);
+    }
+}
+
+function generateId() {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
+class ZoneFile {
+    constructor(zoneText) {
+        this.records = [];
+        this.parse(zoneText || '');
+    }
+
+    parse(text) {
+        const lines = text.split('\n');
+        let currentRecord = null;
+        let inMultiLine = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+
+            // If we are currently parsing a multi-line block (like SOA)
+            if (inMultiLine) {
+                currentRecord.raw += '\n' + line;
+                if (line.includes(')')) {
+                    inMultiLine = false;
+                    this.parseMultiRecord(currentRecord);
+                    this.records.push(currentRecord);
+                    currentRecord = null;
+                }
+                continue;
+            }
+
+            // Empty lines or purely comments
+            if (/^\s*$/.test(line) || /^\s*;/.test(line)) {
+                this.records.push({ id: generateId(), type: 'comment', raw: line, lineIndex: i });
+                continue;
+            }
+
+            // Macros like $TTL or $ORIGIN
+            if (line.startsWith('$')) {
+                this.records.push({ id: generateId(), type: 'macro', raw: line, lineIndex: i });
+                continue;
+            }
+
+            // Check for multi-line start (usually SOA)
+            if (line.includes('(')) {
+                inMultiLine = true;
+                currentRecord = { id: generateId(), type: 'SOA', raw: line, lineIndex: i };
+                if (line.includes(')')) {
+                    inMultiLine = false;
+                    this.parseMultiRecord(currentRecord);
+                    this.records.push(currentRecord);
+                    currentRecord = null;
+                }
+                continue;
+            }
+
+            // Standard one-line Resource Record
+            let rec = this.parseSingleRecord(line);
+            rec.lineIndex = i;
+            this.records.push(rec);
+        }
+
+        if (currentRecord) {
+             this.parseMultiRecord(currentRecord);
+             if (currentRecord.lineIndex === undefined) currentRecord.lineIndex = lines.length;
+             this.records.push(currentRecord);
+        }
+    }
+
+    parseMultiRecord(record) {
+        let clean = record.raw.replace(/;.*$/gm, '').replace(/[\(\)]/g, ' ').trim();
+        let tokens = clean.split(/\s+/);
+
+        let soaIdx = tokens.indexOf('SOA');
+        if (soaIdx !== -1) {
+            record.parsed = {
+                name: tokens[0],
+                ttl: soaIdx > 2 && !isNaN(tokens[1]) ? tokens[1] : '',
+                clazz: 'IN',
+                mname: tokens[soaIdx + 1] || '',
+                rname: tokens[soaIdx + 2] || '',
+                serial: tokens[soaIdx + 3] || '',
+                refresh: tokens[soaIdx + 4] || '',
+                retry: tokens[soaIdx + 5] || '',
+                expire: tokens[soaIdx + 6] || '',
+                minimum: tokens[soaIdx + 7] || ''
+            };
+        }
+    }
+
+    parseSingleRecord(line) {
+        let cIdx = -1;
+        let inQuotes = false;
+        let escape = false;
+
+        for (let i = 0; i < line.length; i++) {
+            let char = line[i];
+            if (escape) {
+                escape = false;
+            } else if (char === '\\') {
+                escape = true;
+            } else if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ';' && !inQuotes) {
+                cIdx = i;
+                break;
+            }
+        }
+
+        let text = line;
+        let comment = '';
+        if (cIdx !== -1) {
+            text = line.substring(0, cIdx);
+            comment = line.substring(cIdx);
+        }
+
+        let tokens = text.trim().split(/\s+/);
+        let name;
+
+        if (/^\s/.test(line)) {
+            name = '@';
+        } else {
+            name = tokens.shift();
+        }
+
+        let ttl = '';
+        if (/^\d+/.test(tokens[0])) {
+            ttl = tokens.shift();
+        }
+
+        let clazz = 'IN';
+        if (tokens[0] === 'IN' || tokens[0] === 'CH' || tokens[0] === 'HS') {
+            clazz = tokens.shift();
+        }
+
+        let rtype = tokens.shift() || 'UNKNOWN';
+        let value = tokens.join(' ');
+
+        return {
+            id: generateId(),
+            type: rtype,
+            raw: line,
+            parsed: { name, ttl, clazz, type: rtype, value },
+            comment
+        };
+    }
+
+    updateRecord(id, parsedData) {
+        let rec = this.records.find(r => r.id === id);
+        if (!rec) return;
+
+        if (parsedData.type === 'SOA') {
+            rec.raw = `${parsedData.name || '@'} ${parsedData.ttl ? parsedData.ttl + ' ' : ''}IN SOA ${parsedData.mname} ${parsedData.rname} (\n` +
+                      `\t\t\t\t${parsedData.serial}\n\t\t\t\t${parsedData.refresh}\n\t\t\t\t${parsedData.retry}\n\t\t\t\t${parsedData.expire}\n\t\t\t\t${parsedData.minimum} )`;
+            rec.parsed = parsedData;
+            rec.type = 'SOA';
+        } else {
+            let line = `${parsedData.name === '@' ? '@' : parsedData.name}\t${parsedData.ttl}\tIN\t${parsedData.type}\t${parsedData.value}`;
+            if (rec.comment) line += `\t${rec.comment}`;
+            rec.raw = line;
+            rec.parsed = parsedData;
+            rec.type = parsedData.type;
+        }
+    }
+
+    addRecord(parsedData) {
+        let line = '';
+        if (parsedData.type === 'SOA') {
+            line = `${parsedData.name || '@'} ${parsedData.ttl ? parsedData.ttl + ' ' : ''}IN SOA ${parsedData.mname} ${parsedData.rname} (\n` +
+                   `\t\t\t\t${parsedData.serial}\n\t\t\t\t${parsedData.refresh}\n\t\t\t\t${parsedData.retry}\n\t\t\t\t${parsedData.expire}\n\t\t\t\t${parsedData.minimum} )`;
+        } else {
+            line = `${parsedData.name === '@' ? '@' : parsedData.name}\t${parsedData.ttl}\tIN\t${parsedData.type}\t${parsedData.value}`;
+        }
+
+        this.records.push({
+            id: generateId(),
+            type: parsedData.type,
+            raw: line,
+            parsed: parsedData,
+            comment: ''
+        });
+    }
+
+    deleteRecord(id) {
+        this.records = this.records.filter(r => r.id !== id);
+    }
+
+    serialize() {
+        return this.records.map(r => r.raw).join('\n');
+    }
+}
+
+function connect() {
+    const l = window.location;
+    let wsUrl = (l.protocol === "https:" ? "wss://" : "ws://") + l.host;
+
+    ws = new WebSocket(wsUrl, "lws-dht-dnssec-monitor");
+
+    const statusBadge = document.getElementById('ws-status');
+
+    ws.onopen = function() {
+        console.log('[INSTRUMENT] WS onopen: Connection established.');
+        statusBadge.classList.add('hide'); statusBadge.classList.remove('show-inline', 'show-flex');
+        document.getElementById('reconnect-overlay').classList.add('hide'); document.getElementById('reconnect-overlay').classList.remove('show-inline', 'show-flex');
+        document.body.classList.remove('is-disconnected');
+        // The backend UDS proxy ring buffer drops overlapping packets if fired synchronously!
+        // We must sequence the API bootstrap calls.
+        console.log('[INSTRUMENT] WS onopen: Bootstrapping with get_domains...');
+        sendReq({ req: 'get_domains' });
+    };
+
+    ws.onmessage = function(msg) {
+        window.wsStreamBuffer = (window.wsStreamBuffer || '') + msg.data;
+        const parts = window.wsStreamBuffer.split('\n');
+        let testBuffer = '';
+        let successfullyParsedUpToPart = -1;
+
+        for (let i = 0; i < parts.length; i++) {
+            testBuffer += (testBuffer ? '\n' : '') + parts[i];
+            let p = testBuffer.trim();
+            if (!p) {
+                testBuffer = '';
+                successfullyParsedUpToPart = i;
+                continue;
+            }
+
+            try {
+                const data = JSON.parse(p);
+                handleResponse(data);
+                testBuffer = '';
+                successfullyParsedUpToPart = i;
+            } catch(e) {
+                // Expected when receiving fragmented JSON over UDS.
+                // The state machine will buffer and re-attempt on the next chunk.
+            }
+        }
+
+        if (successfullyParsedUpToPart === parts.length - 1) {
+            window.wsStreamBuffer = '';
+        } else {
+            window.wsStreamBuffer = parts.slice(successfullyParsedUpToPart + 1).join('\n');
+        }
+    };
+
+    ws.onclose = function() {
+        console.warn('[INSTRUMENT] WS onclose: Connection closed or bounced. Retrying in 3000ms...');
+        statusBadge.classList.remove('hide'); statusBadge.classList.add('show-inline');
+        statusBadge.textContent = 'Disconnected';
+        statusBadge.className = 'status-badge disconnected show-inline';
+        document.getElementById('reconnect-overlay').classList.remove('hide'); document.getElementById('reconnect-overlay').classList.add('show-flex');
+        document.body.classList.add('is-disconnected');
+        setTimeout(connect, 3000);
+    };
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btnDistReset = document.getElementById('btn-dist-reset');
+    if (btnDistReset) {
+        btnDistReset.addEventListener('click', () => {
+            if (confirm("Are you sure you want to completely wipe and regenerate the Distribution PKI? This action cannot be undone and will invalidate all existing certificates.")) {
+                sendReq({ req: "reset_dist_pki" });
+                showToast('Resetting Distribution PKI...');
+            }
+        });
+    }
+});
+
+function sendReq(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log('[INSTRUMENT] sendReq: Dispatching payload -> ', obj);
+        ws.send(JSON.stringify(obj));
+    } else {
+        console.log('[INSTRUMENT] sendReq: Failed because WS is not OPEN (ready state: ' + (ws ? ws.readyState : 'null') + ') -> ', obj);
+        showToast('Not connected to server', true);
+    }
+}
+
+function showToast(msg, isError = false) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast show ' + (isError ? 'error' : 'success');
+    setTimeout(() => {
+        toast.className = 'toast';
+    }, 3000);
+}
+
+function handleResponse(data) {
+    if (data.status === 'error') {
+        showToast(data.msg || 'An error occurred', true);
+        return;
+    }
+
+    switch(data.req) {
+        case 'get_ipv6_suffix':
+            window.ipv6_suffix = data.suffix || '';
+            const inSuf = document.getElementById('input-ipv6-suffix');
+            if (inSuf) inSuf.value = window.ipv6_suffix;
+            if (window.last_extip_data) handleResponse({ status:'ok', req:'extip_update', data:window.last_extip_data });
+            sendReq({ req: 'get_acme_config' });
+            break;
+        case 'set_ipv6_suffix':
+            showToast('IPv6 suffix preference saved successfully');
+            break;
+        case 'extip_update':
+            if (data.data && data.data['ext-ips']) {
+                window.last_extip_data = data.data;
+                const bdg = document.getElementById('extip-status');
+
+                // data.data['ext-ips'] is an Array of strings, handle it properly!
+                const ips = Array.isArray(data.data['ext-ips']) ? data.data['ext-ips'] : (data.data['ext-ips'] + '').split(',');
+                let content = '<table class="extip-table">';
+                ips.forEach(ip => {
+                    let type = ip.includes(':') ? 'Ext IPv6' : 'Ext IPv4';
+                    if (type === 'Ext IPv6' && window.ipv6_suffix) {
+                        let parts = ip.split(':');
+                        if (parts.length > 2) {
+                            parts.pop();
+                            ip = parts.join(':') + ':' + window.ipv6_suffix;
+                        }
+                    }
+                    content += `<tr><td>${type}:</td><td><b>${ip}</b></td></tr>`;
+                });
+                content += '</table>';
+                bdg.classList.remove('hide'); bdg.classList.add('show-inline');
+                bdg.innerHTML = content;
+                if (typeof window.updateRawEditorSubstitutions === 'function') {
+                    window.updateRawEditorSubstitutions();
+                }
+            }
+            break;
+        case 'get_domains':
+            console.log('[DEBUG] get_domains response received. data.domains:', data.domains);
+            window.domainsCache = data.domains || [];
+            console.log('[DEBUG] Calling renderDomains with cache length:', window.domainsCache.length);
+            renderDomains(window.domainsCache);
+            setTimeout(() => {
+                sendReq({ req: 'get_all_tls' });
+            }, 50);
+
+            setTimeout(() => {
+                sendReq({ req: 'get_dist_server_domain' });
+            }, 100);
+
+            let didSelect = false;
+            // Restore saved domain state if possible
+            if (!currentDomain) {
+                const saved = localStorage.getItem('lws-dnssec-monitor-selected-domain');
+                console.log('[DEBUG] No currentDomain. Found saved domain in localStorage:', saved);
+                if (saved && window.domainsCache.find(d => d.name === saved)) {
+                    console.log('[DEBUG] Restoring saved domain state:', saved);
+                    setTimeout(() => selectDomain(saved), 150);
+                    didSelect = true;
+                } else if (saved) {
+                    console.warn('[DEBUG] Saved domain not found in domainsCache:', saved);
+                }
+            } else {
+                console.log('[DEBUG] currentDomain is already set:', currentDomain);
+            }
+
+            if (currentDomain) {
+                const domObj = window.domainsCache.find(d => d.name === currentDomain);
+                if (domObj) {
+                    currentDomainObj = domObj;
+                    renderWhoisHeader();
+                }
+            }
+            // Bootstrap phase 2: now safe to fetch suffix config
+            if (!didSelect) {
+                window.didBootstrapPhase2 = true;
+                setTimeout(() => sendReq({ req: 'get_ipv6_suffix' }), 150);
+            }
+            break;
+        case 'create_domain':
+            closeModal('modal-new-domain');
+            showToast('Domain created successfully');
+            sendReq({ req: 'get_domains' });
+            break;
+        case 'delete_domain':
+            showToast('Domain deleted');
+            closeDetail();
+            sendReq({ req: 'get_domains' });
+            break;
+        case 'regen_keys':
+            if (data.status === 'ok') {
+                showToast('Keys regenerated and zone resign forced');
+                sendReq({ req: 'get_domains' });
+            } else {
+                showPopup('Error: ' + (data.msg || 'Action failed'), true);
+            }
+            break;
+        case 'get_zone':
+            console.log('[DEBUG] get_zone response received for zone length:', data.zone ? data.zone.length : 0);
+            currentZone = new ZoneFile(data.zone || '');
+            console.log('[DEBUG] Parsed ZoneFile records:', currentZone.records.length);
+            renderZoneTable();
+            updateRawEditor();
+            document.getElementById('record-editor')?.classList.add('hidden-panel');
+            // Sequence getting TLS after getting Zone to avoid UDS packet drops
+            console.log('[DEBUG] Dispatching get_tls for domain:', currentDomain);
+            sendReq({ req: 'get_tls', domain: currentDomain });
+            document.getElementById('btn-save-zonefile').disabled = true;
+            break;
+        case 'update_zone':
+            showToast('Zonefile updated successfully');
+            document.getElementById('btn-save-zonefile').disabled = true;
+            break;
+        case 'get_acme_config':
+            if (data.config) {
+                document.getElementById('cb-acme-enable').checked = data.config.enabled || false;
+                document.getElementById('cb-acme-prod').checked = data.config.production || false;
+                document.getElementById('acme-email').value = data.config.email || '';
+                document.getElementById('acme-org').value = data.config.organization || '';
+                document.getElementById('acme-country').value = data.config.country || '';
+                document.getElementById('acme-state').value = data.config.state || '';
+                document.getElementById('acme-locality').value = data.config.locality || '';
+                if (document.getElementById('acme-sign-validity')) {
+                    document.getElementById('acme-sign-validity').value = data.config.sign_validity_days || 21;
+                }
+                if (document.getElementById('acme-profile')) {
+                    document.getElementById('acme-profile').value = data.config.profile || '';
+                    window.currentAcmeProfile = data.config.profile || '';
+                }
+            }
+            sendReq({ req: 'get_acme_profiles' });
+            sendReq({ req: 'get_acme_log' });
+            break;
+        case 'get_acme_profiles':
+            if (data.profiles && typeof data.profiles === 'object') {
+                let select = document.getElementById('acme-profile');
+                if (select) {
+                    let currentValue = window.currentAcmeProfile || select.value || '';
+                    select.innerHTML = '';
+                    for (let p in data.profiles) {
+                        let opt = document.createElement('option');
+                        opt.value = p;
+                        opt.textContent = p.charAt(0).toUpperCase() + p.slice(1) + ' (' + p + ')';
+                        select.appendChild(opt);
+                    }
+                    if (currentValue && data.profiles[currentValue]) {
+                        select.value = currentValue;
+                    }
+                    select.onchange = function() {
+                        window.currentAcmeProfile = this.value;
+                    };
+                }
+            }
+            break;
+        case 'set_acme_config':
+            showToast('ACME configuration saved');
+            break;
+        case 'set_domain_acme':
+            showToast('Domain ACME preference saved');
+            break;
+        case 'get_acme_log':
+            if (data.log) {
+                const logEl = document.getElementById('acme-log');
+                if (logEl) {
+                    logEl.value = data.log;
+                    logEl.scrollTop = logEl.scrollHeight;
+                }
+            }
+            break;
+        case 'get_tls':
+            console.log('[DEBUG] get_tls response received. data.domain:', data.domain, 'data.tls:', data.tls);
+            if (data.tls) {
+                if (data.domain === currentDomain) window.activeTls = data.tls;
+                window.allTlsCache[data.domain || currentDomain] = data.tls;
+
+                // Enqueue background cert checks for all these endpoints
+                data.tls.forEach(t => {
+                    let cacheKey = t.fqdn + ':' + t.port;
+                    if (!window.certStatusCache[cacheKey] && !certCheckTimers[t.fqdn] && !certCheckQueue.some(q => q.fqdn === t.fqdn && q.port === t.port)) {
+                        certCheckQueue.push({fqdn: t.fqdn, port: t.port, domain: data.domain});
+                    }
+                });
+            } else {
+                if (data.domain === currentDomain) window.activeTls = [];
+                window.allTlsCache[data.domain || currentDomain] = [];
+            }
+            console.log('[DEBUG] activeTls set. Length:', window.activeTls.length);
+            if (currentZone && data.domain === currentDomain) {
+                console.log('[DEBUG] Calling renderZoneTable from get_tls');
+                renderZoneTable();
+            } else if (data.domain === currentDomain) {
+                console.log('[DEBUG] No currentZone available in get_tls');
+            }
+            processCertQueue();
+
+            updateGlobalTlsTable();
+            updateDistClientsTable();
+
+            if (!window.didBootstrapPhase2) {
+                window.didBootstrapPhase2 = true;
+                sendReq({ req: 'get_ipv6_suffix' });
+            }
+            break;
+        case 'get_all_tls':
+            if (data.all_tls) {
+                data.all_tls.forEach(d => {
+                    window.allTlsCache[d.domain] = d.tls;
+                    if (d.domain === currentDomain) window.activeTls = d.tls;
+                    d.tls.forEach(t => {
+                        let cacheKey = t.fqdn + ':' + t.port;
+                        if (!window.certStatusCache[cacheKey] && !certCheckTimers[t.fqdn] && !certCheckQueue.some(q => q.fqdn === t.fqdn && q.port === t.port)) {
+                            certCheckQueue.push({fqdn: t.fqdn, port: t.port, domain: d.domain});
+                        }
+                    });
+                });
+            }
+            if (currentZone) {
+                renderZoneTable();
+            }
+            processCertQueue();
+            updateGlobalTlsTable();
+            updateDistClientsTable();
+            break;
+        case 'get_dist_server_domain':
+            if (data.status === 'ok' && data.domain) {
+                const domainInput = document.getElementById('dist-server-domain');
+                if (domainInput && !domainInput.value) {
+                    domainInput.value = data.domain;
+                }
+            }
+            break;
+        case 'create_tls':
+            showToast('TLS Port mapped successfully');
+            sendReq({ req: 'get_tls', domain: currentDomain });
+            break;
+        case 'delete_tls':
+            showToast('TLS Port mapping removed');
+            sendReq({ req: 'get_tls', domain: currentDomain });
+            break;
+        case 'cert_status':
+            console.log('[INSTRUMENT] cert_status RECEIVED for:', data.subdomain, data.port, 'status:', data.status, 'msg:', data.msg);
+            window.certStatusCache[data.subdomain + ':' + data.port] = data;
+            let span = document.getElementById(`cert-status-${data.subdomain}`);
+            if (certCheckTimers[data.subdomain]) {
+                console.log('[INSTRUMENT] CLEARING timer for:', data.subdomain);
+                clearTimeout(certCheckTimers[data.subdomain]);
+                delete certCheckTimers[data.subdomain];
+                concurrentChecks = Math.max(0, concurrentChecks - 1);
+            } else {
+                console.log('[INSTRUMENT] NO TIMER FOUND to clear for:', data.subdomain);
+            }
+            if (span) {
+                if (data.status === 'ok') {
+                    span.innerText = data.msg;
+                    span.classList.remove('text-red', 'text-gray'); span.classList.add('text-green');
+                } else {
+                    span.innerText = data.msg;
+                    span.classList.remove('text-green', 'text-gray'); span.classList.add('text-red');
+                }
+            }
+            updateGlobalTlsTable();
+            renderZoneTable();
+
+            // Re-trigger the queue to process the next one
+            processCertQueue();
+            break;
+        case 'download_dist_ca':
+            if (data.status === 'ok') {
+                const blob = new Blob([data.ca], { type: 'application/x-x509-ca-cert' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `distribution-ca.crt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                showToast('CA Certificate downloaded');
+            }
+            break;
+        case 'download_dist_server':
+            if (data.status === 'ok') {
+                const triggerDownload = (content, filename) => {
+                    const blob = new Blob([content], { type: 'application/x-pem-file' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                };
+
+                const srvPem = `${data.cert}\n${data.ca}\n`;
+                const filenameBase = data.domain ? `distribution-server-${data.domain}` : 'distribution-server';
+                triggerDownload(srvPem, `${filenameBase}.crt`);
+
+                setTimeout(() => {
+                    triggerDownload(`${data.key}\n`, `${filenameBase}.key`);
+                }, 100);
+
+                showToast('Server Certificate and Key downloaded');
+            } else if (data.status === 'error') {
+                showToast(data.msg || 'Error fetching server certificates', true);
+            }
+            break;
+        case 'provisioning_bundle':
+            if (data.status === 'ok') {
+                const triggerDownload = (content, filename) => {
+                    const blob = new Blob([content], { type: 'application/x-pem-file' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                };
+
+                triggerDownload(`${data.cert}\n`, `distribution-client-${data.subdomain}.crt`);
+
+                setTimeout(() => {
+                    triggerDownload(`${data.key}\n`, `distribution-client-${data.subdomain}.key`);
+                }, 100);
+
+                showToast('Provisioning keys downloaded');
+            }
+            break;
+        case 'reset_dist_pki':
+            if (data.status === 'ok') {
+                showToast('Distribution PKI successfully regenerated.', 'success');
+            } else {
+                showToast('Failed to reset PKI: ' + data.msg, true);
+            }
+            break;
+    }
+}
+
+function downloadProvisioningBundle(domain, subdomain) {
+    showToast('Preparing provisioning bundle...');
+    sendReq({ req: 'provisioning_bundle', domain: domain, subdomain: subdomain });
+}
+
+function renderDomains(domains) {
+    console.log('[DEBUG] renderDomains called with domains:', domains);
+    const tbody = document.querySelector('#table-domains tbody');
+    tbody.innerHTML = '';
+    
+    if (!domains.length) {
+        console.log('[DEBUG] No domains to render.');
+        tbody.innerHTML = '<tr><td colspan="3" class="loading">No domains found. Add one to begin.</td></tr>';
+        return;
+    }
+
+    domains.forEach(d => {
+        const name = d.name || d;
+        const expiry = d.whois ? d.whois.expiry_date : 0;
+        
+        const tr = document.createElement('tr');
+        if (name === currentDomain) tr.classList.add('active');
+
+        const tdName = document.createElement('td');
+        const a = document.createElement('a');
+        a.href = '#';
+        a.textContent = name;
+        a.onclick = (e) => {
+            e.preventDefault();
+            selectDomain(name);
+        };
+        tdName.appendChild(a);
+
+        const tdExpiry = document.createElement('td');
+        tdExpiry.className = 'expiry-column';
+        tdExpiry.innerHTML = formatExpiry(expiry);
+
+        const tdAct = document.createElement('td');
+        const btnDel = document.createElement('button');
+        btnDel.className = 'btn btn-sm danger';
+        btnDel.textContent = 'Delete';
+        btnDel.onclick = () => {
+            if (confirm(`Delete domain ${name} and all associated files?`)) {
+                sendReq({ req: 'delete_domain', domain: name });
+            }
+        };
+        tdAct.appendChild(btnDel);
+
+        tr.appendChild(tdName);
+        tr.appendChild(tdExpiry);
+        tr.appendChild(tdAct);
+        tbody.appendChild(tr);
+    });
+}
+
+function formatExpiry(unixtime) {
+    if (!unixtime) return '---';
+    const now = Math.floor(Date.now() / 1000);
+    const diff = unixtime - now;
+    const totalDays = Math.floor(diff / 86400);
+    
+    if (totalDays < 0) return '<span class="expiry-critical">Expired</span>';
+    
+    let str = "";
+    let d = totalDays;
+    if (d >= 365) {
+        str += Math.floor(d / 365) + "y";
+        d = d % 365;
+    }
+    if (d >= 30) {
+        let m = Math.floor(d / 30);
+        if (m > 0 && str.length < 5) str += m + "mo";
+        d = d % 30;
+    }
+    if (d >= 7 && !str) {
+        str += Math.floor(d / 7) + "w";
+        d = d % 7;
+        if (d > 0) str += d + "d";
+    } else if (d > 0 || !str) {
+        if (!str || str.indexOf("mo") === -1) str += d + "d";
+    }
+    
+    if (totalDays < 30) return `<span class="expiry-critical">${str}</span>`;
+    if (totalDays < 90) return `<span class="expiry-soon">${str}</span>`;
+    return str;
+}
+
+function selectDomain(domain) {
+    console.log('[DEBUG] selectDomain called for:', domain);
+    currentDomain = domain;
+    localStorage.setItem('lws-dnssec-monitor-selected-domain', domain);
+    currentDomainObj = window.domainsCache ? window.domainsCache.find(d => d.name === domain) : null;
+    console.log('[DEBUG] currentDomainObj set to:', currentDomainObj);
+    
+    const cbAcme = document.getElementById('cb-domain-acme-enable');
+    if (cbAcme && currentDomainObj) {
+        cbAcme.checked = currentDomainObj.acme_enabled === true;
+        cbAcme.onchange = function() {
+            sendReq({ req: 'set_domain_acme', domain: currentDomain, enabled: this.checked });
+        };
+    }
+
+    document.querySelector('#detail-title span').textContent = domain;
+    document.getElementById('detail-panel')?.classList.remove('hidden-panel');
+    document.getElementById('domain-panel')?.classList.add('hidden-panel');
+    document.getElementById('record-editor')?.classList.add('hidden-panel');
+
+    const rows = document.querySelectorAll('#table-domains tbody tr');
+    rows.forEach(r => {
+        r.classList.remove('active');
+        if (r.cells[0].textContent === domain) r.classList.add('active');
+    });
+
+    renderWhoisHeader();
+    sendReq({ req: 'get_tls', domain: domain });
+    setTimeout(() => {
+        console.log('[DEBUG] dispatching get_zone from selectDomain');
+        sendReq({ req: 'get_zone', domain: domain });
+    }, 50);
+}
+
+function formatExpiryInterval(timestampSec) {
+    if (!timestampSec) return 'Unknown';
+    let diff = timestampSec - Math.floor(Date.now() / 1000);
+    if (diff > 0) {
+        return Math.floor(diff / 86400) + 'd';
+    } else {
+        return Math.floor(diff / 86400) + 'd';
+    }
+}
+
+function renderWhoisHeader() {
+    const hdr = document.getElementById('whois-header');
+    if (!hdr) return;
+    
+    if (!currentDomainObj || !currentDomainObj.whois) {
+        hdr.innerHTML = '<div class="loading">No WHOIS data available</div>';
+        return;
+    }
+    
+    const w = currentDomainObj.whois;
+    const expiryDateStr = w.expiry_date ? new Date(w.expiry_date * 1000).toLocaleDateString() : 'Unknown';
+    const expiryInterval = w.expiry_date ? formatExpiryInterval(w.expiry_date) : '';
+    const expiryDate = w.expiry_date ? `${expiryDateStr} (${expiryInterval})` : 'Unknown';
+    const nsList = (w.nameservers || []).join('<br>') || 'None';
+
+    let dsStatusHTML = '';
+    let isSigned = false;
+    let localMismatch = false;
+    let globalMismatch = false;
+
+    const localDs = (currentDomainObj.local_ds || '').trim().toUpperCase();
+
+    if (currentDomainObj.dns_ds) {
+        const dnsDs = currentDomainObj.dns_ds.trim().toUpperCase();
+        if (localDs && dnsDs && !dnsDs.includes(localDs) && !localDs.includes(dnsDs)) {
+            localMismatch = true;
+        }
+    }
+
+    if (currentDomainObj.dns_ds_global) {
+        const dnsDsGlobal = currentDomainObj.dns_ds_global.trim().toUpperCase();
+        if (localDs && dnsDsGlobal && !dnsDsGlobal.includes(localDs) && !localDs.includes(dnsDsGlobal)) {
+            globalMismatch = true;
+        }
+    }
+
+    let dnssecVal = w.dnssec ? w.dnssec.trim().toLowerCase() : '';
+    if (dnssecVal === 'signeddelegation' || dnssecVal === 'yes' || dnssecVal === 'signed' || dnssecVal === 'active') {
+        isSigned = true;
+    }
+    dsStatusHTML = `DNSSEC Delegation: <span class="${isSigned ? 'dns-fg-green' : 'dns-fg-gray'}">${isSigned ? '✔' : '⚠'}</span>`;
+
+    const extractKeyTag = (dsStr) => {
+        if (!dsStr) return 'Missing';
+        const parts = dsStr.trim().split(/\s+/);
+        return parts.length > 0 ? parts[0] : 'Unknown';
+    };
+
+    if (currentDomainObj.dns_ds || currentDomainObj.dns_ds_global) {
+        dsStatusHTML += `<div class="ds-status-details">`;
+        if (currentDomainObj.dns_ds_global) {
+            const globalTag = extractKeyTag(currentDomainObj.dns_ds_global);
+            dsStatusHTML += `<div>Global DNS Cache (8.8.8.8): <span class="${globalMismatch ? 'dns-fg-red' : 'dns-fg-green'}">${globalMismatch ? `✘ Disagrees with Local Keys (${globalTag})` : `✔ Matches Local Keys (${globalTag})`}</span></div>`;
+        }
+        if (currentDomainObj.dns_ds) {
+            const systemTag = extractKeyTag(currentDomainObj.dns_ds);
+            dsStatusHTML += `<div>System DNS Cache: <span class="${localMismatch ? 'dns-fg-red' : 'dns-fg-green'}">${localMismatch ? `✘ Disagrees with Local Keys (${systemTag})` : `✔ Matches Local Keys (${systemTag})`}</span></div>`;
+        }
+        dsStatusHTML += `</div>`;
+    }
+
+    if (localMismatch || globalMismatch) {
+        dsStatusHTML += `<br><b class="dns-fg-red text-sm">⚠ Registrar DNSSEC key differs</b>`;
+    }
+
+    if (currentDomainObj.alg) {
+        dsStatusHTML += `<br><span class="dns-fg-gray text-sm">Key: ${currentDomainObj.alg} &nbsp; <a href="#" id="link-regen-keys" class="ext-link">replace</a> &nbsp; <a href="#" id="link-info-keys" class="ext-link">info</a></span>`;
+    }
+
+    let overallSigned = isSigned && !localMismatch && !globalMismatch;
+    let overrideClass = overallSigned ? 'ok' : 'warn';
+    let overrideText = overallSigned ? '✔ DNSSEC<br>OK' : '✘<br>INSECURE';
+
+    let dnssecLookupsHTML = '';
+    if (localMismatch || globalMismatch) {
+        dnssecLookupsHTML = `
+            <tr>
+                <td colspan="3">
+                    <div class="dns-fg-red dns-lookup-failed-alert">
+                        ⚠ DNS Lookup Failed due to DNSSEC Error
+                    </div>
+                </td>
+            </tr>`;
+    } else if (isSigned) {
+        dnssecLookupsHTML = `
+            <tr>
+                <td class="dns-layout-lbl">DNS:</td>
+                <td colspan="2"><span class="dns-fg-green">✔ Lookup OK (Validated Local & Global)</span></td>
+            </tr>`;
+    }
+
+    hdr.innerHTML = `
+        <table class="dns-layout-container">
+            <tr>
+                <td class="dns-layout-lbl">WHOIS:<br>
+                ${expiryDate}</td>
+                <td>${nsList.replace(/<br>/g, ',<br>')}</td>
+                <td>
+                    ${dsStatusHTML}
+		</td>
+            </tr>
+            ${dnssecLookupsHTML}
+            <tr id="tls-summary-row" class="hide">
+                <td class="dns-layout-lbl">TLS:</td>
+                <td colspan="2"><span id="tls-summary-content">Loading...</span></td>
+            </tr>
+        </table>
+    `;
+
+	const dnssec_status = document.getElementById('dnssec-status');
+
+	if (dnssec_status)
+		dnssec_status.innerHTML=`<span class="dns-overall-btn ${overrideClass === 'ok' ? 'dns-bg-green' : 'dns-bg-red'}">
+                        ${overrideText}
+                    </span>`;
+
+    // Clear any inline styles that violate CSP and use standard display
+    hdr.removeAttribute('style');
+    hdr.classList.remove('hide', 'hidden');
+
+    const lnkRegen = document.getElementById('link-regen-keys');
+    if (lnkRegen) {
+        lnkRegen.onclick = (e) => {
+            e.preventDefault();
+            document.getElementById('modal-regen-keys').classList.add('show');
+        };
+    }
+
+    const lnkInfo = document.getElementById('link-info-keys');
+    if (lnkInfo) {
+        lnkInfo.onclick = (e) => {
+            e.preventDefault();
+            let ds = currentDomainObj.local_ds || '';
+            let dsText = '';
+            if (ds) {
+                let parts = ds.trim().split(/\s+/);
+                if (parts.length >= 4) {
+                    let keyId = parts[0];
+                    let alg = parts[1];
+                    let digestType = parts[2];
+                    let digest = parts.slice(3).join('');
+
+                    let algName = alg;
+                    if (alg === '8') algName = '8 (RSA/SHA256)';
+                    else if (alg === '13') algName = '13 (ECDSA Curve P-256 with SHA-256)';
+                    else if (alg === '14') algName = '14 (ECDSA Curve P-384 with SHA-384)';
+
+                    let dTypeName = digestType;
+                    if (digestType === '1') dTypeName = '1 (SHA-1)';
+                    else if (digestType === '2') dTypeName = '2 (SHA-256)';
+                    else if (digestType === '4') dTypeName = '4 (SHA-384)';
+
+                    dsText = `DS KeyID: ${keyId},  Alg: ${algName}, Digest Type: ${dTypeName}, Digest: ${digest}`;
+                } else {
+                    dsText = ds;
+                }
+            } else {
+                dsText = "DS record not available yet.";
+            }
+            document.getElementById('textarea-dnssec-info').value = dsText;
+            document.getElementById('modal-dnssec-info').classList.add('show');
+        };
+    }
+
+    const lnkDetails = document.getElementById('link-tls-details');
+    if (lnkDetails) {
+        lnkDetails.onclick = (e) => {
+            e.preventDefault();
+            document.getElementById('tab-btn-tls').click();
+        };
+    }
+}
+
+function updateGlobalTlsTable() {
+    const tbody = document.querySelector('#table-all-tls tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    let allTlsList = [];
+    for (const [dom, tlsArr] of Object.entries(window.allTlsCache)) {
+        if (Array.isArray(tlsArr)) {
+            tlsArr.forEach(t => allTlsList.push({ domain: dom, ...t }));
+        }
+    }
+
+    if (allTlsList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="loading">No TLS subdomains configured across any domain.</td></tr>';
+
+        const row = document.getElementById('tls-summary-row');
+        if (row) row.classList.add('hide');
+        return;
+    }
+
+    allTlsList.forEach(t => {
+        const tr = document.createElement('tr');
+        let cached = window.certStatusCache[t.fqdn + ':' + t.port];
+        let locExp = 'Checking...';
+        let remExp = 'Checking...';
+        let issuer = 'Checking...';
+
+        if (cached) {
+            if (cached.status === 'ok') {
+                locExp = cached.local_msg || 'Unknown';
+                remExp = cached.msg || 'Unknown';
+                issuer = cached.issuer || 'Unknown';
+            } else {
+                remExp = `<span class="text-red">${cached.msg}</span>`;
+                locExp = cached.local_msg || 'Error';
+                issuer = cached.issuer || 'Error';
+            }
+        }
+
+        tr.innerHTML = `
+            <td>${t.fqdn}:${t.port}</td>
+            <td>${locExp}</td>
+            <td>${remExp}</td>
+            <td>${issuer}</td>
+            <td><button class="btn btn-sm secondary btn-provision">Provision</button></td>
+        `;
+        const btn = tr.querySelector('.btn-provision');
+        if (btn) btn.addEventListener('click', () => document.getElementById('tab-btn-dist').click());
+        tbody.appendChild(tr);
+    });
+
+    const row = document.getElementById('tls-summary-row');
+    const content = document.getElementById('tls-summary-content');
+    if (row && content) {
+        let minDays = null;
+        let allChecked = true;
+        let anyError = false;
+
+        allTlsList.forEach(t => {
+            if (t.domain !== currentDomain) return;
+            let cached = window.certStatusCache[t.fqdn + ':' + t.port];
+            if (!cached) {
+                allChecked = false;
+                return;
+            }
+            if (cached.status === 'ok') {
+                let parseDays = (str) => {
+                    if (!str) return null;
+                    let m = str.match(/(\d+)\s*days?/i);
+                    return m ? parseInt(m[1], 10) : null;
+                };
+                let d1 = parseDays(cached.local_msg);
+                let d2 = parseDays(cached.msg);
+                let d = d1 !== null ? d1 : (d2 !== null ? d2 : null);
+                if (d !== null) {
+                    if (minDays === null || d < minDays) minDays = d;
+                } else {
+                    anyError = true;
+                }
+            } else {
+                anyError = true;
+            }
+        });
+
+        let localTlsCount = allTlsList.filter(t => t.domain === currentDomain).length;
+        if (localTlsCount > 0) {
+            let expStr = 'Checking...';
+            if (minDays !== null) {
+                expStr = `Min Expiry: ${minDays}d`;
+                if (anyError) expStr += ' (Some Errors)';
+            } else if (allChecked) {
+                expStr = anyError ? 'Error/Timeout' : 'Unknown';
+            }
+
+            content.innerText = `TLS: ${localTlsCount} certs, ${expStr}`;
+            row.classList.remove('hide');
+        } else {
+            row.classList.add('hide');
+        }
+    }
+}
+
+function updateDistClientsTable() {
+    const tbody = document.querySelector('#table-dist-clients tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    let allTlsList = [];
+    for (const [dom, tlsArr] of Object.entries(window.allTlsCache)) {
+        if (Array.isArray(tlsArr)) {
+            tlsArr.forEach(t => allTlsList.push({ domain: dom, ...t }));
+        }
+    }
+
+    if (allTlsList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="loading">No TLS endpoints to provision.</td></tr>';
+        return;
+    }
+
+    allTlsList.forEach(t => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${t.domain}</td>
+            <td>${t.fqdn}:${t.port}</td>
+            <td><button class="btn btn-sm primary btn-dist-gen">Generate & Download</button></td>
+        `;
+        const btn = tr.querySelector('.btn-dist-gen');
+        if (btn) btn.addEventListener('click', () => downloadProvisioningBundle(t.domain, t.fqdn));
+        tbody.appendChild(tr);
+    });
+}
+
+function closeDetail() {
+    currentDomain = '';
+    localStorage.removeItem('lws-dnssec-monitor-selected-domain');
+    document.getElementById('detail-panel').classList.add('hidden-panel');
+    document.getElementById('domain-panel').classList.remove('hidden-panel');
+}
+
+function updateRawEditor() {
+    const el = document.getElementById('raw-zone-editor');
+    if (!el) return;
+    let text = currentZone ? currentZone.serialize() : '';
+    if (typeof window.padVariables === 'function') text = window.padVariables(text);
+    el.value = text;
+    if (typeof window.updateRawEditorSubstitutions === 'function') {
+        window.updateRawEditorSubstitutions();
+    }
+}
+
+function renderZoneTable() {
+    const tbody = document.querySelector('#table-zone tbody');
+    tbody.innerHTML = '';
+
+    if (!currentZone) return;
+
+    certCheckQueue = [];
+    window.renderedTlsFqdns = new Set();
+    const records = currentZone.records.filter(r => r.type !== 'comment' && r.type !== 'macro');
+
+    if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="loading">No records found.</td></tr>';
+        return;
+    }
+
+    records.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.classList.add('clickable-row');
+        tr.dataset.id = r.id;
+        tr.onclick = (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                openEditor(r.id);
+            }
+        };
+
+        let nameStr = r.parsed?.name || '@';
+        let typeStr = r.type;
+        let ttlStr = r.parsed?.ttl || '-';
+        let valStr = r.parsed?.value;
+
+        if (r.type === 'SOA') {
+            valStr = `${r.parsed?.serial} (MNAME: ${r.parsed?.mname})`;
+        } else if (valStr && typeof window.getSubstitutions === 'function') {
+            window.getSubstitutions().forEach(sub => {
+                let regex = new RegExp(`\\$\\{${sub.key}\\}`, 'g');
+                valStr = valStr.replace(regex, `\$\{${sub.key}\}<span class="subst-preview">${sub.val}</span>`);
+            });
+        }
+
+        let fqdn = nameStr === '@' ? currentDomain : nameStr + '.' + currentDomain;
+        let isTlsCapable = (r.type === 'A' || r.type === 'AAAA' || r.type === 'CNAME');
+        let tlsTd = '<td class="ext-tls-cell">-</td>';
+
+        if (isTlsCapable && !window.renderedTlsFqdns.has(fqdn)) {
+            window.renderedTlsFqdns.add(fqdn);
+            let activeConfig = window.activeTls ? window.activeTls.find(t => t.fqdn === fqdn) : null;
+            let portVal = activeConfig ? activeConfig.port : '';
+            let cacheKey = fqdn + ':' + portVal;
+            let cached = window.certStatusCache[cacheKey];
+            let initStatus = '';
+            let initColorClass = 'text-gray';
+            if (cached) {
+                initStatus = cached.msg;
+                initColorClass = (cached.status === 'ok') ? 'text-green' : 'text-red';
+            } else if (certCheckTimers[fqdn]) {
+                initStatus = 'Checking...';
+            }
+
+            tlsTd = `<td class="ext-tls-cell">
+                         <div class="tls-port-wrapper">
+                             <input type="number" class="tls-port ext-port tls-port-input" data-fqdn="${fqdn}" value="${portVal}" maxlength="5" placeholder="Port">
+                             <br>
+                             <span id="cert-status-${fqdn}" class="cert-status tls-cert-status ${initColorClass}">${initStatus}</span>
+                         </div>
+                     </td>`;
+        }
+
+        tr.innerHTML = `
+            <td class="ext-mono">${nameStr}</td>
+            <td>${ttlStr}</td>
+            <td><span class="status-badge ext-badge">${typeStr}</span></td>
+            <td class="ext-value">${valStr || '-'}</td>
+            ${tlsTd}
+        `;
+
+        const portInput = tr.querySelector('.tls-port');
+        if (portInput) {
+            portInput.onclick = (e) => e.stopPropagation();
+            portInput.onchange = (e) => {
+                let p = e.target.value.trim();
+                let pnum = parseInt(p, 10);
+                if (!p || isNaN(pnum) || pnum <= 0 || pnum > 65535) {
+                    sendReq({ req: 'delete_tls', domain: currentDomain, subdomain: fqdn });
+                    if (window.activeTls) window.activeTls = window.activeTls.filter(x => x.fqdn !== fqdn);
+                    document.getElementById(`cert-status-${fqdn}`).innerText = '';
+                    Object.keys(window.certStatusCache).forEach(k => {
+                        if (k.startsWith(fqdn + ':')) delete window.certStatusCache[k];
+                    });
+                } else {
+                    sendReq({ req: 'create_tls', domain: currentDomain, subdomain: fqdn, port: pnum });
+                    if (!window.activeTls) window.activeTls = [];
+                    let exist = window.activeTls.find(x => x.fqdn === fqdn);
+                    if (exist) exist.port = pnum;
+                    else window.activeTls.push({fqdn: fqdn, port: pnum});
+
+                    if (certCheckTimers[fqdn]) {
+                        clearTimeout(certCheckTimers[fqdn]);
+                        delete certCheckTimers[fqdn];
+                        concurrentChecks = Math.max(0, concurrentChecks - 1);
+                    }
+                    delete window.certStatusCache[fqdn + ':' + pnum];
+                    if (!certCheckQueue.some(q => q.fqdn === fqdn && q.port === pnum)) {
+                        certCheckQueue.push({fqdn: fqdn, port: pnum, domain: currentDomain});
+                    }
+                    processCertQueue();
+                }
+            };
+
+            if (portInput.value) {
+                let pnum = parseInt(portInput.value, 10);
+                if (!window.certStatusCache[fqdn + ':' + pnum] && !certCheckTimers[fqdn] && !certCheckQueue.some(q => q.fqdn === fqdn && q.port === pnum)) {
+                    certCheckQueue.push({fqdn: fqdn, port: pnum, domain: currentDomain});
+                }
+            }
+        }
+
+        const tdAct = document.createElement('td');
+        if (r.type !== 'SOA') {
+            const btnDel = document.createElement('button');
+            btnDel.className = 'btn btn-sm danger';
+            btnDel.textContent = 'Delete';
+            btnDel.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (confirm('Delete this record?')) {
+                    currentZone.deleteRecord(r.id);
+                    renderZoneTable();
+                    updateRawEditor();
+                    document.getElementById('record-editor')?.classList.add('hidden-panel');
+                    document.getElementById('btn-save-zonefile').disabled = false;
+                }
+            };
+            tdAct.appendChild(btnDel);
+        }
+
+        tr.appendChild(tdAct);
+        tbody.appendChild(tr);
+    });
+
+    if (certCheckQueue.length > 0) processCertQueue();
+}
+
+let editingRecordId = null;
+
+function renderFormFields(type, data) {
+    const form = document.getElementById('editor-form');
+
+    let common = `
+        <div class="ext-grid-1">
+            <div>
+                <label>Name (e.g. @ or www)</label>
+                <input type="text" id="edit-name" value="${data.name || ''}" placeholder="@">
+            </div>
+            <div>
+                <label>TTL</label>
+                <input type="text" id="edit-ttl" value="${data.ttl || ''}" placeholder="3600">
+            </div>
+        </div>
+    `;
+
+    if (type === 'SOA') {
+        form.innerHTML = `
+            ${common}
+            <div class="ext-grid-2">
+                <div><label>MNAME (Primary NS)</label><input type="text" id="edit-mname" value="${data.mname || ''}"></div>
+                <div><label>RNAME (Admin Email)</label><input type="text" id="edit-rname" value="${data.rname || ''}"></div>
+            </div>
+            <div class="ext-grid-4">
+                <div><label>Serial</label><input type="number" id="edit-serial" value="${data.serial || ''}"></div>
+                <div><label>Refresh</label><input type="number" id="edit-refresh" value="${data.refresh || ''}"></div>
+                <div><label>Retry</label><input type="number" id="edit-retry" value="${data.retry || ''}"></div>
+                <div><label>Expire</label><input type="number" id="edit-expire" value="${data.expire || ''}"></div>
+            </div>
+            <div class="ext-mt">
+                <label>Minimum TTL</label><input type="number" id="edit-minimum" value="${data.minimum || ''}">
+            </div>
+            <input type="hidden" id="edit-type" value="SOA">
+        `;
+    } else {
+        let valueLabel = 'Value (Target IP or Data)';
+        if (type === 'CNAME') valueLabel = 'Target Domain (CNAME)';
+        if (type === 'TXT') valueLabel = 'Text Content';
+
+        form.innerHTML = `
+            ${common}
+            <div class="ext-grid-select">
+                <div>
+                    <label>Record Type</label>
+                    <select id="edit-type" class="ext-select">
+                        <option value="A" ${type === 'A' ? 'selected' : ''}>A</option>
+                        <option value="AAAA" ${type === 'AAAA' ? 'selected' : ''}>AAAA</option>
+                        <option value="CNAME" ${type === 'CNAME' ? 'selected' : ''}>CNAME</option>
+                        <option value="TXT" ${type === 'TXT' ? 'selected' : ''}>TXT</option>
+                        <option value="MX" ${type === 'MX' ? 'selected' : ''}>MX</option>
+                        <option value="NS" ${type === 'NS' ? 'selected' : ''}>NS</option>
+                    </select>
+                </div>
+                <div>
+                    <label>${valueLabel}</label>
+                    <input type="text" id="edit-value" value="${(data.value || '').replace(/"/g, '&quot;')}" placeholder="...">
+                </div>
+            </div>
+        `;
+
+        document.getElementById('edit-type').onchange = (e) => {
+            const v = document.getElementById('edit-value');
+            if (e.target.value === 'A') v.placeholder = '192.168.1.1';
+            if (e.target.value === 'CNAME') v.placeholder = 'example.com.';
+        };
+    }
+}
+
+function openEditor(id) {
+    editingRecordId = id;
+    const editor = document.getElementById('record-editor');
+    editor.classList.remove('hidden-panel');
+
+    if (id) {
+        const rec = currentZone.records.find(r => r.id === id);
+        document.getElementById('editor-title').textContent = 'Edit Record';
+        renderFormFields(rec.type, rec.parsed || {});
+    } else {
+        document.getElementById('editor-title').textContent = 'Add New Record';
+        renderFormFields('A', { name: '@' });
+    }
+}
+
+function initApp() {
+    if (typeof window.renderLwsLoginStatus === 'function') {
+        window.renderLwsLoginStatus('user-info');
+    }
+    connect();
+
+    // Tab Switching Logic
+    const tabs = document.querySelectorAll('.tab-link');
+    const tabContents = document.querySelectorAll('.tab-content');
+    for (let i = 0; i < tabs.length; i++) {
+        let tab = tabs[i];
+        tab.addEventListener('click', () => {
+            console.log("Tab clicked: " + tab.getAttribute('data-tab'));
+            for (let j = 0; j < tabs.length; j++) tabs[j].classList.remove('active');
+            for (let j = 0; j < tabContents.length; j++) tabContents[j].classList.remove('active');
+
+            tab.classList.add('active');
+            const target = document.getElementById(tab.getAttribute('data-tab'));
+            if (target) target.classList.add('active');
+        });
+    }
+
+    const btnDownloadCa = document.getElementById('btn-dist-download-ca');
+    if (btnDownloadCa) btnDownloadCa.onclick = () => sendReq({ req: 'download_dist_ca' });
+
+    const btnDownloadServer = document.getElementById('btn-dist-download-server');
+    const domainInput = document.getElementById('dist-server-domain');
+    if (domainInput) {
+        const saveDomain = () => {
+            sendReq({ req: 'set_dist_server_domain', domain: domainInput.value.trim() });
+        };
+        domainInput.addEventListener('change', saveDomain);
+        domainInput.addEventListener('blur', saveDomain);
+    }
+    if (btnDownloadServer) {
+        btnDownloadServer.onclick = () => {
+            if (domainInput && domainInput.value.trim() !== '') {
+                sendReq({ req: 'set_dist_server_domain', domain: domainInput.value.trim() });
+                sendReq({ req: 'download_dist_server', domain: domainInput.value.trim() });
+            } else {
+                alert('Please enter a valid domain for the Distribution Server.');
+            }
+        };
+    }
+
+    const rawEditor = document.getElementById('raw-zone-editor');
+    
+    // Centralized substitution logic
+    window.getSubstitutions = function() {
+        let subs = [];
+        if (!window.last_extip_data) {
+            console.log("getSubstitutions: window.last_extip_data is missing!");
+            return subs;
+        }
+        const ips = Array.isArray(window.last_extip_data['ext-ips']) ? window.last_extip_data['ext-ips'] : (window.last_extip_data['ext-ips'] + '').split(',');
+        let ext_ipv4 = '';
+        let ext_ipv6 = '';
+        ips.forEach(ip => {
+            if (ip.includes(':')) {
+                if (window.ipv6_suffix) {
+                    let parts = ip.split(':');
+                    if (parts.length > 2) {
+                        parts.pop();
+                        ext_ipv6 = parts.join(':') + ':' + window.ipv6_suffix;
+                    } else ext_ipv6 = ip;
+                } else ext_ipv6 = ip;
+            } else ext_ipv4 = ip;
+        });
+        if (ext_ipv4) subs.push({ key: 'EXTIP4', val: ext_ipv4 });
+        if (ext_ipv6) subs.push({ key: 'EXTIP6', val: ext_ipv6 });
+        
+        if (window.activeTls) {
+            console.log("getSubstitutions: window.activeTls has", window.activeTls.length, "items", window.activeTls);
+            window.activeTls.forEach(t => {
+                console.log("getSubstitutions: checking TLS item:", t);
+                let fullFqdn = t.fqdn === '@' ? currentDomain : t.fqdn + '.' + currentDomain;
+                if (t.dane0) {
+                    subs.push({ key: `DANE0/${t.fqdn}`, val: t.dane0 });
+                    subs.push({ key: `DANE0/${fullFqdn}`, val: t.dane0 });
+                    console.log(`getSubstitutions: Added DANE0 for ${fullFqdn}`);
+                } else {
+                    console.log(`getSubstitutions: t.dane0 is falsy/missing for ${fullFqdn}`);
+                }
+                if (t.dane1) {
+                    subs.push({ key: `DANE1/${t.fqdn}`, val: t.dane1 });
+                    subs.push({ key: `DANE1/${fullFqdn}`, val: t.dane1 });
+                    console.log(`getSubstitutions: Added DANE1 for ${fullFqdn}`);
+                } else {
+                    console.log(`getSubstitutions: t.dane1 is falsy/missing for ${fullFqdn}`);
+                }
+            });
+        } else {
+            console.log("getSubstitutions: window.activeTls is falsy/missing!");
+        }
+        
+        console.log("getSubstitutions returning:", subs);
+        return subs;
+    };
+
+    window.padVariables = function(text) {
+        let subs = window.getSubstitutions();
+        subs.forEach(sub => {
+            let regex = new RegExp(`\\$\\{${sub.key}\\}`, 'g');
+            text = text.replace(regex, `\$\{${sub.key}\}` + '\u2007'.repeat(sub.val.length));
+        });
+
+        // Unconditionally pad any DANE0/DANE1 macro with 70 chars if it hasn't been padded yet
+        // The DANE hash format is "3 1 1 <64_char_hex>" which is 70 characters.
+        text = text.replace(/(\$\{DANE[01]\/[^}]+?\})(?!\u2007)/g, '$1' + '\u2007'.repeat(70));
+
+        return text;
+    };
+
+    window.stripVariables = function(text) {
+        return text.replace(/\u2007/g, '');
+    };
+
+    window.updateRawEditorSubstitutions = function() {
+        if (!rawEditor) return;
+        const backdrop = document.getElementById('raw-zone-backdrop');
+        if (!backdrop) return;
+        
+        let text = rawEditor.value;
+        let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+        
+        let subs = window.getSubstitutions();
+        subs.forEach(sub => {
+            let safeKey = sub.key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            let padded = `\\$\\{${safeKey}\\}` + '\u2007'.repeat(sub.val.length);
+            let regex = new RegExp(padded, 'g');
+            html = html.replace(regex, `\$\{${sub.key}\}<span class="subst-preview">${sub.val}</span>`);
+        });
+
+        if (text.endsWith('\n')) html += '<br>';
+        
+        backdrop.innerHTML = html;
+        backdrop.scrollTop = rawEditor.scrollTop;
+        backdrop.scrollLeft = rawEditor.scrollLeft;
+    };
+
+    rawEditor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0, start) + "\t" + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 1;
+            this.dispatchEvent(new Event('input'));
+        }
+    });
+
+    rawEditor.addEventListener('input', (e) => {
+        if (!currentDomain) return;
+        
+        let originalValue = rawEditor.value;
+        let stripped = window.stripVariables(originalValue);
+        let padded = window.padVariables(stripped);
+        
+        if (originalValue !== padded) {
+            let origStart = rawEditor.selectionStart;
+            let u2007BeforeStartOrig = (originalValue.substring(0, origStart).match(/\u2007/g) || []).length;
+            let realStart = origStart - u2007BeforeStartOrig;
+            
+            rawEditor.value = padded;
+            
+            let pIdx = 0;
+            let rCount = 0;
+            while (pIdx < padded.length && rCount < realStart) {
+                if (padded[pIdx] !== '\u2007') rCount++;
+                pIdx++;
+            }
+            // If the cursor lands right before padding, let it jump after it so it acts like a block
+            while (pIdx < padded.length && padded[pIdx] === '\u2007') {
+                pIdx++;
+            }
+            
+            rawEditor.selectionStart = rawEditor.selectionEnd = pIdx;
+        }
+
+        window.updateRawEditorSubstitutions();
+        currentZone = new ZoneFile(window.stripVariables(rawEditor.value));
+        renderZoneTable();
+        document.getElementById('record-editor')?.classList.add('hidden-panel');
+        syncScroll(e.target);
+        document.getElementById('btn-save-zonefile').disabled = false;
+    });
+
+    rawEditor.addEventListener('scroll', (e) => {
+        const backdrop = document.getElementById('raw-zone-backdrop');
+        if (backdrop) {
+            backdrop.scrollTop = rawEditor.scrollTop;
+            backdrop.scrollLeft = rawEditor.scrollLeft;
+        }
+    });
+
+    const syncScroll = (target) => {
+        if (!currentZone) return;
+        let pos = target.selectionStart;
+        if (pos === undefined) return;
+        let lineNumber = target.value.substring(0, pos).split('\n').length - 1;
+        
+        let closestRec = null;
+        for (let r of currentZone.records) {
+            if (r.lineIndex !== undefined && r.lineIndex <= lineNumber) {
+                if (!closestRec || r.lineIndex > closestRec.lineIndex) {
+                    closestRec = r;
+                }
+            }
+        }
+        
+        if (closestRec) {
+            let row = document.querySelector(`#table-zone tr[data-id="${closestRec.id}"]`);
+            if (row) {
+                document.querySelectorAll('#table-zone tr').forEach(r => r.classList.remove('active'));
+                row.classList.add('active');
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    };
+
+    ['keyup', 'click', 'focus'].forEach(evt => {
+        rawEditor.addEventListener(evt, (e) => syncScroll(e.target));
+    });
+
+    document.getElementById('btn-add-domain').onclick = () => {
+        document.getElementById('input-new-domain').value = '';
+        openModal('modal-new-domain');
+    };
+
+    document.getElementById('input-new-domain').oninput = (e) => {
+        document.getElementById('btn-nd-save').disabled = !e.target.value.trim();
+    };
+
+    document.getElementById('btn-nd-cancel').onclick = () => closeModal('modal-new-domain');
+    document.getElementById('btn-nd-save').onclick = () => {
+        const domain = document.getElementById('input-new-domain').value.trim();
+        if (domain) {
+            sendReq({ req: 'create_domain', domain: domain });
+        }
+    };
+
+    document.getElementById('btn-regen-cancel').onclick = () => closeModal('modal-regen-keys');
+    document.getElementById('btn-dnssec-info-close').onclick = () => closeModal('modal-dnssec-info');
+    let btnTlsClose = document.getElementById('btn-tls-details-close');
+    if (btnTlsClose) btnTlsClose.onclick = () => closeModal('modal-tls-details');
+    // Legacy modal close handlers removed
+    document.getElementById('btn-regen-replace').onclick = () => {
+        const keyType = document.getElementById('select-regen-key-type').value;
+        if (currentDomain) {
+            sendReq({ req: 'regen_keys', domain: currentDomain, key_type: keyType });
+            closeModal('modal-regen-keys');
+            showPopup('Regenerating keys and resigning zone...');
+        }
+    };
+
+    document.getElementById('btn-back-domains').onclick = () => {
+        closeDetail();
+    };
+
+    document.getElementById('btn-save-zonefile').onclick = () => {
+        if (!currentDomain || !currentZone) return;
+        document.getElementById('btn-save-zonefile').disabled = true;
+
+        let existingFqdns = new Set();
+        currentZone.records.forEach(r => {
+            if (r.type === 'comment' || r.type === 'macro' || r.type === 'SOA') return;
+            let nameStr = r.parsed?.name || '@';
+            let fqdn = nameStr === '@' ? currentDomain : nameStr + '.' + currentDomain;
+            existingFqdns.add(fqdn);
+        });
+
+        if (window.activeTls) {
+            window.activeTls.forEach(obj => {
+                let fqdn = obj.fqdn;
+                if (!existingFqdns.has(fqdn)) {
+                    sendReq({ req: 'delete_tls', domain: currentDomain, subdomain: fqdn });
+                }
+            });
+        }
+
+        const serialized = currentZone.serialize();
+        sendReq({ req: 'update_zone', domain: currentDomain, zone: serialized });
+    };
+
+    document.getElementById('btn-add-record').onclick = () => {
+        openEditor(null);
+    };
+
+    document.getElementById('btn-cancel-edit').onclick = () => {
+        document.getElementById('record-editor')?.classList.add('hidden-panel');
+    };
+
+    document.getElementById('btn-apply-record').onclick = () => {
+        const type = document.getElementById('edit-type').value;
+        const name = document.getElementById('edit-name').value.trim() || '@';
+        const ttl = document.getElementById('edit-ttl').value.trim();
+
+        let data = { type, name, ttl };
+
+        if (type === 'SOA') {
+            data.mname = document.getElementById('edit-mname').value.trim();
+            data.rname = document.getElementById('edit-rname').value.trim();
+            data.serial = document.getElementById('edit-serial').value.trim();
+            data.refresh = document.getElementById('edit-refresh').value.trim();
+            data.retry = document.getElementById('edit-retry').value.trim();
+            data.expire = document.getElementById('edit-expire').value.trim();
+            data.minimum = document.getElementById('edit-minimum').value.trim();
+        } else {
+            data.value = document.getElementById('edit-value').value.trim();
+        }
+
+        if (editingRecordId) {
+            currentZone.updateRecord(editingRecordId, data);
+        } else {
+            currentZone.addRecord(data);
+        }
+
+        renderZoneTable();
+        updateRawEditor();
+        document.getElementById('record-editor')?.classList.add('hidden-panel');
+        document.getElementById('btn-save-zonefile').disabled = false;
+    };
+
+    const btnSaveSuffix = document.getElementById('btn-save-suffix');
+    if (btnSaveSuffix) {
+        btnSaveSuffix.onclick = () => {
+            const val = document.getElementById('input-ipv6-suffix').value.trim();
+            window.ipv6_suffix = val;
+            sendReq({ req: 'set_ipv6_suffix', suffix: val });
+            if (window.last_extip_data) handleResponse({ status:'ok', req:'extip_update', data:window.last_extip_data });
+        };
+    }
+
+    const btnAcmeSave = document.getElementById('btn-acme-save');
+    if (btnAcmeSave) {
+        btnAcmeSave.onclick = () => {
+            sendReq({
+                req: 'set_acme_config',
+                enabled: document.getElementById('cb-acme-enable').checked,
+                production: document.getElementById('cb-acme-prod').checked,
+                email: document.getElementById('acme-email').value.trim(),
+                organization: document.getElementById('acme-org').value.trim(),
+                country: document.getElementById('acme-country').value.trim(),
+                state: document.getElementById('acme-state').value.trim(),
+                locality: document.getElementById('acme-locality').value.trim(),
+                profile: document.getElementById('acme-profile') ? document.getElementById('acme-profile').value : '',
+                sign_validity_days: document.getElementById('acme-sign-validity') ? parseInt(document.getElementById('acme-sign-validity').value, 10) || 21 : 21
+            });
+        };
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    initApp();
+}
+
+function openModal(id) {
+    document.getElementById(id).classList.add('show');
+}
+function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+}

@@ -1,0 +1,224 @@
+/*
+ * libwebsockets - small server side websockets and web server implementation
+ *
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
+#if defined(LWS_WITH_UDP) && defined(LWS_WITH_NETWORK)
+
+typedef enum dns_query_type {
+	LWS_ADNS_RECORD_A					= 0x01,
+	LWS_ADNS_RECORD_CNAME					= 0x05,
+	LWS_ADNS_RECORD_SOA					= 0x06,
+	LWS_ADNS_RECORD_MX					= 0x0f,
+	LWS_ADNS_RECORD_TXT					= 0x10,
+	LWS_ADNS_RECORD_AAAA					= 0x1c,
+	LWS_ADNS_RECORD_DS					= 0x2b,
+	LWS_ADNS_RECORD_RRSIG					= 0x2e,
+	LWS_ADNS_RECORD_NSEC					= 0x2f,
+	LWS_ADNS_RECORD_DNSKEY					= 0x30,
+	LWS_ADNS_RECORD_NSEC3					= 0x32,
+	LWS_ADNS_RECORD_HTTPS					= 0x41,
+} adns_query_type_t;
+
+typedef enum {
+	LADNS_RET_FAILED_WSI_CLOSED				= -4,
+	LADNS_RET_NXDOMAIN					= -3,
+	LADNS_RET_TIMEDOUT					= -2,
+	LADNS_RET_FAILED					= -1,
+	LADNS_RET_FOUND,
+	LADNS_RET_CONTINUING
+} lws_async_dns_retcode_t;
+
+typedef enum {
+	LWS_ADNS_DNSSEC_OFF = 0,
+	LWS_ADNS_DNSSEC_TOLERATE,
+	LWS_ADNS_DNSSEC_REQUIRE,
+} lws_async_dns_dnssec_mode_t;
+
+#define LWS_ADNS_DNSSEC_VALID	(1 << 8)
+#define LWS_ADNS_DNSSEC_INVALID	(1 << 9)
+
+#define LWS_ADNS_SYNTHETIC	0x10000	/* don't send, synthetic response will
+					 * be injected for testing */
+#define LWS_ADNS_INDICATE_LACKS_DNSSEC	0x20000 /* tolerate missing DNSSEC on this specific lookup */
+#define LWS_ADNS_NOCACHE		0x40000 /* force network query, bypass cache */
+#define LWS_ADNS_WANT_DNSSEC	0x80000 /* Explicitly set DO bit in EDNS0 OPT record */
+#define LWS_ADNS_IGNORE_HOSTS_FILE 0x100000 /* Bypass checking /etc/hosts and force network DNS lookup */
+#define LADNS_NO_WSI_BUT_OK ((struct lws *)(intptr_t)0x1)
+
+struct addrinfo;
+
+typedef struct lws * (*lws_async_dns_cb_t)(struct lws *wsi, const char *ads,
+		const struct addrinfo *result, int n, void *opaque);
+
+struct lws_adns_q;
+struct lws_async_dns;
+struct lws_async_dns_server;
+
+/**
+ * lws_async_dns_query() - perform a dns lookup using async dns
+ *
+ * \param context: the lws_context
+ * \param tsi: thread service index (usually 0)
+ * \param name: DNS name to look up
+ * \param qtype: type of query (A, AAAA etc)
+ * \param cb: query completion callback
+ * \param wsi: wsi if the query is related to one
+ * \param pq: NULL, or pointer to lws_adns_q query (used for testing)
+ *
+ * Starts an asynchronous DNS lookup, on completion the \p cb callback will
+ * be called.
+ *
+ * The reference count on the cached object is incremented for every callback
+ * that was called with the cached addrinfo results.
+ *
+ * The cached object can't be evicted until the reference count reaches zero...
+ * use lws_async_dns_freeaddrinfo() to indicate you're finsihed with the
+ * results for each callback that happened with them.
+ */
+LWS_VISIBLE LWS_EXTERN lws_async_dns_retcode_t
+lws_async_dns_query(struct lws_context *context, int tsi, const char *name,
+		    adns_query_type_t qtype, lws_async_dns_cb_t cb,
+		    struct lws *wsi, void *opaque, struct lws_adns_q **pq);
+
+/**
+ * lws_async_dns_freeaddrinfo() - decrement refcount on cached addrinfo results
+ *
+ * \param pai: a pointert to a pointer to first addrinfo returned as result in the callback
+ *
+ * Decrements the cache object's reference count.  When it reaches zero, the
+ * cached object may be reaped subject to LRU rules.
+ *
+ * The pointer to the first addrinfo give in the argument is set to NULL.
+ */
+LWS_VISIBLE LWS_EXTERN void
+lws_async_dns_freeaddrinfo(const struct addrinfo **ai);
+
+/**
+ * lws_async_dns_get_rr_cache() - get a stashed DNSSEC/raw record from the cache
+ *
+ * \param context: the lws_context
+ * \param name: the DNS name
+ * \param qtype: the query type of the record to find (e.g. LWS_ADNS_RECORD_DS)
+ * \param paylen: set to the payload length if found
+ *
+ * Retrieves a pointer to the payload of a cached DNS record that doesn't
+ * normally result in an addrinfo (like DS, DNSKEY, TXT).
+ * Returns NULL if not found or no cache entry exists.
+ */
+LWS_VISIBLE LWS_EXTERN const uint8_t *
+lws_async_dns_get_rr_cache(struct lws_context *context, const char *name,
+			   adns_query_type_t qtype, uint16_t *paylen);
+
+/**
+ * lws_async_dns_get_alpn() - check if an ALPN protocol is in the cached HTTPS record
+ *
+ * \param context: the lws_context
+ * \param name: the DNS name
+ * \param alpn: the ALPN protocol string to check (e.g. "h3")
+ *
+ * Returns 1 if the ALPN protocol is found in the cached HTTPS record for the name,
+ * or 0 otherwise.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_async_dns_get_alpn(struct lws_context *context, const char *name, const char *alpn);
+
+/**
+ * lws_async_dns_server_add() - add a DNS server to the lws async DNS list
+ *
+ * \param cx: the lws_context
+ * \param sa46: the ipv4 or ipv6 DNS server address to add
+ *
+ * Adds the given DNS server to the lws list of async DNS servers to query.
+ * If the address is already listed, its refcount is increased, otherwise a new
+ * entry is made.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_async_dns_server_add(struct lws_context *cx, const lws_sockaddr46 *sa46);
+
+/**
+ * lws_async_dns_server_remove() - remove a DNS server from the lws async DNS list
+ *
+ * \param cx: the lws_context
+ * \param sa46: the ipv4 or ipv6 DNS server address to add
+ *
+ * Removes the given DNS server from the lws list of async DNS servers to query.
+ * If the address does not correspond to an existing entry, no action is taken.
+ * If it does, the refcount on it is decremented, and if it reaches zero, the
+ * entry is detached from the list and destroyed.
+ */
+LWS_VISIBLE LWS_EXTERN void
+lws_async_dns_server_remove(struct lws_context *cx, const lws_sockaddr46 *sa46);
+
+/* only needed for testing */
+
+LWS_VISIBLE LWS_EXTERN uint16_t
+lws_adns_get_tid(struct lws_adns_q *q);
+LWS_VISIBLE LWS_EXTERN struct lws_async_dns *
+lws_adns_get_async_dns(struct lws_adns_q *q);
+
+LWS_VISIBLE LWS_EXTERN struct lws_async_dns_server *
+lws_adns_get_server(struct lws_adns_q *q);
+
+LWS_VISIBLE LWS_EXTERN void
+lws_adns_parse_udp(struct lws_async_dns *dns, const uint8_t *pkt, size_t len,
+		   struct lws_async_dns_server *dsrv);
+
+/**
+ * lws_plat_asyncdns_get_server() - Get system DNS server address
+ *
+ * \param context: the lws_context
+ * \param n: the zero-based index of the server to get
+ * \param sa46: pointer to lws_sockaddr46 to receive the server address
+ *
+ * This platform-specific primitive allows retrieving the system's DNS
+ * configuration. It returns 0 if the `n`th nameserver is written to `sa46`,
+ * or < 0 if there is no `n`th nameserver available.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_plat_asyncdns_get_server(struct lws_context *context, int n,
+			     lws_sockaddr46 *sa46);
+
+/**
+ * lws_async_dns_server_reload() - reload the OS assigned DNS servers
+ *
+ * \param context: the lws_context
+ *
+ * This forces LWS to re-check the OS for assigned DNS servers.
+ * It is useful when the device has changed networks.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_async_dns_server_reload(struct lws_context *context);
+
+
+/**
+ * lws_async_dns_dnssec_set_mode() - Set the system-wide DNSSEC mode
+ *
+ * \param context: the lws_context
+ * \param mode: the requested DNSSEC mode (off, tolerate, or require)
+ *
+ * Configures how the asynchronous DNS handles DNSSEC validation.
+ */
+LWS_VISIBLE LWS_EXTERN void
+lws_async_dns_dnssec_set_mode(struct lws_context *context, lws_async_dns_dnssec_mode_t mode);
+
+#endif

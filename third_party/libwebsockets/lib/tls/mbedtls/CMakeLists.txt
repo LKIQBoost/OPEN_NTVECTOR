@@ -1,0 +1,127 @@
+#
+# libwebsockets - small server side websockets and web server implementation
+#
+# Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+# IN THE SOFTWARE.
+#
+# The strategy is to only export to PARENT_SCOPE
+#
+#  - changes to LIB_LIST
+#  - changes to SOURCES
+#  - includes via include_directories
+#
+# and keep everything else private
+
+	set(LWS_WITH_SSL ON)
+
+	set(_WANT_MBT 0)
+	if (NOT LWS_PLAT_FREERTOS)
+		if (NOT DEFINED LWS_MBEDTLS_LIBRARIES)
+			set(_WANT_MBT 1)
+		endif()
+		if (NOT DEFINED LWS_MBEDTLS_INCLUDE_DIRS)
+			set(_WANT_MBT 1)
+		endif()
+	endif()
+
+	if (_WANT_MBT)
+
+		find_path(LWS_MBEDTLS_INCLUDE_DIRS mbedtls/ssl.h)
+
+		if (LWS_MBEDTLS_INCLUDE_DIRS)
+			list(GET LWS_MBEDTLS_INCLUDE_DIRS 0 MBEDTLS_INC_BASE)
+			set(MBEDTLS_HINTS
+				"${MBEDTLS_INC_BASE}/../lib"
+				"${MBEDTLS_INC_BASE}/../lib64"
+				"${MBEDTLS_INC_BASE}/../build/library"
+				"${MBEDTLS_INC_BASE}/../library"
+			)
+		endif()
+
+		find_library(MBEDTLS_LIBRARY mbedtls HINTS ${MBEDTLS_HINTS})
+		find_library(MBEDX509_LIBRARY mbedx509 HINTS ${MBEDTLS_HINTS})
+		find_library(MBEDCRYPTO_LIBRARY mbedcrypto HINTS ${MBEDTLS_HINTS})
+
+		set(LWS_MBEDTLS_LIBRARIES "${MBEDTLS_LIBRARY}" "${MBEDX509_LIBRARY}" "${MBEDCRYPTO_LIBRARY}")
+
+		include(FindPackageHandleStandardArgs)
+		find_package_handle_standard_args(MBEDTLS DEFAULT_MSG
+			LWS_MBEDTLS_INCLUDE_DIRS MBEDTLS_LIBRARY MBEDX509_LIBRARY MBEDCRYPTO_LIBRARY)
+
+		mark_as_advanced(LWS_MBEDTLS_INCLUDE_DIRS MBEDTLS_LIBRARY MBEDX509_LIBRARY MBEDCRYPTO_LIBRARY)
+
+		if ("${LWS_MBEDTLS_LIBRARIES}" STREQUAL "" OR "${LWS_MBEDTLS_INCLUDE_DIRS}" STREQUAL "")
+			message(FATAL_ERROR "You must set LWS_MBEDTLS_LIBRARIES and LWS_MBEDTLS_INCLUDE_DIRS when LWS_WITH_MBEDTLS is turned on.")
+		endif()
+	endif()
+	if (LWS_MBEDTLS_LIBRARIES)
+		set(MBEDTLS_LIBRARIES ${LWS_MBEDTLS_LIBRARIES})
+		set(MBEDTLS_LIBRARIES ${LWS_MBEDTLS_LIBRARIES} PARENT_SCOPE)
+	endif()
+	if (LWS_MBEDTLS_INCLUDE_DIRS)
+		set(CMAKE_REQUIRED_INCLUDES_TEMP ${CMAKE_REQUIRED_INCLUDES})
+		list(GET LWS_MBEDTLS_INCLUDE_DIRS 0 MBEDTLS_INC_BASE)
+		set(LWS_MBEDTLS_TF_PSA_PATH "${MBEDTLS_INC_BASE}/../tf-psa-crypto" CACHE PATH "Path to TF-PSA-Crypto submodule")
+		set(CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES} ${LWS_MBEDTLS_INCLUDE_DIRS} "${LWS_MBEDTLS_TF_PSA_PATH}/include" "${LWS_MBEDTLS_TF_PSA_PATH}/drivers/builtin/include")
+
+		CHECK_C_SOURCE_COMPILES("#include <mbedtls/build_info.h>\n#if MBEDTLS_VERSION_MAJOR < 4\n#error Not V4\n#endif\nint main(void) { return 0; }\n" LWS_HAVE_MBEDTLS_V4)
+		if (NOT LWS_HAVE_MBEDTLS_V4)
+			CHECK_C_SOURCE_COMPILES("#include <mbedtls/version.h>\n#if MBEDTLS_VERSION_MAJOR < 4\n#error Not V4\n#endif\nint main(void) { return 0; }\n" LWS_HAVE_MBEDTLS_V4_ALT)
+			if (LWS_HAVE_MBEDTLS_V4_ALT)
+				set(LWS_HAVE_MBEDTLS_V4 1)
+			endif()
+		endif()
+		if (LWS_HAVE_MBEDTLS_V4)
+			list(APPEND LWS_MBEDTLS_INCLUDE_DIRS "${LWS_MBEDTLS_TF_PSA_PATH}/include" "${LWS_MBEDTLS_TF_PSA_PATH}/drivers/builtin/include")
+			
+			find_library(TFPSACRYPTO_LIBRARY tfpsacrypto PATHS "${LWS_MBEDTLS_TF_PSA_PATH}/../build/library" "${MBEDTLS_INC_BASE}/../build/library")
+			if (NOT TFPSACRYPTO_LIBRARY)
+				message(FATAL_ERROR "Mbed TLS 4 requires TF-PSA-Crypto library (tfpsacrypto). Please specify TFPSACRYPTO_LIBRARY.")
+			endif()
+			list(APPEND MBEDTLS_LIBRARIES "${TFPSACRYPTO_LIBRARY}")
+			set(MBEDTLS_LIBRARIES ${MBEDTLS_LIBRARIES} PARENT_SCOPE)
+		endif()
+		set(CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES_TEMP})
+
+		set(MBEDTLS_INCLUDE_DIRS ${LWS_MBEDTLS_INCLUDE_DIRS})
+		set(MBEDTLS_INCLUDE_DIRS ${LWS_MBEDTLS_INCLUDE_DIRS} PARENT_SCOPE)
+	endif()
+	set(USE_MBEDTLS 1 PARENT_SCOPE)
+	if (DEFINED MBEDTLS_INCLUDE_DIRS)
+		include_directories(${MBEDTLS_INCLUDE_DIRS})
+		set(CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES} ${MBEDTLS_INCLUDE_DIRS})
+	endif()
+
+	if (DEFINED MBEDTLS_LIBRARIES)
+		list(APPEND LIB_LIST ${MBEDTLS_LIBRARIES})
+	endif()
+
+# old mbedtls has everything in mbedtls/net.h
+
+CHECK_C_SOURCE_COMPILES("#include <mbedtls/net_sockets.h>\nint main(void) { return 0;}\n" LWS_HAVE_MBEDTLS_NET_SOCKETS)
+CHECK_C_SOURCE_COMPILES("#include <mbedtls/ssl.h>\nint main(void) { return MBEDTLS_SSL_NEW_SESSION_TICKET;}\n" LWS_HAVE_MBEDTLS_SSL_NEW_SESSION_TICKET)
+
+#
+# Keep explicit parent scope exports at end
+#
+
+exports_to_parent_scope()
+set(LWS_HAVE_MBEDTLS_NET_SOCKETS ${LWS_HAVE_MBEDTLS_NET_SOCKETS} PARENT_SCOPE)
+set(LWS_HAVE_MBEDTLS_SSL_NEW_SESSION_TICKET ${LWS_HAVE_MBEDTLS_SSL_NEW_SESSION_TICKET} PARENT_SCOPE)

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Secure Authentication Server Login">
+    <title>Auth Server | Secure Login</title>
+    <link rel="stylesheet" href="auth.css">
+</head>
+<body>
+    <div class="background-elements">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="auth-container">
+        <div class="glass-panel">
+            <div class="panel-header">
+                <h1>Authentication Server</h1>
+                <p id="subtitle">Give your credentials to continue</p>
+            </div>
+
+            <!-- Notification Area -->
+            <div id="notification" class="notification hidden">
+                <span id="notif-message"></span>
+            </div>
+
+            <!-- No JS Notification -->
+            <noscript>
+                <link rel="stylesheet" href="nojs.css">
+                <div class="auth-form active text-center">
+                    <p class="js-req-title">JavaScript is Required</p>
+                    <p>This login portal relies on JavaScript to function securely. Please enable JavaScript in your browser settings and refresh the page to continue.</p>
+                </div>
+            </noscript>
+
+            <!-- Login Form -->
+            <form id="login-form" class="auth-form active">
+                <div class="input-group">
+                    <label for="login-username">Email Address</label>
+                    <input type="email" id="login-username" name="username" required autocomplete="username">
+                </div>
+                <div class="input-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" name="password" required autocomplete="current-password">
+                </div>
+                <div class="input-group" id="totp-group">
+                    <label>Authenticator Code (6-digit)</label>
+                    <div class="totp-boxes">
+                        <input type="text" class="totp-box" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="one-time-code">
+                        <input type="text" class="totp-box" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        <input type="text" class="totp-box" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        <input type="text" class="totp-box" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        <input type="text" class="totp-box" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        <input type="text" class="totp-box" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                    </div>
+                    <input type="hidden" id="login-totp" name="totp">
+                </div>
+                <button type="submit" id="login-btn" class="hidden"></button>
+            </form>
+
+            <!-- Registration Form (Hidden natively... it is toggled via JS) -->
+            <form id="register-form" class="auth-form hidden">
+                <div class="input-group">
+                    <label for="reg-username">Email Address</label>
+                    <input type="email" id="reg-username" name="username" required autocomplete="email">
+                </div>
+                <div class="input-group">
+                    <label for="reg-password">Create Password</label>
+                    <input type="password" id="reg-password" name="password" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn primary-btn" id="reg-btn">
+                    <span>Register Account</span>
+                    <div class="loader hidden"></div>
+                </button>
+            </form>
+
+            <div id="totp-setup-box" class="auth-form hidden totp-setup-box">
+                <h3>Setup Authenticator</h3>
+                <p>Scan this code in your Authenticator app</p>
+                <div id="qrcode-container" class="qrcode-container"></div>
+                <p id="totp-secret-text" class="totp-secret-text"></p>
+                <button type="button" class="btn primary-btn" id="finish-totp-btn">I've Saved It</button>
+            </div>
+
+            <div id="device-auth-box" class="auth-form hidden">
+                <div class="input-group">
+                    <label for="device-code">Device Code</label>
+                    <input type="text" id="device-code" name="device_code" required autocomplete="off" placeholder="XXXX-YYYY">
+                </div>
+                <button type="button" class="btn primary-btn" id="device-auth-btn">
+                    <span>Authorize Device</span>
+                    <div class="loader hidden"></div>
+                </button>
+            </div>
+
+            <div class="panel-footer" id="registration-toggle-box">
+                <p>New to the network? <button type="button" class="btn-link" id="switch-to-reg">Register here</button></p>
+                <p class="forgot-btn-wrap"><button type="button" class="btn-link forgot-btn" id="switch-to-forgot">Forgot Password?</button></p>
+            </div>
+            <div class="panel-footer hidden" id="login-toggle-box">
+                <p>Already have clearance? <button type="button" class="btn-link" id="switch-to-login">Access Portal</button></p>
+            </div>
+
+            <!-- Forgot Password Form -->
+            <form id="forgot-password-form" class="auth-form hidden">
+                <div class="input-group">
+                    <label for="forgot-email">Email Address</label>
+                    <input type="email" id="forgot-email" name="email" required autocomplete="email">
+                </div>
+                <button type="submit" class="btn primary-btn" id="forgot-btn">
+                    <span>Send Recovery Link</span>
+                    <div class="loader hidden"></div>
+                </button>
+            </form>
+
+            <!-- Reset Password Form -->
+            <form id="reset-password-form" class="auth-form hidden">
+                <input type="hidden" id="reset-token" name="reset_token">
+                <div class="input-group">
+                    <label for="reset-password">New Password</label>
+                    <input type="password" id="reset-password" name="new_password" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn primary-btn" id="reset-btn">
+                    <span>Reset Password</span>
+                    <div class="loader hidden"></div>
+                </button>
+            </form>
+
+            <div id="strike-overlay" class="strike-overlay hidden">
+                <img src="refgirl.png" alt="Strikes">
+                <span id="strike-count" class="strike-count">0/5</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Required for strict CSP bindings -->
+    <script src="auth.js"></script>
+</body>
+</html>

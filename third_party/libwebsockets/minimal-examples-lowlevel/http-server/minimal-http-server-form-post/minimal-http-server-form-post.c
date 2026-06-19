@@ -1,0 +1,234 @@
+/*
+ * lws-minimal-http-server-form-post
+ *
+ * Written in 2010-2019 by Andy Green <andy@warmcat.com>
+ *
+ * This file is made available under the Creative Commons CC0 1.0
+ * Universal Public Domain Dedication.
+ *
+ * This demonstrates a minimal http server that performs POST with a couple
+ * of parameters.  It dumps the parameters to the console log and redirects
+ * to another page.
+ */
+
+#include <libwebsockets.h>
+
+enum {
+	LWS_SW_303,
+	LWS_SW_PORT,
+	LWS_SW_D,
+	LWS_SW_S,
+	LWS_SW_HELP,
+};
+
+static const struct lws_switches switches[] = {
+	[LWS_SW_303]	= { "--303",           "Enable --303 feature" },
+	[LWS_SW_PORT]	= { "--port",          "Port to connect or listen on" },
+	[LWS_SW_D]	= { "-d",              "Debug logs (e.g. -d 15)" },
+	[LWS_SW_S]	= { "-s",              "Use TLS / https" },
+	[LWS_SW_HELP]	= { "--help",		"Show this help information" },
+};
+
+#include <string.h>
+#include <signal.h>
+
+/*
+ * Unlike ws, http is a stateless protocol.  This pss only exists for the
+ * duration of a single http transaction.  With http/1.1 keep-alive and http/2,
+ * that is unrelated to (shorter than) the lifetime of the network connection.
+ */
+struct pss {
+	struct lws_spa *spa;
+};
+
+static int interrupted, use303;
+
+static const char * const param_names[] = {
+	"text1",
+	"send",
+};
+
+enum enum_param_names {
+	EPN_TEXT1,
+	EPN_SEND,
+};
+
+static int
+callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user,
+	      void *in, size_t len)
+{
+	struct pss *pss = (struct pss *)user;
+	uint8_t buf[LWS_PRE + LWS_RECOMMENDED_MIN_HEADER_SPACE], *start = &buf[LWS_PRE],
+		*p = start, *end = &buf[sizeof(buf) - 1];
+	int n;
+
+	switch (reason) {
+	case LWS_CALLBACK_HTTP:
+
+		/*
+		 * Manually report that our form target URL exists
+		 *
+		 * you can also do this by adding a mount for the form URL
+		 * to the protocol with type LWSMPRO_CALLBACK, then no need
+		 * to trap LWS_CALLBACK_HTTP.
+		 */
+
+		if (!strcmp((const char *)in, "/form1"))
+			/* assertively allow it to exist in the URL space */
+			return 0;
+
+		/* default to 404-ing the URL if not mounted */
+		break;
+
+	case LWS_CALLBACK_HTTP_BODY:
+
+		/* create the POST argument parser if not already existing */
+
+		if (!pss->spa) {
+			pss->spa = lws_spa_create(wsi, param_names,
+					LWS_ARRAY_SIZE(param_names), 1024,
+					NULL, NULL); /* no file upload */
+			if (!pss->spa)
+				return -1;
+		}
+
+		/* let it parse the POST data */
+
+		if (lws_spa_process(pss->spa, in, (int)len))
+			return -1;
+		break;
+
+	case LWS_CALLBACK_CLOSED_CLIENT_HTTP:
+		if (pss->spa && lws_spa_destroy(pss->spa))
+			return -1;
+		break;
+
+	case LWS_CALLBACK_HTTP_BODY_COMPLETION:
+
+		/* inform the spa no more payload data coming */
+
+		lwsl_user("LWS_CALLBACK_HTTP_BODY_COMPLETION\n");
+		lws_spa_finalize(pss->spa);
+
+		/* we just dump the decoded things to the log */
+
+		if (pss->spa)
+			for (n = 0; n < (int)LWS_ARRAY_SIZE(param_names); n++) {
+				if (!lws_spa_get_string(pss->spa, n))
+					lwsl_user("%s: undefined\n", param_names[n]);
+				else
+					lwsl_user("%s: (len %d) '%s'\n",
+					    param_names[n],
+					    lws_spa_get_length(pss->spa, n),
+					    lws_spa_get_string(pss->spa, n));
+			}
+
+		/*
+		 * Our response is to redirect to a static page.  We could
+		 * have generated a dynamic html page here instead.
+		 */
+
+		if (lws_http_redirect(wsi, use303 ? HTTP_STATUS_SEE_OTHER :
+					   HTTP_STATUS_MOVED_PERMANENTLY,
+				      (unsigned char *)"after-form1.html",
+				      16, &p, end) < 0)
+			return -1;
+		break;
+
+	case LWS_CALLBACK_HTTP_DROP_PROTOCOL:
+		/* called when our wsi user_space is going to be destroyed */
+		if (pss->spa) {
+			lws_spa_destroy(pss->spa);
+			pss->spa = NULL;
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	return lws_callback_http_dummy(wsi, reason, user, in, len);
+}
+
+static struct lws_protocols protocols[] = {
+	{ "http", callback_http, sizeof(struct pss), 0, 0, NULL, 0 },
+	LWS_PROTOCOL_LIST_TERM
+};
+
+/* default mount serves the URL space from ./mount-origin */
+
+static const struct lws_http_mount mount = {
+	.mountpoint		= "/",			/* mountpoint URL */
+	.origin			= "./mount-origin",	/* serve from dir */
+	.def			= "index.html",		/* default filename */
+	.origin_protocol	= LWSMPRO_FILE,		/* files in a dir */
+	.mountpoint_len		= 1,			/* char count */
+};
+
+void sigint_handler(int sig)
+{
+	interrupted = 1;
+}
+
+int main(int argc, const char **argv)
+{
+	struct lws_context_creation_info info;
+	struct lws_context *context;
+	const char *p;
+	int n = 0;
+	(void)switches;
+
+	if ((argc == 1) || lws_cmdline_option(argc, argv, switches[LWS_SW_HELP].sw)) {
+		lws_switches_print_help(argv[0], switches, LWS_ARRAY_SIZE(switches));
+		return 0;
+	}
+
+
+	signal(SIGINT, sigint_handler);
+
+
+	lwsl_user("LWS minimal http server POST | visit http://localhost:7681\n");
+
+	lws_context_info_defaults(&info, NULL);
+	lws_cmdline_option_handle_builtin(argc, argv, &info);
+	info.port = 7681;
+	info.protocols = protocols;
+	info.mounts = &mount;
+	info.options =
+		LWS_SERVER_OPTION_HTTP_HEADERS_SECURITY_BEST_PRACTICES_ENFORCE;
+#if defined(LWS_WITH_TLS)
+	if (lws_cmdline_option(argc, argv, switches[LWS_SW_S].sw)) {
+		info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+		info.ssl_cert_filepath = "localhost-100y.cert";
+		info.ssl_private_key_filepath = "localhost-100y.key";
+	}
+#endif
+
+	if ((p = lws_cmdline_option(argc, argv, switches[LWS_SW_PORT].sw)))
+		{
+			int __pt = atoi(p);
+			if (__pt < 0 || __pt > 65535) {
+				lwsl_err("Port %d is outside valid 16-bit range\n", __pt);
+				return 1;
+			}
+			info.port = __pt;
+		}
+
+	if (lws_cmdline_option(argc, argv, switches[LWS_SW_303].sw)) {
+		lwsl_user("%s: using 303 redirect\n", __func__);
+		use303 = 1;
+	}
+
+	context = lws_create_context(&info);
+	if (!context) {
+		lwsl_err("lws init failed\n");
+		return 1;
+	}
+
+	while (n >= 0 && !interrupted)
+		n = lws_service(context, 0);
+
+	lws_context_destroy(context);
+
+	return 0;
+}

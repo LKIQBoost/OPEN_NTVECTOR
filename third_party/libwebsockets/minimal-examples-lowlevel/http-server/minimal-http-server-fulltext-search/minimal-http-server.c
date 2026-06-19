@@ -1,0 +1,117 @@
+/*
+ * lws-minimal-http-server-fts
+ *
+ * Written in 2010-2019 by Andy Green <andy@warmcat.com>
+ *
+ * This file is made available under the Creative Commons CC0 1.0
+ * Universal Public Domain Dedication.
+ *
+ * This demonstrates how to use lws full-text search
+ */
+
+#include <libwebsockets.h>
+
+enum {
+	LWS_SW_D,
+	LWS_SW_HELP,
+};
+
+static const struct lws_switches switches[] = {
+	[LWS_SW_D]	= { "-d",              "Debug logs (e.g. -d 15)" },
+	[LWS_SW_HELP]	= { "--help",		"Show this help information" },
+};
+
+#include <string.h>
+#include <signal.h>
+
+#define LWS_PLUGIN_STATIC
+#include "../../../plugins/protocol_fulltext_demo/protocol_fulltext_demo.c"
+
+const char *index_filepath = "./lws-fts.index";
+static int interrupted;
+
+static struct lws_protocols protocols[] = {
+	LWS_PLUGIN_PROTOCOL_FULLTEXT_DEMO,
+	LWS_PROTOCOL_LIST_TERM
+};
+
+static struct lws_protocol_vhost_options pvo_idx = {
+	NULL,
+	NULL,
+	"indexpath",		/* pvo name */
+	NULL	/* filled in at runtime */
+};
+
+static const struct lws_protocol_vhost_options pvo = {
+	NULL,		/* "next" pvo linked-list */
+	&pvo_idx,	/* "child" pvo linked-list */
+	"lws-test-fts",	/* protocol name we belong to on this vhost */
+	""		/* ignored */
+};
+
+/* override the default mount for /fts in the URL space */
+
+static const struct lws_http_mount mount_fts = {
+	.mountpoint		= "/fts",		/* mountpoint URL */
+	.protocol		= "lws-test-fts",
+	.origin_protocol	= LWSMPRO_CALLBACK, 	/* dynamic */
+	.mountpoint_len		= 4,			/* char count */
+};
+
+static const struct lws_http_mount mount = {
+	.mount_next		= &mount_fts,		/* linked-list "next" */
+	.mountpoint		= "/",			/* mountpoint URL */
+	.origin			= "./mount-origin",	/* serve from dir */
+	.def			= "index.html",		/* default filename */
+	.origin_protocol	= LWSMPRO_FILE,		/* files in a dir */
+	.mountpoint_len		= 1,			/* char count */
+};
+
+void sigint_handler(int sig)
+{
+	interrupted = 1;
+}
+
+int main(int argc, const char **argv)
+{
+	int n = 0;
+	struct lws_context_creation_info info;
+	struct lws_context *context;
+	(void)switches;
+
+	if ((argc == 1) || lws_cmdline_option(argc, argv, switches[LWS_SW_HELP].sw)) {
+		lws_switches_print_help(argv[0], switches, LWS_ARRAY_SIZE(switches));
+		return 0;
+	}
+
+
+	signal(SIGINT, sigint_handler);
+
+
+	lwsl_user("LWS minimal http server fulltext search | "
+		  "visit http://localhost:7681\n");
+
+	lws_context_info_defaults(&info, NULL);
+	lws_cmdline_option_handle_builtin(argc, argv, &info);
+	info.port = 7681;
+	info.mounts = &mount;
+	info.protocols = protocols;
+	info.pvo = &pvo;
+	info.options =
+		LWS_SERVER_OPTION_HTTP_HEADERS_SECURITY_BEST_PRACTICES_ENFORCE;
+
+	pvo_idx.value = index_filepath;
+
+	context = lws_create_context(&info);
+	if (!context) {
+		lwsl_err("lws init failed\n");
+		return 1;
+	}
+
+	while (n >= 0 && !interrupted)
+		n = lws_service(context, 0);
+
+	lws_context_destroy(context);
+
+	return 0;
+}

@@ -1,0 +1,261 @@
+#include <libwebsockets.h>
+
+enum {
+	LWS_SW_C,
+	LWS_SW_D,
+	LWS_SW_H,
+	LWS_SW_M,
+	LWS_SW_N,
+	LWS_SW_P,
+	LWS_SW_S,
+	LWS_SW_HELP,
+};
+
+static const struct lws_switches switches[] = {
+	[LWS_SW_C]	= { "-c",              "Client connections" },
+	[LWS_SW_D]	= { "-d",              "Debug logs (e.g. -d 15)" },
+	[LWS_SW_H]	= { "-h",              "Strict Host Check / Help" },
+	[LWS_SW_M]	= { "-m",              "Enable -m feature" },
+	[LWS_SW_N]	= { "-n",              "Enable -n feature" },
+	[LWS_SW_P]	= { "-p",              "Port number to listen or connect on" },
+	[LWS_SW_S]	= { "-s",              "Use TLS / https" },
+	[LWS_SW_HELP]	= { "--help",		"Show this help information" },
+};
+
+#include <string.h>
+#include <signal.h>
+#include <time.h>
+#if defined(WIN32)
+#define HAVE_STRUCT_TIMESPEC
+#if defined(pid_t)
+#undef pid_t
+#endif
+#endif
+
+static int nclients = 11;
+static unsigned char msg[LWS_PRE+128];
+static int message_delay = 500000; // microseconds
+static int connection_delay = 100000; // microseconds
+static struct lws_context *context;
+static const char *server_address = "localhost", *pro = "lws-minimal";
+static int interrupted = 0, port = 7681, ssl_connection = 0;
+
+static int connect_client()
+{
+	struct lws_client_connect_info i;
+
+	memset(&i, 0, sizeof(i));
+
+	i.context = context;
+	i.port = port;
+	i.address = server_address;
+	i.path = "/";
+	i.host = i.address;
+	i.origin = i.address;
+	i.ssl_connection = ssl_connection;
+	i.protocol = pro;
+	i.local_protocol_name = pro;
+
+	//usleep(connection_delay);
+	lwsl_notice("%s: connection %s:%d\n", __func__, i.address, i.port);
+	if (!lws_client_connect_via_info(&i)) return 1;
+
+	return 0;
+}
+
+static int
+callback(struct lws *wsi, enum lws_callback_reasons reason,
+		void *user, void *in, size_t len)
+{
+	int m= 0, n = 0;
+	short r;
+#if defined(_DEBUG) && !defined(LWS_WITH_NO_LOGS)
+	size_t remain;
+	int first = 0, final = 0;
+#endif
+
+	//lwsl_notice("callback called with reason %d\n", reason);
+	switch (reason) {
+
+	case LWS_CALLBACK_PROTOCOL_INIT:
+		for (n = 0; n < nclients; n++)
+			connect_client();
+		break;
+
+	case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+		lwsl_err("CLIENT_CONNECTION_ERROR: %s\n", in ? (char *)in :
+				"(null)");
+		if(--nclients == 0) interrupted = 1;
+		break;
+
+		/* --- client callbacks --- */
+
+	case LWS_CALLBACK_CLIENT_ESTABLISHED:
+		lws_callback_on_writable(wsi);
+		lwsl_user("%s: established connection, wsi = %p\n",
+				__func__, wsi);
+		break;
+
+	case LWS_CALLBACK_CLIENT_CLOSED:
+		lwsl_user("%s: CLOSED\n", __func__);
+		if(--nclients == 0) interrupted = 1;
+		break;
+
+	case LWS_CALLBACK_CLIENT_WRITEABLE:
+
+		m = lws_write(wsi, msg + LWS_PRE, 128, LWS_WRITE_TEXT);
+		if (m < 128) {
+			lwsl_err("sending message failed: %d < %d\n", m, n);
+			return -1;
+		}
+
+		/*
+		 * Schedule the timer after minimum message delay plus the
+		 * random number of centiseconds.
+		 */
+		if (lws_get_random(lws_get_context(wsi), &r, 2) == 2) {
+			n = message_delay + 10000*(r % 100);
+			lwsl_debug("set timer on %d usecs\n", n);
+			lws_set_timer_usecs(wsi, n);
+		}
+		break;
+
+	case LWS_CALLBACK_TIMER:
+		// Let the main loop know we want to send another message to the
+		// server
+		lws_callback_on_writable(wsi);
+		break;
+
+	case LWS_CALLBACK_CLIENT_RECEIVE:
+#if defined(_DEBUG) && !defined(LWS_WITH_NO_LOGS)
+		first = lws_is_first_fragment(wsi);
+		final = lws_is_final_fragment(wsi);
+		remain = lws_remaining_packet_payload(wsi);
+		lwsl_debug("LWS_CALLBACK_RECEIVE: len = %lu, first = %d, "
+			   "final = %d, remains = %lu\n",
+			   (unsigned long)len, first, final,
+			   (unsigned long)remain);
+#endif
+		break;
+
+	case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
+		lwsl_notice("server initiated connection close: len = %lu, "
+			    "in = %s\n", (unsigned long)len, (char*)in);
+		return 0;
+
+	default:
+		break;
+	}
+
+	return lws_callback_http_dummy(wsi, reason, user, in, len);
+}
+
+static const struct lws_protocols protocols[] = {
+		{ "spam-rx-tx", callback, 4096, 4096, 0, NULL, 0 },
+		LWS_PROTOCOL_LIST_TERM
+};
+
+static void
+sigint_handler(int sig)
+{
+	interrupted = 1;
+}
+
+int main(int argc, const char **argv)
+{
+	struct lws_context_creation_info info;
+	const char *p;
+	int n = 0;
+#ifndef WIN32
+	srandom((unsigned int)time(0));
+#endif
+	(void)switches;
+
+	if ((argc == 1) || lws_cmdline_option(argc, argv, switches[LWS_SW_HELP].sw)) {
+		lws_switches_print_help(argv[0], switches, LWS_ARRAY_SIZE(switches));
+		return 0;
+	}
+
+
+	memset(msg, 'x', sizeof(msg));
+
+	signal(SIGINT, sigint_handler);
+
+
+
+	lws_context_info_defaults(&info, NULL);
+	lws_cmdline_option_handle_builtin(argc, argv, &info);
+	info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+	info.port = CONTEXT_PORT_NO_LISTEN; /* we do not run any server */
+	info.protocols = protocols;
+#if defined(LWS_WITH_MBEDTLS) || defined(USE_WOLFSSL) || defined(LWS_WITH_OPENHITLS)
+	/*
+	 * OpenSSL uses the system trust store.  mbedTLS has to be told which
+	 * CA to trust explicitly.
+	 */
+	info.client_ssl_ca_filepath = "./libwebsockets.org.cer";
+#endif
+
+	if ((p = lws_cmdline_option(argc, argv, switches[LWS_SW_H].sw))) {
+		server_address = p;
+	}
+
+	if ((p = lws_cmdline_option(argc, argv, switches[LWS_SW_S].sw))) {
+		ssl_connection |=
+				LCCSCF_USE_SSL |
+				LCCSCF_ALLOW_SELFSIGNED |
+				LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+	}
+
+	if ((p = lws_cmdline_option(argc, argv, switches[LWS_SW_P].sw))) {
+		{
+			int __pt = atoi(p);
+			if (__pt < 0 || __pt > 65535) {
+				lwsl_err("Port %d is outside valid 16-bit range\n", __pt);
+				return 1;
+			}
+			port = __pt;
+		}
+		if (port > 65535 || port < 0)
+			return 1;
+	}
+
+	if ((p = lws_cmdline_option(argc, argv, switches[LWS_SW_N].sw))) {
+		n = atoi(p);
+		if (n < 1)
+			n = 1;
+		if (n > LWS_MAX_SMP)
+			n = LWS_MAX_SMP;
+		if (n < nclients)
+			nclients = n;
+		lwsl_notice("Start test clients: %d\n", nclients);
+	}
+
+	if ((p = lws_cmdline_option(argc, argv, switches[LWS_SW_C].sw))) {
+		connection_delay = atoi(p);
+		lwsl_notice("Connection delay: %d\n", connection_delay);
+	}
+
+	if ((p = lws_cmdline_option(argc, argv, switches[LWS_SW_M].sw))) {
+		message_delay = atoi(p);
+		lwsl_notice("Message delay: %d\n", connection_delay);
+	}
+
+	info.fd_limit_per_thread = (unsigned int)(1 + nclients + 1);
+
+	context = lws_create_context(&info);
+	if (!context) {
+		lwsl_err("lws init failed\n");
+		return 1;
+	}
+
+	while (n >= 0 && !interrupted)
+		n = lws_service(context, 0);
+
+	lwsl_notice("%s: exiting service loop. n = %d, interrupted = %d\n",
+			__func__, n, interrupted);
+
+	lws_context_destroy(context);
+
+	return 0;
+}

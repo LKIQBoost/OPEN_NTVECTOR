@@ -1,0 +1,131 @@
+# Asynchronous DNS
+
+## Introduction
+
+Lws now features optional asynchronous, ie, nonblocking recursive DNS
+resolution done on the event loop, enable `-DLWS_WITH_SYS_ASYNC_DNS=1`
+at cmake to build it in.
+
+## Description
+
+The default libc name resolution is via libc `getaddrinfo()`, which is
+blocking, possibly for quite long periods (seconds).  If you are
+taking care about latency, but want to create outgoing connections,
+you can't tolerate this exception from the rule that everything in
+lws is nonblocking.
+
+Lws' asynchronous DNS resolver creates a caching name resolver
+that directly queries the configured nameserver itself over UDP,
+from the event loop.
+
+It supports both ipv4 / A records and ipv6 / AAAA records (see later
+for a description about how).  One server supported over UDP :53,
+and the nameserver is autodicovered on linux, windows, and freertos.
+    
+Other features
+
+ - lws-style paranoid response parsing
+ - random unique tid generation to increase difficulty of poisoning
+ - it's really integrated with the lws event loop, it does not spawn
+   threads or use the libc resolver, and of course no blocking at all
+ - platform-specific server address capturing (from /etc/resolv.conf
+   on linux, windows apis on windows)
+ - LRU caching
+ - piggybacking (multiple requests before the first completes go on
+    a list on the first request, not spawn multiple requests)
+ - observes TTL in cache
+ - TTL and timeout use `lws_sul` timers on the event loop
+ - Uses CNAME resolution inside the same response if present, otherwise
+   recurses to resolve the CNAME (up to 3 deep)
+ - ipv6 pieces only built if cmake `LWS_IPV6` enabled
+ - **Multi-server support**: automatically parses multiple nameservers from `/etc/resolv.conf`.
+ - **Adaptive server selection**: tracks DNS server response latencies using exponential weighted moving averages.
+ - **Parallel broadsiding**: initially sends queries to all configured servers simultaneously to determine the fastest responder.
+ - **Round-robin fallback**: utilizes the fastest server for subsequent queries or round-robins between equally performant servers.
+
+## Api
+
+If enabled at cmake, the async DNS implementation is used automatically
+for lws client connections.  It's also possible to call it directly, see
+the api-test-async-dns example for how.
+
+The Api follows that of `getaddrinfo()` but results are not created on
+the heap.  Instead a single, const cached copy of the addrinfo struct
+chain is reference-counted, with `lws_async_dns_freeaddrinfo()` provided
+to deduct from the reference count.  Cached items with a nonzero
+reference count can't be destroyed from the cache, so it's safe to keep
+a pointer to the results and iterate through them.
+
+## Dealing with IPv4 and IPv6
+
+DNS is a very old standard that has some quirks... one of them is that
+multiple queries are not supported in one packet, even though the protocol
+suggests it is.  This creates problems on ipv6 enabled systems, where
+it may prefer to have AAAA results, but the server may only have A records.
+
+To square the circle, for ipv4 only systems (`LWS_IPV6=0`) the resolver
+requests only A records.  For ipv6-capable systems, it always requests
+first A and then immediately afterwards AAAA records.
+
+To simplify the implementation, the tid b0 is used to differentiate
+between A (b0 = 0) and AAAA (b0 = 1) requests and responses using the
+same query body.
+
+The first response to come back is parsed, and a cache entry made...
+it leaves a note in the query about the address of the last `struct addrinfo`
+record.  When the second response comes, a second allocation is made,
+but not added to the logical cache... instead it's chained on to the
+first cache entry and the `struct addrinfo` linked-list from the
+first cache entry is extended into the second one.  At the time the
+second result arrives, the query is destroyed and the cached results
+provided on the result callback.
+
+## Recursion
+
+Where CNAMEs are returned, DNS servers may take two approaches... if the
+CNAME is also resolved by the same server and so it knows what it should
+resolve to, it may provide the CNAME resolution in the same response
+packet.
+
+In the case the CNAME is actually resolved by a different name server,
+the server with the CNAME does not have the information to hand to also
+resolve the CNAME in the same response.  So it just leaves it for the
+client to sort out.
+
+The lws implementation can deal with both of these, first it "recurses"
+(it does not recurse on the process stack but uses its own manual stack)
+to look for results in the same packet that told it about the CNAME.  If
+there are no results, it resets the query to look instead for the CNAME,
+and restarts it.  It allows this to happen for 3 CNAME deep.
+
+At the end, either way, the cached result is set using the original
+query name and the results from the last CNAME in the chain.
+
+## DNSSEC Support
+
+Async DNS supports DNSSEC validation of responses. This is optional and provides robust protection against DNS spoofing or injection of forged results.
+
+To enable DNSSEC features, build with `-DLWS_WITH_SYS_ASYNC_DNS_DNSSEC=1` in CMake. This will automatically enable the `LWS_WITH_GENCRYPTO` required dependency.
+
+Once enabled, clients can strictly enforce DNSSEC validation globally via the config struct or explicitly over context:
+```c
+lws_async_dns_dnssec_set_mode(context, LWS_ADNS_DNSSEC_REQUIRE);
+```
+
+When validation is set to `LWS_ADNS_DNSSEC_REQUIRE`, queries failing to authenticate computationally with upstream Trust Anchors (or those lacking RRSIG/DNSKEY records entirely) will be explicitly rejected by the resolver and not propagate to callbacks or connections. But some domains inherently lack DNSSEC. For situations where strict DNSSEC is globally mandated, but a small handful of known-unsigned destinations must be reached, clients can explicitly set the `LWS_ADNS_INDICATE_LACKS_DNSSEC` bitflag natively on integer `qtype` lookups. This allows the resolver to tolerate missing records explicitly for that singular lookup, while strictly required globally.
+
+## Network configuration changes and failover
+
+Since lws async DNS natively talks to the DNS servers over UDP, it doesn't automatically adapt when the OS routing table or network configuration changes (e.g., when a mobile device moves from WiFi to a cellular network and loses access to the previous local DNS server).
+
+To handle this gracefully, there are three mechanisms:
+
+1. **Reactive Failover**: The adaptive server selection tracks response latencies using `lws_adapt`. If all active DNS servers consecutively fail to respond or experience severe timeouts (e.g. >10s tracking averages), the lws async DNS system will infer the network configuration has changed and will automatically flush its active nameserver list. It then re-queries the system (e.g., via `GetNetworkParams` on Windows or `__system_property_get` on Android) to learn the new servers. This occurs automatically.
+2. **File Monitoring (POSIX)**: On POSIX systems (Linux, macOS, etc.), lws async DNS automatically checks the modification time of `/etc/resolv.conf` before making new queries. If the file has changed since the last check, it transparently reloads the DNS servers.
+3. **Explicit API**: Applications can explicitly tell lws to drop its currently tracked DNS servers and refresh its understanding of the network environment by calling the public API:
+
+```c
+lws_async_dns_server_reload(context);
+```
+
+This is particularly useful on Android, where native C code cannot easily hook onto Java `ConnectivityManager` link change broadcasts. Android applications can listen to `onLinkPropertiesChanged()` natively in Kotlin/Java and call a JNI function that executes `lws_async_dns_server_reload()` out-of-band to proactively trigger the failover.
