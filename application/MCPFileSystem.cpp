@@ -1,4 +1,5 @@
 #include "MCPFileSystem.h"
+#include <algorithm>
 
 MCPFileSystem::MCPFileSystem()
     : m_fp(nullptr)
@@ -24,7 +25,7 @@ MCPFileSystem::MCPFileSystem(const char* filename)
 }
 
 void MCPFileSystem::_Init(const char* filename) {
-    // ´ò¿ªMCPÎÄ¼þ
+    // ï¿½ï¿½MCPï¿½Ä¼ï¿½
     this->m_fp = fopen(filename, "rb");
     if (!this->m_fp) {
         printf("Failed to open file: %s\n", filename);
@@ -34,7 +35,7 @@ void MCPFileSystem::_Init(const char* filename) {
         }
         return;
     }
-    // ¶ÁÈ¡ÎÄ¼þÍ·
+    // ï¿½ï¿½È¡ï¿½Ä¼ï¿½Í·
     MCPHeader header;
     if (fread(&header, 0x18, 1, this->m_fp) != 1 || header.signature != 0x4B50434D) { // "MCPK"
         puts("Invalid file format!");
@@ -44,63 +45,47 @@ void MCPFileSystem::_Init(const char* filename) {
         }
     }
 
-    // ±£´æÍ·²¿ÐÅÏ¢
+    // ï¿½ï¿½ï¿½ï¿½Í·ï¿½ï¿½ï¿½ï¿½Ï¢
     this->m_timestamp = header.timestamp;
     this->m_dir_table_offset = header.dir_table_offset;
     this->m_file_table_offset = header.file_table_offset;
     this->m_stream_offset = header.stream_offset;
 
-    // ¶¨Î»µ½Ä¿Â¼±í²¢¶ÁÈ¡
+    // ï¿½ï¿½Î»ï¿½ï¿½Ä¿Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¡
     fseek(this->m_fp, this->m_dir_table_offset, SEEK_SET);
 
-    // ¼ÆËãÄ¿Â¼±íÌõÄ¿ÊýÁ¿ (ÎÄ¼þ±íÆ«ÒÆ - Ä¿Â¼±íÆ«ÒÆ) / 12 (Ã¿¸öDirectoryEntry 12×Ö½Ú)
+    // ï¿½ï¿½ï¿½ï¿½Ä¿Â¼ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½ (ï¿½Ä¼ï¿½ï¿½ï¿½Æ«ï¿½ï¿½ - Ä¿Â¼ï¿½ï¿½Æ«ï¿½ï¿½) / 12 (Ã¿ï¿½ï¿½DirectoryEntry 12ï¿½Ö½ï¿½)
     size_t dir_entry_count = (this->m_file_table_offset - this->m_dir_table_offset) / sizeof(DirectoryEntry);
 
-    // µ÷ÕûÄ¿Â¼±ívector´óÐ¡
+    // ï¿½ï¿½ï¿½ï¿½Ä¿Â¼ï¿½ï¿½vectorï¿½ï¿½Ð¡
     this->m_dir_table.resize(dir_entry_count);
 
-    // ¶ÁÈ¡Õû¸öÄ¿Â¼±íµ½ÄÚ´æ
+    // ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½Ä¿Â¼ï¿½ï¿½ï¿½ï¿½ï¿½Ú´ï¿½
     fread(this->m_dir_table.data(),
         sizeof(DirectoryEntry),
         this->m_dir_table.size(),
         this->m_fp);
 
-    // ¶ÔÄ¿Â¼±í½øÐÐÅÅÐòÑéÖ¤£¨ÄæÏò´úÂëÖÐµÄ¶þ·Ö²éÕÒÂß¼­£©
-    // Õâ¿ÉÄÜÊÇÎªÁËÈ·±£Ä¿Â¼±íÒÑÅÅÐò£¬»òÕß²éÕÒÌØ¶¨ÌõÄ¿
-    auto first = this->m_dir_table.begin();
-    auto last = this->m_dir_table.end();
-    /*
-    size_t count = std::distance(first, last);
-
-    while (count > 0) {
-        auto it = first;
-        size_t step = count / 2;
-        std::advance(it, step);
-
-        if (it->dir_id >= 0) {
-            count = step;
-        }
-        else {
-            first = ++it;
-            count -= step + 1;
-        }
-    }*/
-
-    // ¼ì²éÄ¿Â¼±íÊÇ·ñÓÐÐ§
-    if (first == this->m_dir_table.end()) {
+    if (this->m_dir_table.empty()) {
         puts("Invalid directory table!");
         if (this->m_fp) {
             fclose(this->m_fp);
             this->m_fp = nullptr;
         }
+        return;
     }
+
+    std::sort(this->m_dir_table.begin(), this->m_dir_table.end(),
+        [](const DirectoryEntry& a, const DirectoryEntry& b) {
+            return a.dir_id < b.dir_id;
+        });
 
     return;
 }
 void MCPFileSystem::CloseFile(const MCPFile* file) {
     if (file) {
-        // µ÷ÓÃscalar deleting destructor
-        // Êµ¼ÊÉÏ¾ÍÊÇÊÖ¶¯Ö´ÐÐÇåÀíÂß¼­
+        // ï¿½ï¿½ï¿½ï¿½scalar deleting destructor
+        // Êµï¿½ï¿½ï¿½Ï¾ï¿½ï¿½ï¿½ï¿½Ö¶ï¿½Ö´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¼ï¿½
         char* m_buf = file->m_buf;
         if (m_buf) {
             operator delete(m_buf);
@@ -109,87 +94,71 @@ void MCPFileSystem::CloseFile(const MCPFile* file) {
     }
 }
 bool MCPFileSystem::_PrepareFileEntries(int dir_id) {
-    // 1. ÔÚm_file_tableÖÐ´´½¨Ä¿Â¼ÌõÄ¿£¨Èç¹û²»´æÔÚ£©
+    // 1. ï¿½ï¿½m_file_tableï¿½Ð´ï¿½ï¿½ï¿½Ä¿Â¼ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú£ï¿½
     std::pair<std::map<int, std::vector<FileEntry>>::iterator, bool> result;
     result = m_file_table.insert(std::make_pair(dir_id, std::vector<FileEntry>()));
 
     if (!result.second) {
-        // Ä¿Â¼ÒÑ¾­´æÔÚ£¬Ö±½Ó·µ»Ø³É¹¦
+        // Ä¿Â¼ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ú£ï¿½Ö±ï¿½Ó·ï¿½ï¿½Ø³É¹ï¿½
         return true;
     }
 
     auto iter = result.first;
 
-    // 2. ÔÚm_dir_tableÖÐ¶þ·Ö²éÕÒÄ¿Â¼ÐÅÏ¢
-    /*
-    auto dir_begin = m_dir_table.begin();
-    auto dir_end = m_dir_table.end();
-    auto dir_iter = dir_begin;
-    size_t count = m_dir_table.size();
+    // äºŒåˆ†æŸ¥æ‰¾ç›®å½•
+    auto dir_it = std::lower_bound(m_dir_table.begin(), m_dir_table.end(), dir_id,
+        [](const DirectoryEntry& entry, int id) {
+            return entry.dir_id < id;
+        });
 
-    // ¶þ·Ö²éÕÒÄ¿Â¼
-    while (count > 0) {
-        size_t step = count / 2;
-        dir_iter = dir_begin + step;
-
-        if (dir_iter->dir_id >= dir_id) {
-            count = step;
-        }
-        else {
-            dir_begin = dir_iter + 1;
-            count -= step + 1;
-        }
-    }*/
-    bool find = false;
-    DirectoryEntry dir_iter;
-    for (size_t i = 0; i < m_dir_table.size(); i++)
-    {
-        if (m_dir_table[i].dir_id == dir_id) {
-            find = true;
-            dir_iter = m_dir_table[i];
-            break;
-        }
-    }
-
-    // ¼ì²éÊÇ·ñÕÒµ½Ä¿Â¼
-    if (!find) {
-        // Ã»ÕÒµ½Ä¿Â¼£¬´Óm_file_tableÖÐÒÆ³ý¸Õ´´½¨µÄÌõÄ¿
+    if (dir_it == m_dir_table.end() || dir_it->dir_id != dir_id) {
+        printf("[MCPFileSystem] _PrepareFileEntries: dir_id=0x%08X NOT FOUND (table size=%zu)\n",
+               (unsigned)dir_id, m_dir_table.size());
+        for (size_t dbg = 0; dbg < m_dir_table.size(); dbg++)
+            printf("  dir_table[%zu] = 0x%08X\n", dbg, (unsigned)m_dir_table[dbg].dir_id);
         m_file_table.erase(iter);
         return false;
     }
 
+    DirectoryEntry dir_iter = *dir_it;
 
 
-    // 3. ¶¨Î»µ½ÎÄ¼þ±íÇøÓò²¢¶ÁÈ¡ÎÄ¼þÌõÄ¿
+
+    // 3. ï¿½ï¿½Î»ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ò²¢¶ï¿½È¡ï¿½Ä¼ï¿½ï¿½ï¿½Ä¿
     uint32_t file_table_pos = m_file_table_offset + dir_iter.offset;
     fseek(m_fp, file_table_pos, SEEK_SET);
 
-    // 4. µ÷Õûvector´óÐ¡ÒÔÈÝÄÉËùÓÐÎÄ¼þÌõÄ¿
+    // 4. ï¿½ï¿½ï¿½ï¿½vectorï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½Ä¿
     std::vector<FileEntry>& file_entries = iter->second;
     file_entries.resize(dir_iter.count);
 
-    // 5. ¶ÁÈ¡ÎÄ¼þÌõÄ¿Êý¾Ý
+    // 5. ï¿½ï¿½È¡ï¿½Ä¼ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½
     fread(file_entries.data(), sizeof(FileEntry), dir_iter.count, m_fp);
+
+    std::sort(file_entries.begin(), file_entries.end(),
+        [](const FileEntry& a, const FileEntry& b) {
+            return a.file_id < b.file_id;
+        });
 
     return true;
 }
 
 const std::vector<uint8_t> MCPFileSystem::Open(const char* filename) {
-    // 1. ·ÖÀëÂ·¾¶ºÍÎÄ¼þÃû
+    // 1. ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½
     const char* slash_pos = strrchr(filename, '/');
     const char* pure_filename = filename;
-    int dir_hash = 0;  // 0±íÊ¾¸ùÄ¿Â¼
+    int dir_hash = 0;  // 0ï¿½ï¿½Ê¾ï¿½ï¿½Ä¿Â¼
 
     if (slash_pos) {
-        // ¼ÆËãÄ¿Â¼²¿·ÖµÄ¹þÏ£
+        // ï¿½ï¿½ï¿½ï¿½Ä¿Â¼ï¿½ï¿½ï¿½ÖµÄ¹ï¿½Ï£
         dir_hash = NeoXHash::StringIDLegacy(filename, slash_pos - filename);
         pure_filename = slash_pos + 1;
     }
 
-    // 2. ÔÚºìºÚÊ÷ÖÐ²éÕÒÄ¿Â¼½Úµã
+    // 2. ï¿½Úºï¿½ï¿½ï¿½ï¿½ï¿½Ð²ï¿½ï¿½ï¿½Ä¿Â¼ï¿½Úµï¿½
     auto dir_iter = m_file_table.find(dir_hash);
     if (dir_iter == m_file_table.end()) {
-        // Ä¿Â¼Î´¼ÓÔØ£¬¶¯Ì¬¼ÓÔØ
+        // Ä¿Â¼Î´ï¿½ï¿½ï¿½Ø£ï¿½ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½
         if (!_PrepareFileEntries(dir_hash)) {
             return std::vector<uint8_t>();
         }
@@ -199,60 +168,33 @@ const std::vector<uint8_t> MCPFileSystem::Open(const char* filename) {
         }
     }
 
-    // 3. ¼ÆËãÎÄ¼þÃûµÄ¹þÏ£
+    // 3. ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½Ä¹ï¿½Ï£
     int file_hash = NeoXHash::StringIDLegacy(pure_filename, strlen(pure_filename));
+    printf("[MCPFileSystem] Open('%s') dir_hash=0x%08X file_hash=0x%08X dir_entries=%zu\n",
+           filename, (unsigned)dir_hash, (unsigned)file_hash, dir_iter->second.size());
 
-    // 4. ÔÚÄ¿Â¼µÄÎÄ¼þÁÐ±íÖÐ¶þ·Ö²éÕÒ
+    // äºŒåˆ†æŸ¥æ‰¾æ–‡ä»¶
     std::vector<FileEntry>& file_list = dir_iter->second;
 
-    
-    // ¶þ·Ö²éÕÒÊµÏÖ
-    FileEntry first;
-    bool is_find = false;
-    for (size_t i = 0; i < file_list.size(); i++)
-    {
-        if (file_list[i].file_id == file_hash) {
-            is_find = true;
-            first.file_id = file_list[i].file_id;
-            first.offset = file_list[i].offset;
-            first.length = file_list[i].length;
-            first.origin_len = file_list[i].origin_len;
-            break;
-        }
-    }
-    /*
-    FileEntry* last = first + file_list.size();
-    size_t count = file_list.size();
+    auto file_it = std::lower_bound(file_list.begin(), file_list.end(), file_hash,
+        [](const FileEntry& entry, int id) {
+            return entry.file_id < id;
+        });
 
-    while (count > 0) {
-        size_t step = count / 2;
-        FileEntry* mid = first + step;
-
-        if (mid->file_id >= file_hash) {
-            count = step;
-        }
-        else {
-            first = mid + 1;
-            count -= step + 1;
-        }
-    }
-
-    if (first == last || first->file_id != file_hash) {
-        return nullptr;
-    }
-    */
-    if (!is_find) {
+    if (file_it == file_list.end() || file_it->file_id != file_hash) {
         return std::vector<uint8_t>();
     }
+
+    const FileEntry& first = *file_it;
     
 
-    // 5. ´´½¨MCPFile¶ÔÏó
+    // 5. ï¿½ï¿½ï¿½ï¿½MCPFileï¿½ï¿½ï¿½ï¿½
     std::vector<uint8_t> file;
 
-    // 6. ·ÖÅä»º³åÇø²¢¶ÁÈ¡ÎÄ¼þÊý¾Ý
+    // 6. ï¿½ï¿½ï¿½ä»ºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¡ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½
     file.resize(first.length);
 
-    // 7. ´ÓNPK°ü¶ÁÈ¡Êý¾Ý
+    // 7. ï¿½ï¿½NPKï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½
     fseek(m_fp, first.offset + m_stream_offset, SEEK_SET);
     fread(file.data(), 1, first.length, m_fp);
 

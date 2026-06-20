@@ -6,6 +6,7 @@
 #include "setting.h"
 #include "mod_log.h"
 #include "engine.h"
+#include "pkt_module.h"
 #include "socket_static.h"
 #include "Logger.h"
 
@@ -483,5 +484,7 @@ void PythonRuntime::initModules()
 	initrotor();
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing fop module");
 	initfop();
+	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing pkt module");
+	initpkt();
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - All modules initialized");
 }

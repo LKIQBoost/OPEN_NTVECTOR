@@ -618,7 +618,8 @@ ping_drop:
 
 		case LWSWSOPC_PONG:
 			lwsl_wsi_info(wsi, "Received pong");
-			lwsl_hexdump_wsi_debug(wsi, &wsi->ws->rx_ubuf[LWS_PRE],
+			lwsl_hexdump_wsi(wsi, LLL_DEBUG,
+				     &wsi->ws->rx_ubuf[LWS_PRE],
 				     wsi->ws->rx_ubuf_head);
 
 			lws_validity_confirmed(wsi);
@@ -736,7 +737,8 @@ drain_extension:
 						(uint8_t *)"partial utf8", 12);
 utf8_fail:
 					lwsl_wsi_info(wsi, "utf8 error");
-					lwsl_hexdump_wsi_info(wsi, pmdrx.eb_out.token,
+					lwsl_hexdump_wsi(wsi, LLL_INFO,
+							  pmdrx.eb_out.token,
 							  (unsigned int)pmdrx.eb_out.len);
 
 					return LWS_HPI_RET_PLEASE_CLOSE_ME;

@@ -8,7 +8,7 @@ All dependencies are included in the repository and compiled from source — no 
 
 | Platform | Requirements |
 |----------|-------------|
-| **Windows** | Visual Studio 2015 ~ 2022, CMake 3.20+ |
+| **Windows** | Visual Studio 2022, CMake 3.20+ |
 | **Linux x86_64** | clang, cmake 3.20+, perl, make, pkg-config |
 | **Linux ARM64** | Above + `gcc-aarch64-linux-gnu`, `g++-aarch64-linux-gnu` |
 
@@ -17,10 +17,6 @@ All dependencies are included in the repository and compiled from source — no 
 ```bash
 # Windows (from Developer Command Prompt)
 cmake -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
-
-# Older VS versions
-cmake -B build -G "Visual Studio 14 2015" -A x64
 cmake --build build --config Release
 
 # Linux x86_64

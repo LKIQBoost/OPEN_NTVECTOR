@@ -180,7 +180,7 @@ lws_spawn_piped_destroy(struct lws_spawn_piped **_lsp)
 int
 lws_spawn_reap(struct lws_spawn_piped *lsp)
 {
-	lws_spawn_resource_us_t res = { };
+	lws_spawn_resource_us_t res = {0};
 	void *opaque = lsp->info.opaque;
 	lsp_cb_t cb = lsp->info.reap_cb;
 	PROCESS_MEMORY_COUNTERS pmc;

@@ -39,75 +39,36 @@ else()
     set(_PY_CC "${CMAKE_C_COMPILER}")
     set(_PY_CXX "${CMAKE_CXX_COMPILER}")
 
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64" AND CMAKE_CROSSCOMPILING)
-        set(_PY_CROSS_FLAGS "--host=aarch64-linux-gnu;--build=x86_64-linux-gnu;--disable-ipv6")
-        set(_PY_CC "aarch64-linux-gnu-gcc")
-        set(_PY_CXX "aarch64-linux-gnu-g++")
-
-        # 创建 config.site 缓存交叉编译检测结果
+    if(PLATFORM_ANDROID)
+        # Termux 原生编译: Android Bionic libc 缺少大量 POSIX/GNU 函数
         file(WRITE "${_PYTHON_BUILD}/config.site"
-"ac_cv_file__dev_ptmx=no
+"ac_cv_file__dev_ptmx=yes
 ac_cv_file__dev_ptc=no
 ac_cv_have_long_long_format=yes
 ac_cv_buggy_getaddrinfo=no
+ac_cv_lib_util_forkpty=no
+ac_cv_func_forkpty=no
+ac_cv_func_openpty=no
+ac_cv_func_login_tty=no
+ac_cv_func_getloadavg=no
+ac_cv_func_setpwent=no
+ac_cv_func_getpwent=no
+ac_cv_func_endpwent=no
+ac_cv_func_getspnam=no
+ac_cv_func_getspent=no
+ac_cv_func_setspent=no
+ac_cv_func_endspent=no
+ac_cv_header_shadow_h=no
+ac_cv_func_clock_getres=no
+ac_cv_lib_rt_clock_getres=no
 ")
         set(ENV{CONFIG_SITE} "${_PYTHON_BUILD}/config.site")
-
-        # 交叉编译需要一个 host python 来执行 generate-posix-vars
-        # 先尝试找系统的 python2.7，找不到就本地构建一个
-        find_program(_HOST_PYTHON NAMES python2.7 python2 PATHS /opt/python27/bin /usr/local/bin /usr/bin NO_DEFAULT_PATH)
-        if(NOT _HOST_PYTHON)
-            find_program(_HOST_PYTHON NAMES python2.7 python2)
-        endif()
-        if(NOT _HOST_PYTHON)
-            message(STATUS "No host python2.7 found, building native python first...")
-            set(_PY_HOST_BUILD "${CMAKE_BINARY_DIR}/_deps/python27-host-build")
-            set(_PY_HOST_INSTALL "${CMAKE_BINARY_DIR}/_deps/python27-host")
-            file(MAKE_DIRECTORY "${_PY_HOST_BUILD}")
-
-            set(ENV{CC} "gcc")
-            set(ENV{CXX} "g++")
-            set(ENV{CFLAGS} "-fPIC -std=c11")
-            unset(ENV{CONFIG_SITE})
-
-            execute_process(
-                COMMAND "${_PYTHON_SRC}/configure"
-                    "--prefix=${_PY_HOST_INSTALL}"
-                    --enable-shared=no
-                    --enable-unicode=ucs4
-                WORKING_DIRECTORY "${_PY_HOST_BUILD}"
-                RESULT_VARIABLE _result
-            )
-            if(_result)
-                message(FATAL_ERROR "Host Python configure failed")
-            endif()
-            execute_process(
-                COMMAND make -j${_nproc}
-                WORKING_DIRECTORY "${_PY_HOST_BUILD}"
-                RESULT_VARIABLE _result
-            )
-            if(_result)
-                message(FATAL_ERROR "Host Python build failed")
-            endif()
-            execute_process(
-                COMMAND make altbininstall
-                WORKING_DIRECTORY "${_PY_HOST_BUILD}"
-            )
-            set(_HOST_PYTHON "${_PY_HOST_INSTALL}/bin/python2.7")
-
-            # 重设 config.site 用于交叉编译
-            set(ENV{CONFIG_SITE} "${_PYTHON_BUILD}/config.site")
-        endif()
-
-        # 将 host python 路径加入 PATH
-        get_filename_component(_HOST_PYTHON_DIR "${_HOST_PYTHON}" DIRECTORY)
-        set(ENV{PATH} "${_HOST_PYTHON_DIR}:$ENV{PATH}")
     endif()
 
     # GCC 15+ 默认 C23，bool/true/false 是关键字，与 Python 2.7 冲突
     set(ENV{CC} "${_PY_CC}")
     set(ENV{CXX} "${_PY_CXX}")
-    set(ENV{CFLAGS} "-fPIC -std=c11")
+    set(ENV{CFLAGS} "-fPIC -std=gnu11")
 
     # Configure
     execute_process(
@@ -173,7 +134,12 @@ if(NOT TARGET python27)
         IMPORTED_LOCATION "${PYTHON27_LIBRARY}"
         INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${PYTHON27_INCLUDE_DIR}>"
     )
-    target_link_libraries(python27 INTERFACE dl pthread util m)
+    if(PLATFORM_ANDROID)
+        # Android/Bionic 没有 libutil; pthread/dl 内置于 libc 但 -l 标志无害
+        target_link_libraries(python27 INTERFACE dl m)
+    else()
+        target_link_libraries(python27 INTERFACE dl pthread util m)
+    endif()
 endif()
 
 # Linux 上 Python 扩展模块内置于 libpython2.7，不需要单独的 .lib

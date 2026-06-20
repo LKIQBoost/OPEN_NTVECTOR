@@ -37,6 +37,8 @@ target_compile_definitions(Program PRIVATE
     Py_NO_ENABLE_SHARED
     PYTHON_STATIC
     RTC_STATIC
+    JUICE_STATIC
+    _RAKNET_LIB
 )
 
 if(WIN32)
@@ -108,11 +110,11 @@ if(WIN32)
 
     target_sources(Program PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Program.rc")
 else()
-    target_link_libraries(Program PRIVATE
-        pthread
-        dl
-        m
-    )
+    if(PLATFORM_ANDROID)
+        target_link_libraries(Program PRIVATE dl m)
+    else()
+        target_link_libraries(Program PRIVATE pthread dl m)
+    endif()
 endif()
 
 # MSVC 特定编译选项
@@ -121,5 +123,18 @@ if(MSVC)
         /MP
         /W3
         /GS-
+    )
+    target_link_options(Program PRIVATE
+        /OPT:REF
+        /OPT:ICF
+    )
+else()
+    target_compile_options(Program PRIVATE
+        -fvisibility=hidden
+        -fvisibility-inlines-hidden
+    )
+    target_link_options(Program PRIVATE
+        -Wl,--exclude-libs,ALL
+        -Wl,-s
     )
 endif()
