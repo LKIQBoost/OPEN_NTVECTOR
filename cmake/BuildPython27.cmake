@@ -65,6 +65,35 @@ ac_cv_lib_rt_clock_getres=no
         set(ENV{CONFIG_SITE} "${_PYTHON_BUILD}/config.site")
     endif()
 
+    # 将项目依赖的 C 扩展模块静态编入 libpython2.7.a
+    # Windows python27.lib 预编译时已内置这些模块; Linux/Android 从源码编译时
+    # 默认会将它们编为 .so 动态扩展, 嵌入式使用时找不到, 必须通过 Setup.local 强制内置
+    file(MAKE_DIRECTORY "${_PYTHON_BUILD}/Modules")
+    file(WRITE "${_PYTHON_BUILD}/Modules/Setup.local"
+"_struct _struct.c
+binascii binascii.c
+time timemodule.c
+_collections _collectionsmodule.c
+_io _io/bufferedio.c _io/bytesio.c _io/fileio.c _io/iobase.c _io/_iomodule.c _io/stringio.c _io/textio.c
+itertools itertoolsmodule.c
+operator operator.c
+_functools _functoolsmodule.c
+cStringIO cStringIO.c
+cPickle cPickle.c
+strop stropmodule.c
+array arraymodule.c
+_bisect _bisectmodule.c
+_heapq _heapqmodule.c
+_locale _localemodule.c
+datetime datetimemodule.c
+math mathmodule.c _math.c
+_md5 md5module.c md5.c
+_sha shamodule.c
+_sha256 sha256module.c
+_sha512 sha512module.c
+zlib zlibmodule.c -lz
+")
+
     # GCC 15+ 默认 C23，bool/true/false 是关键字，与 Python 2.7 冲突
     set(ENV{CC} "${_PY_CC}")
     set(ENV{CXX} "${_PY_CXX}")

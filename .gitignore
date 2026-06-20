@@ -2,6 +2,7 @@
 build*/
 out/
 Program_arm64/
+/Program
 
 # IDE
 .vs/
