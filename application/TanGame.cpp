@@ -96,8 +96,8 @@ namespace {
 } // namespace
 
 
-TanLobbyGameCtx::TanLobbyGameCtx() {
-    LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] Created");
+TanLobbyGameCtx::TanLobbyGameCtx(bool disout) : m_disout(disout) {
+    LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] Created (disout=", disout, ")");
 }
 
 TanLobbyGameCtx::~TanLobbyGameCtx() {
@@ -126,7 +126,6 @@ void TanLobbyGameCtx::setOnDataChannelMessage(OnDataChannelMessage cb) {
 void TanLobbyGameCtx::setOnDataChannelOpen(OnDataChannelOpen cb) {
     std::lock_guard<std::mutex> lk(m_callback_mutex);
     m_on_dc_open = std::move(cb);
-    // 如果 DC 已经 open,立即触发一次(避免错过事件)
     if (m_dc_open && m_on_dc_open) {
         auto local_cb = m_on_dc_open;
         try { local_cb(); }
@@ -157,6 +156,18 @@ bool TanLobbyGameCtx::sendDataChannelMessage(const std::vector<uint8_t>& data) {
         return false;
     }
 }
+
+// unified exit: trigger Python event + optional process exit
+void TanLobbyGameCtx::doExit(const char* event_name, int exit_code) {
+    LOG(LOG_ERROR, "[TanLobbyGameCtx] doExit: event=", event_name, " code=", exit_code);
+    PythonEventEngine e;
+    e.trigger(event_name, exit_code);
+    if (m_disout) {
+        LOG(LOG_ERROR, "[TanLobbyGameCtx] disout enabled, exiting with code ", exit_code);
+        exit(exit_code);
+    }
+}
+
 void TanLobbyGameCtx::shutdown() {
     LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] shutdown() called");
     m_closing.store(true, std::memory_order_release);
@@ -202,11 +213,9 @@ void TanLobbyGameCtx::sendSignalingMessage(const std::string& message_payload) {
     Json::Value root;
     root["Type"] = 1;
 
-    // To 永远是数字，nethernet_id 是 uint64 范围
-    uint64_t to_num = std::stoull(m_nethernet_id_to);   // 不接 catch，让它在配置错时大声崩
+    uint64_t to_num = std::stoull(m_nethernet_id_to);
     root["To"] = static_cast<Json::UInt64>(to_num);
 
-    // From 是字符串
     root["From"] = m_nethernet_id_from;
     root["Message"] = message_payload;
 
@@ -243,10 +252,9 @@ void TanLobbyGameCtx::startKeepalive() {
         }
         LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] keepalive thread exited");
 
-        PythonEventEngine e;
-        e.trigger("on_nethernet_invalid_token", EXIT_CODE_WS_Invalid_token);
-        if (Params::disout) {
-            exit(EXIT_CODE_WS_Invalid_token);
+        auto self = weak_self.lock();
+        if (self) {
+            self->doExit("on_nethernet_invalid_token", EXIT_CODE_WS_Invalid_token);
         }
         });
 }
@@ -258,7 +266,14 @@ void TanLobbyGameCtx::stopKeepalive() {
 
 void TanLobbyGameCtx::onConnection(bool connected) {
     LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] onConnection connected=", connected);
-    if (connected) startKeepalive();
+    if (connected) {
+        m_ws_connected.store(true, std::memory_order_release);
+        startKeepalive();
+        startTurnConfigTimeout();
+    }
+    else {
+        doExit("on_nethernet_ws_closed", EXIT_CODE_WS_CONNECT);
+    }
 }
 
 void TanLobbyGameCtx::onDataReceived(const std::string& content, size_t size) {
@@ -325,7 +340,6 @@ void TanLobbyGameCtx::setupPeerConnection(const std::string& turn_config_json) {
         }
     }
 
-    // connection_id 仍然随机，每次会话一个
     m_connection_id = std::to_string(GetRandomData());
     LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] connection_id=", m_connection_id);
 
@@ -348,7 +362,6 @@ void TanLobbyGameCtx::setupPeerConnection(const std::string& turn_config_json) {
         std::string payload = "CONNECTREQUEST " + self->m_connection_id + " " + sdp;
         self->sendSignalingMessage(payload);
 
-        // ★ 发完 offer,启动 CONNECTRESPONSE 超时检测
         self->startConnectResponseTimeout();
         });
 
@@ -386,19 +399,15 @@ void TanLobbyGameCtx::setupPeerConnection(const std::string& turn_config_json) {
     unrel_init.reliability.maxRetransmits = 0;
     m_dc_unreliable = m_pc->createDataChannel("UnreliableDataChannel", unrel_init);
 
-    // Unreliable 只挂 onOpen 看一眼,业务数据完全不动它
     m_dc_unreliable->onOpen([]() {
         LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] UnreliableDataChannel opened (no business data)");
         });
 
     m_dc_unreliable->onMessage([](rtc::message_variant msg) {
-        // 不应该收到东西,但收到了也只打日志
         LOG(LOG_WARN, "[TanLobbyGameCtx] Unexpected message on UnreliableDataChannel");
         });
 
-    // === 第二条:Reliable (业务数据走这条) ===
     rtc::DataChannelInit rel_init;
-    // 默认就是 reliable + ordered,不用动 reliability
     m_dc_reliable = m_pc->createDataChannel("ReliableDataChannel", rel_init);
 
     m_dc_reliable->onOpen([weak_self]() {
@@ -406,7 +415,6 @@ void TanLobbyGameCtx::setupPeerConnection(const std::string& turn_config_json) {
         if (!self) return;
         LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] DataChannel MC opened");
 
-        // ★ 新增:置位 + 转发给用户回调
         self->m_dc_open = true;
         OnDataChannelOpen cb;
         {
@@ -453,15 +461,12 @@ void TanLobbyGameCtx::setupPeerConnection(const std::string& turn_config_json) {
         auto self = weak_self.lock();
         if (!self) return;
 
-        // libdatachannel 的 message_variant 是 std::variant<std::string, rtc::binary>
-        // 业务数据是二进制,提取 rtc::binary 那个分支
         std::vector<uint8_t> data;
         if (auto* bin = std::get_if<rtc::binary>(&msg)) {
             data.reserve(bin->size());
             for (auto b : *bin) data.push_back(static_cast<uint8_t>(b));
         }
         else if (auto* str = std::get_if<std::string>(&msg)) {
-            // 一般业务不会发文本,但兜底
             data.assign(str->begin(), str->end());
         }
 
@@ -504,7 +509,7 @@ void TanLobbyGameCtx::handleType1_Signaling(const std::string& from, const std::
     try {
         if (cmd == "CONNECTRESPONSE") {
             LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] handle CONNECTRESPONSE (answer)");
-            m_connect_response_received.store(true, std::memory_order_release);   // ★ 置位
+            m_connect_response_received.store(true, std::memory_order_release);
             m_pc->setRemoteDescription(rtc::Description(content, "answer"));
         }
         else if (cmd == "CANDIDATEADD") {
@@ -519,6 +524,93 @@ void TanLobbyGameCtx::handleType1_Signaling(const std::string& from, const std::
         LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] signaling exception: ", e.what());
     }
 }
+
+// Stage 1: WebSocket connect timeout
+void TanLobbyGameCtx::startWsConnectTimeout() {
+    std::weak_ptr<TanLobbyGameCtx> weak_self = shared_from_this();
+    m_ws_timeout_thread = std::thread([weak_self]() {
+        using namespace std::chrono;
+        auto deadline = steady_clock::now() + milliseconds(WS_CONNECT_TIMEOUT_MS);
+
+        while (steady_clock::now() < deadline) {
+            auto self = weak_self.lock();
+            if (!self) return;
+            if (self->m_ws_connected.load(std::memory_order_acquire)) return;
+            if (self->m_closing.load(std::memory_order_acquire)) return;
+            if (!self->m_running) return;
+            self.reset();
+            std::this_thread::sleep_for(milliseconds(200));
+        }
+
+        auto self = weak_self.lock();
+        if (!self) return;
+        if (self->m_ws_connected.load(std::memory_order_acquire)) return;
+
+        LOG(LOG_ERROR, "[TanLobbyGameCtx] WebSocket connect timeout after ", WS_CONNECT_TIMEOUT_MS, "ms");
+        self->doExit("on_nethernet_ws_timeout", EXIT_CODE_WS_CONNECT);
+        });
+    m_ws_timeout_thread.detach();
+}
+
+// Stage 2: TURN config timeout
+void TanLobbyGameCtx::startTurnConfigTimeout() {
+    std::weak_ptr<TanLobbyGameCtx> weak_self = shared_from_this();
+    m_turn_timeout_thread = std::thread([weak_self]() {
+        using namespace std::chrono;
+        auto deadline = steady_clock::now() + milliseconds(TURN_CONFIG_TIMEOUT_MS);
+
+        while (steady_clock::now() < deadline) {
+            auto self = weak_self.lock();
+            if (!self) return;
+            if (self->m_turn_received.load(std::memory_order_acquire)) return;
+            if (self->m_closing.load(std::memory_order_acquire)) return;
+            if (!self->m_running) return;
+            self.reset();
+            std::this_thread::sleep_for(milliseconds(200));
+        }
+
+        auto self = weak_self.lock();
+        if (!self) return;
+        if (self->m_turn_received.load(std::memory_order_acquire)) return;
+
+        LOG(LOG_ERROR, "[TanLobbyGameCtx] TURN config timeout after ", TURN_CONFIG_TIMEOUT_MS, "ms");
+        self->doExit("on_nethernet_turn_timeout", EXIT_CODE_TURN_TIMEOUT);
+        });
+    m_turn_timeout_thread.detach();
+}
+
+// Stage 3: CONNECTRESPONSE timeout
+void TanLobbyGameCtx::startConnectResponseTimeout() {
+    m_connect_response_received.store(false, std::memory_order_release);
+
+    std::weak_ptr<TanLobbyGameCtx> weak_self = shared_from_this();
+    m_connect_timeout_thread = std::thread([weak_self]() {
+        using namespace std::chrono;
+        auto deadline = steady_clock::now() + milliseconds(CONNECT_RESPONSE_TIMEOUT_MS);
+
+        while (steady_clock::now() < deadline) {
+            auto self = weak_self.lock();
+            if (!self) return;
+            if (self->m_connect_response_received.load(std::memory_order_acquire)) {
+                LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] CONNECTRESPONSE received, timeout watcher exit");
+                return;
+            }
+            if (!self->m_running) return;
+            self.reset();
+            std::this_thread::sleep_for(milliseconds(100));
+        }
+
+        auto self = weak_self.lock();
+        if (!self) return;
+        if (self->m_connect_response_received.load(std::memory_order_acquire)) return;
+
+        LOG(LOG_ERROR, "[TanLobbyGameCtx] CONNECTRESPONSE timeout after ", CONNECT_RESPONSE_TIMEOUT_MS, "ms");
+        self->doExit("on_nethernet_connect_timeout", EXIT_CODE_WS_TIMEOUT);
+        });
+    m_connect_timeout_thread.detach();
+}
+
+// Stage 4: WebRTC connect timeout (ICE/DTLS/SCTP)
 void TanLobbyGameCtx::startWebRtcTimeout() {
     std::weak_ptr<TanLobbyGameCtx> weak_self = shared_from_this();
     m_webrtc_timeout_thread = std::thread([weak_self]() {
@@ -544,72 +636,20 @@ void TanLobbyGameCtx::startWebRtcTimeout() {
 
         LOG(LOG_ERROR, "[TanLobbyGameCtx] WebRTC connect timeout after ",
             WEBRTC_CONNECT_TIMEOUT_MS, "ms (ICE/DTLS never connected)");
-
-        PythonEventEngine e;
-        e.trigger("on_nethernet_connect_timeout", EXIT_CODE_WS_TIMEOUT);
-
-        if (Params::disout) {
-            exit(EXIT_CODE_WS_TIMEOUT);
-        }
+        self->doExit("on_nethernet_webrtc_timeout", EXIT_CODE_NetherNet_TIMEOUT);
         });
     m_webrtc_timeout_thread.detach();
 }
-void TanLobbyGameCtx::startConnectResponseTimeout() {
-    m_connect_response_received.store(false, std::memory_order_release);
 
-    std::weak_ptr<TanLobbyGameCtx> weak_self = shared_from_this();
-    m_connect_timeout_thread = std::thread([weak_self]() {
-        using namespace std::chrono;
-        auto deadline = steady_clock::now() + milliseconds(CONNECT_RESPONSE_TIMEOUT_MS);
-
-        while (steady_clock::now() < deadline) {
-            auto self = weak_self.lock();
-            if (!self) return;   // ctx 已销毁
-            if (self->m_connect_response_received.load(std::memory_order_acquire)) {
-                LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] CONNECTRESPONSE received, timeout watcher exit");
-                return;
-            }
-            if (!self->m_running) return;   // 正在关闭
-            self.reset();
-            std::this_thread::sleep_for(milliseconds(100));
-        }
-
-        // 超时
-        auto self = weak_self.lock();
-        if (!self) return;
-        if (self->m_connect_response_received.load(std::memory_order_acquire)) return;   // 边界:最后一刻收到
-
-        LOG(LOG_ERROR, "[TanLobbyGameCtx] CONNECTRESPONSE timeout after ",
-            CONNECT_RESPONSE_TIMEOUT_MS, "ms");
-
-        PythonEventEngine e;
-        e.trigger("on_nethernet_connect_timeout", EXIT_CODE_WS_TIMEOUT);
-
-        if (Params::disout) {
-            LOG(LOG_ERROR, "[TanLobbyGameCtx] disout enabled, exiting with code ", EXIT_CODE_WS_TIMEOUT);
-            exit(EXIT_CODE_WS_TIMEOUT);
-        }
-        });
-    m_connect_timeout_thread.detach();
-}
+// Stage 5: connection lost after established
 void TanLobbyGameCtx::handleConnectionLost() {
-    // 正常 shutdown 流程关的,不算异常,不 out
     if (m_closing.load(std::memory_order_acquire)) return;
-
-    // 只报一次
-    static std::atomic<bool> reported{ false };
-    if (reported.exchange(true)) return;
+    if (m_connection_lost_reported.exchange(true)) return;
 
     LOG(LOG_ERROR, "[TanLobbyGameCtx] connection lost / closed unexpectedly");
-
-    PythonEventEngine e;
-    e.trigger("on_nethernet_disconnected", EXIT_CODE_NetherNet_TIMEOUT);
-
-    if (Params::disout) {
-        LOG(LOG_ERROR, "[TanLobbyGameCtx] disout enabled, exiting with code ", EXIT_CODE_NetherNet_TIMEOUT);
-        exit(EXIT_CODE_NetherNet_TIMEOUT);
-    }
+    doExit("on_nethernet_disconnected", EXIT_CODE_NetherNet_TIMEOUT);
 }
+
 void TanLobbyGameCtx::startUp(const std::string& nethernet_id_to,
     const std::string& nethernet_id_from,
     const std::string& token,
@@ -667,11 +707,15 @@ void TanLobbyGameCtx::startUp(const std::string& nethernet_id_to,
 
     m_initialized = true;
     m_running = ok;
+
+    if (ok) {
+        startWsConnectTimeout();
+    }
 }
 
-std::shared_ptr<TanLobbyGameCtx> TanLobbyGameCtx::create() {
+std::shared_ptr<TanLobbyGameCtx> TanLobbyGameCtx::create(bool disout) {
     LOG(LOG_SCRIPTING, "[TanLobbyGameCtx] create() factory called");
-    return std::make_shared<TanLobbyGameCtx>();
+    return std::make_shared<TanLobbyGameCtx>(disout);
 }
 
 void register_tan_lobby_game_module() {
@@ -695,7 +739,7 @@ void register_tan_lobby_game_module() {
             py::arg("user_id"))
         .def("__repr__", [](const TanLobbyGameCtx&) { return std::string("<TanLobbyGameCtx>"); });
 
-    m.def("create", &TanLobbyGameCtx::create);
+    m.def("create", &TanLobbyGameCtx::create, py::arg("disout") = false);
     py::module::import("sys").attr("modules")["tan_lobby_game_clicpp_wrapper"] = m;
     LOG(LOG_SCRIPTING, "[PythonRuntime] tan_lobby_game_clicpp_wrapper registered!");
 }

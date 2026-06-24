@@ -6,7 +6,7 @@ NetherNetConnectInstance::NetherNetConnectInstance(
     std::string host_nethernet_id, std::string from_nethernet_id,
     std::string md5_token_b64, std::string signaling_ip, int signaling_port,
     uint32_t user_id, EVP_PKEY* ec_key, ClientInstance* instance)
-    // ¸¸Àà ctor: ÓÃ¿Õ ip/port,ÒòÎªÕâÌõÂ·¾¶²»ÓÃÆÕÍ¨ ip/port
+    // ï¿½ï¿½ï¿½ï¿½ ctor: ï¿½Ã¿ï¿½ ip/port,ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¨ ip/port
     : ConnectInstance(std::move(chain), std::move(skindata), "", 0, ec_key, instance),
     m_host_nethernet_id(std::move(host_nethernet_id)),
     m_from_nethernet_id(std::move(from_nethernet_id)),
@@ -26,9 +26,9 @@ void NetherNetConnectInstance::Connect() {
     if (!m_is_disconnect) return;
     m_is_disconnect = false;
 
-    m_nethernet_ctx = TanLobbyGameCtx::create();
+    m_nethernet_ctx = TanLobbyGameCtx::create(Params::disout);
 
-    // ×¢Èë»Øµ÷: DC ÊÕµ½°ü -> Î¹¸ø¸¸Àà HandlePakcet
+    // ×¢ï¿½ï¿½Øµï¿½: DC ï¿½Õµï¿½ï¿½ï¿½ -> Î¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ HandlePakcet
     m_nethernet_ctx->setOnDataChannelMessage([this](const std::vector<uint8_t>& data) {
         this->onDataChannelMessage(data);
         });
@@ -37,7 +37,7 @@ void NetherNetConnectInstance::Connect() {
         LOG(LOG_NETWORK, "[NetherNet] DataChannel opened, ready to send");
         m_dc_opened = true;
 
-        // ¸ú RakNet Â·¾¶ÉÏ ID_CONNECTION_REQUEST_ACCEPTED Ò»ÑùµÄ³õÊ¼»¯
+        // ï¿½ï¿½ RakNet Â·ï¿½ï¿½ï¿½ï¿½ ID_CONNECTION_REQUEST_ACCEPTED Ò»ï¿½ï¿½ï¿½Ä³ï¿½Ê¼ï¿½ï¿½
         RequestNetworkSettings r;
         r.ProtocolVersion = MinecraftBedrockProtocolVersion;
         WritePacket(r);
@@ -47,7 +47,7 @@ void NetherNetConnectInstance::Connect() {
         m_host_nethernet_id, m_from_nethernet_id,
         m_md5_token_b64, m_signaling_ip, m_signaling_port, m_user_id);
 
-    // Æð·¢ËÍÏß³Ì
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ß³ï¿½
     m_send_thread_nn = std::thread(&NetherNetConnectInstance::sendThread, this);
     m_send_thread_nn.detach();
 }
@@ -55,7 +55,7 @@ void NetherNetConnectInstance::Connect() {
 void NetherNetConnectInstance::Disconnect() {
     m_is_disconnect = true;
     if (m_nethernet_ctx) {
-        m_nethernet_ctx->shutdown();   // Äã TanLobbyGameCtx ÉÏÐèÒªÓÐÕâ¸ö·½·¨
+        m_nethernet_ctx->shutdown();   // ï¿½ï¿½ TanLobbyGameCtx ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         m_nethernet_ctx.reset();
     }
 }
@@ -100,7 +100,7 @@ void NetherNetConnectInstance::sendThread() {
             SendKey->encrypt(data);
         }
 
-        // ¡ï ÍøÒ× NetherNet ×ÓÐ­ÒéÍ· 0x00
+        // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ NetherNet ï¿½ï¿½Ð­ï¿½ï¿½Í· 0x00
         std::vector<uint8_t> framed;
         framed.reserve(1 + data.size());
         framed.push_back(0x00);
@@ -114,8 +114,8 @@ void NetherNetConnectInstance::sendThread() {
 void NetherNetConnectInstance::onDataChannelMessage(const std::vector<uint8_t>& data) {
     if (data.empty()) return;
 
-    // ¡ï ÍøÒ× NetherNet ×ÓÐ­ÒéÍ·(Ó¦¸ÃÊÇ 0x00),°þµô
-    // ·ÀÓùÐÔ¼ì²é:Èç¹ûµÚÒ»×Ö½Ú²»ÊÇ 0x00,¼ÇÒ»ÏÂÈÕÖ¾
+    // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ NetherNet ï¿½ï¿½Ð­ï¿½ï¿½Í·(Ó¦ï¿½ï¿½ï¿½ï¿½ 0x00),ï¿½ï¿½ï¿½ï¿½
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½:ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½Ö½Ú²ï¿½ï¿½ï¿½ 0x00,ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ö¾
     if (data[0] != 0x00) {
         LOG(LOG_NETWORK, "[NetherNet] unexpected header byte: 0x",
             std::hex, (int)data[0], std::dec, " (expected 0x00)");

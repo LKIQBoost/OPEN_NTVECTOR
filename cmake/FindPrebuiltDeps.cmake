@@ -97,23 +97,13 @@ if(NOT TARGET websockets_static)
     endif()
 endif()
 
-# LibWebSocketWrapper — Windows 用预编译 .lib，Linux 用源码替代实现
-if(WIN32)
-    if(EXISTS "${APP_DIR}/LibWebSocketWrapper.lib")
-        add_library(LibWebSocketWrapper STATIC IMPORTED GLOBAL)
-        set_target_properties(LibWebSocketWrapper PROPERTIES
-            IMPORTED_LOCATION "${APP_DIR}/LibWebSocketWrapper.lib"
-        )
-    else()
-        add_library(LibWebSocketWrapper INTERFACE)
-    endif()
-else()
-    add_library(LibWebSocketWrapper STATIC
-        "${APP_DIR}/platform/LinuxWebSocketClient.cpp"
-    )
-    target_link_libraries(LibWebSocketWrapper PUBLIC websockets_static)
-    target_include_directories(LibWebSocketWrapper PRIVATE "${APP_DIR}")
-endif()
+# LibWebSocketWrapper — 全平台从源码编译，隔离 libwebsockets 头文件
+# WebSocketClient.h 只暴露纯虚接口，lws 符号不泄露到主项目
+add_library(LibWebSocketWrapper STATIC
+    "${APP_DIR}/platform/LinuxWebSocketClient.cpp"
+)
+target_link_libraries(LibWebSocketWrapper PUBLIC websockets_static)
+target_include_directories(LibWebSocketWrapper PRIVATE "${APP_DIR}")
 
 # ============================================================
 # 5. libdatachannel (源码编译, 含 libjuice/srtp2/usrsctp)

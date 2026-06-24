@@ -112,10 +112,6 @@ bool MCPFileSystem::_PrepareFileEntries(int dir_id) {
         });
 
     if (dir_it == m_dir_table.end() || dir_it->dir_id != dir_id) {
-        printf("[MCPFileSystem] _PrepareFileEntries: dir_id=0x%08X NOT FOUND (table size=%zu)\n",
-               (unsigned)dir_id, m_dir_table.size());
-        for (size_t dbg = 0; dbg < m_dir_table.size(); dbg++)
-            printf("  dir_table[%zu] = 0x%08X\n", dbg, (unsigned)m_dir_table[dbg].dir_id);
         m_file_table.erase(iter);
         return false;
     }
@@ -170,9 +166,6 @@ const std::vector<uint8_t> MCPFileSystem::Open(const char* filename) {
 
     // 3. �����ļ����Ĺ�ϣ
     int file_hash = NeoXHash::StringIDLegacy(pure_filename, strlen(pure_filename));
-    printf("[MCPFileSystem] Open('%s') dir_hash=0x%08X file_hash=0x%08X dir_entries=%zu\n",
-           filename, (unsigned)dir_hash, (unsigned)file_hash, dir_iter->second.size());
-
     // 二分查找文件
     std::vector<FileEntry>& file_list = dir_iter->second;
 

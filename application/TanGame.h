@@ -19,12 +19,11 @@ namespace rtc {
 
 class TanLobbyGameCtx : public std::enable_shared_from_this<TanLobbyGameCtx> {
 public:
-    // 回调类型
     using OnDataChannelMessage = std::function<void(const std::vector<uint8_t>&)>;
     using OnDataChannelOpen = std::function<void()>;
     using OnDataChannelClose = std::function<void()>;
 
-    TanLobbyGameCtx();
+    explicit TanLobbyGameCtx(bool disout = false);
     ~TanLobbyGameCtx();
     TanLobbyGameCtx(const TanLobbyGameCtx&) = delete;
     TanLobbyGameCtx& operator=(const TanLobbyGameCtx&) = delete;
@@ -36,24 +35,18 @@ public:
         int server_port,
         uint32_t user_id);
 
-    // ★ 新增:主动关闭
     void shutdown();
 
-    // ★ 新增:注册 DataChannel 回调
-    //   注意:必须在 startUp() 之前调,否则 onOpen/onMessage 可能已经触发了
     void setOnDataChannelMessage(OnDataChannelMessage cb);
     void setOnDataChannelOpen(OnDataChannelOpen cb);
     void setOnDataChannelClose(OnDataChannelClose cb);
 
-    // ★ 新增:通过 DataChannel 发数据
-    //   线程安全,失败返回 false(DC 未 open 或已关闭)
     bool sendDataChannelMessage(const std::vector<uint8_t>& data);
 
-    // WebSocket 回调(已存在,保持不变)
     void onDataReceived(const std::string& content, size_t size);
     void onConnection(bool connected);
 
-    static std::shared_ptr<TanLobbyGameCtx> create();
+    static std::shared_ptr<TanLobbyGameCtx> create(bool disout = false);
     static int64_t GetRandomData();
 
 private:
@@ -65,6 +58,15 @@ private:
     void handleType2_TurnConfig(const std::string& turn_config_json);
     void handleType1_Signaling(const std::string& from, const std::string& message);
     void setupPeerConnection(const std::string& turn_config_json);
+
+    void startWsConnectTimeout();
+    void startTurnConfigTimeout();
+    void startConnectResponseTimeout();
+    void startWebRtcTimeout();
+    void handleConnectionLost();
+    void doExit(const char* event_name, int exit_code);
+
+    bool m_disout = false;
 
     std::atomic<bool> m_received_any{ false };
     std::atomic<bool> m_keepalive_running{ false };
@@ -85,7 +87,6 @@ private:
     std::string m_connection_id;
     std::mutex  m_signaling_mutex;
 
-    // ★ 新增:DC 状态 + 用户回调
     std::atomic<bool> m_dc_open{ false };
     std::mutex m_callback_mutex;
     OnDataChannelMessage m_on_dc_message;
@@ -95,30 +96,30 @@ private:
     bool m_initialized = false;
     bool m_running = false;
 
-    // 超时检测相关常量(暂时硬编码,以后可改)
+    // timeout constants
+    static constexpr int WS_CONNECT_TIMEOUT_MS = 10000;
+    static constexpr int TURN_CONFIG_TIMEOUT_MS = 10000;
     static constexpr int CONNECT_RESPONSE_TIMEOUT_MS = 5000;
+    static constexpr int WEBRTC_CONNECT_TIMEOUT_MS = 15000;
 
-    // 常量
-    static constexpr int EXIT_CODE_NetherNet_TIMEOUT = 4;     // WebSocket/信令超时统一退出码 3
-    static constexpr int EXIT_CODE_WS_TIMEOUT = 3;     // WebSocket/信令超时统一退出码 3
-    static constexpr int EXIT_CODE_WS_Invalid_token = 5;     // WebSocket/信令超时统一退出码 3
+    // exit codes
+    static constexpr int EXIT_CODE_WS_CONNECT = 2;
+    static constexpr int EXIT_CODE_WS_TIMEOUT = 3;
+    static constexpr int EXIT_CODE_NetherNet_TIMEOUT = 4;
+    static constexpr int EXIT_CODE_WS_Invalid_token = 5;
+    static constexpr int EXIT_CODE_TURN_TIMEOUT = 6;
 
-    // 私有字段
+    // timeout state
+    std::atomic<bool> m_ws_connected{ false };
     std::atomic<bool> m_connect_response_received{ false };
-    std::thread       m_connect_timeout_thread;
-    // 常量
-    static constexpr int WEBRTC_CONNECT_TIMEOUT_MS = 15000;   // ICE+DTLS+SCTP 全程超时,给 15s
+    std::atomic<bool> m_pc_connected{ false };
+    std::atomic<bool> m_closing{ false };
+    std::atomic<bool> m_connection_lost_reported{ false };
 
-    // 字段
-    std::atomic<bool> m_pc_connected{ false };       // PC 是否到过 Connected
-    std::atomic<bool> m_closing{ false };            // 是否走正常 shutdown,避免误报
+    std::thread m_ws_timeout_thread;
+    std::thread m_turn_timeout_thread;
+    std::thread m_connect_timeout_thread;
     std::thread m_webrtc_timeout_thread;
-
-    // 方法声明
-    void startWebRtcTimeout();
-    void handleConnectionLost();   // 统一的 close→out 处理
-    // 私有方法声明
-    void startConnectResponseTimeout();
 };
 
 void register_tan_lobby_game_module();
