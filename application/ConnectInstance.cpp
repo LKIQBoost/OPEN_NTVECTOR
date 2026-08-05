@@ -1,5 +1,6 @@
 #include "ConnectInstance.h"
 #include "RakPeer.h"
+#include <fstream>
 
 extern unsigned int MinecraftBedrockProtocolVersion;
 ConnectInstance::ConnectInstance(std::string chain, std::string skindata, std::string ip, int port, EVP_PKEY* ec_key, ClientInstance* Instance) : chain(std::move(chain)),
@@ -244,6 +245,26 @@ void ConnectInstance::HandlePakcet(unsigned char* data, size_t length) {
             uint32_t packetid;
             uint32_t length = br2.ReadVarUInt32(packetid);
             std::string payload = std::string((const char*)(br2.Read(packetlength - length)), packetlength - length);
+            // ID=5 的内核事件触发时写入 dis.log
+            if (packetid == 5) {
+                static std::mutex dis_log_mutex;
+                std::lock_guard<std::mutex> lock(dis_log_mutex);
+                std::ofstream dis_log("dis.log", std::ios::app);
+                if (dis_log.is_open()) {
+                    auto now = std::chrono::system_clock::now();
+                    auto now_time = std::chrono::system_clock::to_time_t(now);
+                    std::tm time_info;
+#ifdef _WIN32
+                    localtime_s(&time_info, &now_time);
+#else
+                    localtime_r(&now_time, &time_info);
+#endif
+                    dis_log << std::put_time(&time_info, "[%Y-%m-%d %H:%M:%S]")
+                            << " [KernelEvent ID=5] payload_size=" << payload.size()
+                            << " payload=" << payload << std::endl;
+                    dis_log.close();
+                }
+            }
             m_event_wrapper->invokeEventHandlers(packetid, payload);
             m_callback->invokeCallback(packetid, (const unsigned char*)(payload.c_str()), payload.size());
             size_t d = br.m_pointer;

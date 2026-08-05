@@ -1,5 +1,6 @@
 #include "CallbackManager.h"
 #include "ClientInstance.h"
+#include "PlayStatus.h"
 
 extern unsigned int MinecraftBedrockProtocolVersion;
 void CallbackManager::onNetworkSetting(ConnectInstance* m_session, std::vector<uint8_t> packet) {
@@ -84,13 +85,26 @@ void CallbackManager::onServerToClientHandshake(ConnectInstance* m_session, std:
 void CallbackManager::onPlayStatus(ConnectInstance* m_session, std::vector<uint8_t> packet)
 {
     LOG(LOG_SERVER, "[Callback] onPlayStatus - Received play status packet, size: ", packet.size());
+    PlayStatus ps;
+    ps.Deserializ(packet);
+    LOG(LOG_WARN, "[Callback] PlayStatus value: ", ps.Status);
+    // Minecraft PlayStatus: 0=LoginSuccess, 1=FailedClientOutdated, 2=FailedServerOutdated,
+    // 3=PlayerSpawn, 4=FailedInvalidTenant, 5=FailedVanillaEdu, 6=FailedEduVanilla,
+    // 7=FailedServerFullSubClient
+    if (ps.Status != 0 && ps.Status != 3) {
+        LOG(LOG_ERROR, "[Callback] PlayStatus indicates failure (", ps.Status, "), server will disconnect");
+        // ä¾ç„¶è§¦å‘äº‹ä»¶ï¼Œè®©Pythonå±‚å¯ä»¥æ„ŸçŸ¥
+        PythonEventEngine engine;
+        engine.trigger("on_play_status", ps.Status);
+        return;
+    }
     ClientCacheStatus cth;
     cth.Enabled = true;
     cth.Unknow = false;
     LOG(LOG_SERVER, "[Callback] Sending ClientCacheStatus (Enabled=true)");
     m_session->WritePacket(cth);
     PythonEventEngine engine;
-    engine.trigger("on_play_status", 0);
+    engine.trigger("on_play_status", ps.Status);
 }
 
 void CallbackManager::onResourcePacksInfo(ConnectInstance* m_session, std::vector<uint8_t> packet)
@@ -340,7 +354,7 @@ void CallbackManager::runLoopAuthInput(ClientInstance* ctx)
     a.MoveVector.y = 0;
     a.headYaw = ctx->getLocalPlayer()->headYaw;
     a.inputData = ctx->getLocalPlayer()->inputData;
-    // µÚ¶þ²½£º±éÀúÍê³Éºó£¬Ò»´ÎÐÔÉ¾³ýÄ¿±êÔªËØ£¨µü´úÆ÷ÓÐÐ§£©
+    // ï¿½Ú¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Éºï¿½Ò»ï¿½ï¿½ï¿½ï¿½É¾ï¿½ï¿½Ä¿ï¿½ï¿½Ôªï¿½Ø£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½
     ctx->getLocalPlayer()->inputData.erase(
         std::remove(ctx->getLocalPlayer()->inputData.begin(), ctx->getLocalPlayer()->inputData.end(), (PlayerAuthInputData)37),
         ctx->getLocalPlayer()->inputData.end()

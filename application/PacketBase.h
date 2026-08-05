@@ -1,5 +1,5 @@
 #pragma once
-// Êı¾İ°ü ID ºê¶¨Òå
+// æ•°æ®åŒ… ID å®å®šä¹‰
 // https://prismarinejs.github.io/minecraft-data/protocol/bedrock/1.21.42/#Action
 #include <vector>
 #include <string>
@@ -9,227 +9,227 @@
 
 #define RakNetID 0xfe
 
-#define IDLogin 1                  // ¿Í»§¶ËµÇÂ¼£¨±¾µØ£©(·¢ËÍchain½»»»ÃÜÔ¿)
-#define IDPlayStatus 2             // Íæ¼Ò×´Ì¬
-#define IDServerToClientHandshake 3 // ·şÎñ¶Ëµ½¿Í»§¶ËÎÕÊÖ(Ğ¯´ø·şÎñÆ÷¹«Ô¿ºÍsalt(Öµ))
-#define IDClientToServerHandshake 4 // ¿Í»§¶Ëµ½·şÎñ¶ËÎÕÊÖ(¿ÕÖµÊı¾İ°ü)
-#define IDDisconnect 5             // ¶Ï¿ªÁ¬½Ó
-#define IDResourcePacksInfo 6      // ×ÊÔ´°üĞÅÏ¢£¨·Ç³£ÓÃ£©
-#define IDResourcePackStack 7      // ×ÊÔ´°ü¶Ñµş£¨·Ç³£ÓÃ£©
-#define IDResourcePackClientResponse 8 // ×ÊÔ´°ü¿Í»§¶ËÏìÓ¦£¨·Ç³£ÓÃ£©
-#define IDText 9                   // ÎÄ±¾ÏûÏ¢
-#define IDSetTime 10               // ¸üĞÂ¿Í»§¶ËÊ±¼ä£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDStartGame 11             // ¿ªÊ¼ÓÎÏ·
-#define IDAddPlayer 12             // Ìí¼ÓÍæ¼ÒÊµÌå
-#define IDAddActor 13              // Ìí¼ÓÊµÌå
-#define IDRemoveActor 14           // Ìí¼ÓÊµÌå
-#define IDAddItemActor 15          // Ìí¼ÓÎïÆ·ÊµÌå
-#define IDTakeItemActor 17         // ¼ñÆğÎïÆ·ÊµÌå£¨¶¯»­£©
-#define IDMoveActorAbsolute 18     // ÒÆ¶¯ÊµÌåµ½¾ø¶ÔÎ»ÖÃ
-#define IDMovePlayer 19            // Íæ¼ÒÒÆ¶¯£¨·şÎñ¶Ë <-> ¿Í»§¶Ë£©
-#define IDPassengerJump 20         // ³ËÆïÌøÔ¾£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDUpdateBlock 21           // ¸üĞÂ·½¿é£¨µ¥·½¿éĞŞ¸Ä£©
-#define IDAddPainting 22           // Ìí¼Ó»æ»­ÊµÌå
-#define IDTickSync 23              // Í¬²½Tick£¨·şÎñ¶Ë <-> ¿Í»§¶Ë£©
+#define IDLogin 1                  // å®¢æˆ·ç«¯ç™»å½•ï¼ˆæœ¬åœ°ï¼‰(å‘é€chainäº¤æ¢å¯†é’¥)
+#define IDPlayStatus 2             // ç©å®¶çŠ¶æ€
+#define IDServerToClientHandshake 3 // æœåŠ¡ç«¯åˆ°å®¢æˆ·ç«¯æ¡æ‰‹(æºå¸¦æœåŠ¡å™¨å…¬é’¥å’Œsalt(å€¼))
+#define IDClientToServerHandshake 4 // å®¢æˆ·ç«¯åˆ°æœåŠ¡ç«¯æ¡æ‰‹(ç©ºå€¼æ•°æ®åŒ…)
+#define IDDisconnect 5             // æ–­å¼€è¿æ¥
+#define IDResourcePacksInfo 6      // èµ„æºåŒ…ä¿¡æ¯ï¼ˆéå¸¸ç”¨ï¼‰
+#define IDResourcePackStack 7      // èµ„æºåŒ…å †å ï¼ˆéå¸¸ç”¨ï¼‰
+#define IDResourcePackClientResponse 8 // èµ„æºåŒ…å®¢æˆ·ç«¯å“åº”ï¼ˆéå¸¸ç”¨ï¼‰
+#define IDText 9                   // æ–‡æœ¬æ¶ˆæ¯
+#define IDSetTime 10               // æ›´æ–°å®¢æˆ·ç«¯æ—¶é—´ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDStartGame 11             // å¼€å§‹æ¸¸æˆ
+#define IDAddPlayer 12             // æ·»åŠ ç©å®¶å®ä½“
+#define IDAddActor 13              // æ·»åŠ å®ä½“
+#define IDRemoveActor 14           // æ·»åŠ å®ä½“
+#define IDAddItemActor 15          // æ·»åŠ ç‰©å“å®ä½“
+#define IDTakeItemActor 17         // æ¡èµ·ç‰©å“å®ä½“ï¼ˆåŠ¨ç”»ï¼‰
+#define IDMoveActorAbsolute 18     // ç§»åŠ¨å®ä½“åˆ°ç»å¯¹ä½ç½®
+#define IDMovePlayer 19            // ç©å®¶ç§»åŠ¨ï¼ˆæœåŠ¡ç«¯ <-> å®¢æˆ·ç«¯ï¼‰
+#define IDPassengerJump 20         // ä¹˜éª‘è·³è·ƒï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDUpdateBlock 21           // æ›´æ–°æ–¹å—ï¼ˆå•æ–¹å—ä¿®æ”¹ï¼‰
+#define IDAddPainting 22           // æ·»åŠ ç»˜ç”»å®ä½“
+#define IDTickSync 23              // åŒæ­¥Tickï¼ˆæœåŠ¡ç«¯ <-> å®¢æˆ·ç«¯ï¼‰
 #define IDLevelSoundEventV1 24     // ???
-#define IDLevelEvent 25            // ÊÀ½çÊÂ¼ş£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDBlockEvent 26            // ·½¿éÊÂ¼ş£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©[´ò¿ªÏä×Ó./././...]
-#define IDActorEvent 27            // ÊµÌåÊÂ¼ş£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©[ÀÇ¶¶¸É×Ô¼º./././...]
-#define IDMobEffect 28             // ÉúÎïĞ§¹û£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDUpdateAttributes 29      // ¸üĞÂÊµÌåÊôĞÔ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©[ÒÆ¶¯ËÙ¶È./½¡¿µ×´¿ö./...]
-#define IDInventoryTransaction 30  // ÎïÆ·½»Ò×£¨·şÎñ¶Ë <- ¿Í»§¶Ë£©
-#define IDMobEquipment 31          // ÊµÌåÎïÆ·³ÖÓĞ£¨·şÎñ¶Ë <-> ¿Í»§¶Ë£©[½©Ê¬ÊÖ³ÖÊ¯½£././...]
-#define IDMobArmourEquipment 32    // ×°±¸´©´÷£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©[Íæ¼Ò./½©Ê¬./ÆäËûÊµÌå./...]
-#define IDInteract 33              // ÊµÌå½»»¥£¨ÆúÓÃ£©
-#define IDBlockPickRequest 34      // Ê°È¡ÎïÆ·ÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDActorPickRequest 35      // Ê°È¡ÊµÌåÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDPlayerAction 36          // Íæ¼ÒĞĞÎª£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDHurtArmour 38            // ¿ø¼×Ëğº¦£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetActorData 39          // ÊµÌåÔªÊı¾İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©[ÊµÌåÊÇ·ñ×Å»ğ././...]
-#define IDSetActorMotion 40        // ÉèÖÃ¿Í»§¶ËËÙ¶È£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetActorLink 41          // ÉèÖÃÊµÌå³ËÆï£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetHealth 42             // ÉèÖÃÍæ¼ÒÑªÁ¿£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetSpawnPosition 43      // ÉèÖÃÍæ¼Ò³öÉúµãÎ»ÖÃ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDAnimate 44               // ¶¯»­Ğ§¹û£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDRespawn 45               // ÖØÉú£¨·şÎñ¶Ë <-> ¿Í»§¶Ë£©
-#define IDContainerOpen 46         // ´ò¿ªÈİÆ÷£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDContainerClose 47        // ¹Ø±ÕÈİÆ÷£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPlayerHotBar 48          // Íæ¼Ò¿ì½İÀ¸²ÛÎ»£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDInventoryContent 49      // ¸üĞÂÍæ¼Ò±³°ü£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDInventorySlot 50         // Íæ¼Ò±³°üµ¥²ÛÎ»¸üĞÂ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDContainerSetData 51      // ÈİÆ÷ÉèÖÃÊı¾İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCraftingData 52          // ºÏ³ÉÊı¾İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCraftingEvent 53         // ºÏ³ÉÊÂ¼ş£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDGUIDataPickItem 54       // GUIÊı¾İÊ°È¡ÎïÆ·£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDAdventureSettings 55     // Ã°ÏÕÉèÖÃ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDBlockActorData 56        // ·½¿éÊµÌåÊı¾İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPlayerInput 57           // Íæ¼ÒÊäÈë£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDLevelChunk 58            // Çø¿éÊı¾İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetCommandsEnabled 59    // ÉèÖÃÃüÁîÆôÓÃ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetDifficulty 60         // ÉèÖÃÄÑ¶È£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDChangeDimension 61       // ¸Ä±äÎ¬¶È£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetPlayerGameType 62     // ÉèÖÃÍæ¼ÒÓÎÏ·ÀàĞÍ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPlayerList 63            // Íæ¼ÒÁĞ±í£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSimpleEvent 64           // ¼òµ¥ÊÂ¼ş£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDEvent 65                 // ÊÂ¼ş£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSpawnExperienceOrb 66    // Éú³É¾­ÑéÇò£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDClientBoundMapItemData 67 // ¿Í»§¶Ë°ó¶¨µØÍ¼ÎïÆ·Êı¾İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDMapInfoRequest 68        // µØÍ¼ĞÅÏ¢ÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDRequestChunkRadius 69    // ÇëÇóÇø¿é°ë¾¶£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDChunkRadiusUpdated 70    // Çø¿é°ë¾¶¸üĞÂ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDItemFrameDropItem 71     // ÎïÆ·Õ¹Ê¾¿òµôÂäÎïÆ·£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDGameRulesChanged 72      // ÓÎÏ·¹æÔò¸Ä±ä£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCamera 73                // Ïà»ú£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDBossEvent 74             // BossÊÂ¼ş£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDShowCredits 75           // ÏÔÊ¾ credits£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDAvailableCommands 76     // ¿ÉÓÃÃüÁî£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCommandRequest 77        // ÃüÁîÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDCommandBlockUpdate 78    // ÃüÁî¿é¸üĞÂ£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDCommandOutput 79         // ÃüÁîÊä³ö£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDUpdateTrade 80           // ¸üĞÂ½»Ò×£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDUpdateEquip 81           // ¸üĞÂ×°±¸£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDResourcePackDataInfo 82  // ×ÊÔ´°üÊı¾İĞÅÏ¢£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDResourcePackChunkData 83 // ×ÊÔ´°ü¿éÊı¾İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDResourcePackChunkRequest 84 // ×ÊÔ´°ü¿éÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDTransfer 85              // ´«Êä£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPlaySound 86             // ²¥·ÅÉùÒô£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDStopSound 87             // Í£Ö¹ÉùÒô£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetTitle 88              // ÉèÖÃ±êÌâ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDAddBehaviourTree 89      // Ìí¼ÓĞĞÎªÊ÷£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDStructureBlockUpdate 90  // ½á¹¹·½¿é¸üĞÂ£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDShowStoreOffer 91        // ÏÔÊ¾ÉÌµêÓÅ»İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPurchaseReceipt 92       // ¹ºÂòÊÕ¾İ£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDPlayerSkin 93            // Íæ¼ÒÆ¤·ô£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDSubClientLogin 94        // ×Ó¿Í»§¶ËµÇÂ¼£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDAutomationClientConnect 95 // ×Ô¶¯»¯¿Í»§¶ËÁ¬½Ó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDSetLastHurtBy 96         // ÉèÖÃ×îºóÊÜÉËÀ´Ô´£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDBookEdit 97              // Êé±¾±à¼­£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDNPCRequest 98            // NPCÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDPhotoTransfer 99         // ÕÕÆ¬´«Êä£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDModalFormRequest 100     // Ä£Ì¬±íµ¥ÇëÇó£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDModalFormResponse 101    // Ä£Ì¬±íµ¥ÏìÓ¦£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDServerSettingsRequest 102 // ·şÎñÆ÷ÉèÖÃÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDServerSettingsResponse 103 // ·şÎñÆ÷ÉèÖÃÏìÓ¦£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDShowProfile 104          // ÏÔÊ¾×ÊÁÏ£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDSetDefaultGameType 105   // ÉèÖÃÄ¬ÈÏÓÎÏ·ÀàĞÍ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDRemoveObjective 106      // ÒÆ³ıÄ¿±ê£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetDisplayObjective 107  // ÉèÖÃÏÔÊ¾Ä¿±ê£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetScore 108             // ÉèÖÃ·ÖÊı£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDLabTable 109             // ÊµÑéÊÒ±í£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDUpdateBlockSynced 110    // Í¬²½¸üĞÂ·½¿é£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDMoveActorDelta 111       // ÒÆ¶¯ÊµÌåÔöÁ¿£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetScoreboardIdentity 112 // ÉèÖÃ¼Æ·Ö°åÉí·İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetLocalPlayerAsInitialised 113 // ÉèÖÃ±¾µØÍæ¼ÒÎªÒÑ³õÊ¼»¯£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDUpdateSoftEnum 114       // ¸üĞÂÈíÃ¶¾Ù£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDNetworkStackLatency 115  // ÍøÂç¶ÑÕ»ÑÓ³Ù£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDScriptCustomEvent 117    // ½Å±¾×Ô¶¨ÒåÊÂ¼ş£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDSpawnParticleEffect 118  // Éú³ÉÁ£×ÓĞ§¹û£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDAvailableActorIdentifiers 119 // ¿ÉÓÃÊµÌå±êÊ¶·û£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDLevelSoundEventV2 120    // ÊÀ½çÉùÒôÊÂ¼ş V2£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDNetworkChunkPublisherUpdate 121 // ÍøÂçÇø¿é·¢²¼Õß¸üĞÂ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDBiomeDefinitionList 122  // ÉúÎïÈºÏµ¶¨ÒåÁĞ±í£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDLevelSoundEvent 123      // ÊÀ½çÉùÒôÊÂ¼ş£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDLevelEventGeneric 124    // ÊÀ½çÊÂ¼şÍ¨ÓÃ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDLecternUpdate 125        // ½²Ì¨¸üĞÂ£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDAddEntity 127            // Ìí¼ÓÊµÌå£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDRemoveEntity 128         // ÒÆ³ıÊµÌå£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDClientCacheStatus 129    // ¿Í»§¶Ë»º´æ×´Ì¬£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDOnScreenTextureAnimation 130 // ÆÁÄ»ÎÆÀí¶¯»­£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDMapCreateLockedCopy 131  // µØÍ¼´´½¨Ëø¶¨¸±±¾£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDStructureTemplateDataRequest 132 // ½á¹¹Ä£°åÊı¾İÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDStructureTemplateDataResponse 133 // ½á¹¹Ä£°åÊı¾İÏìÓ¦£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDClientCacheBlobStatus 135 // ¿Í»§¶Ë»º´æ¿é×´Ì¬£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDClientCacheMissResponse 136 // ¿Í»§¶Ë»º´æÎ´ÃüÖĞÏìÓ¦£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDEducationSettings 137    // ½ÌÓıÉèÖÃ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDEmote 138                // ±íÇé£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDMultiPlayerSettings 139  // ¶àÈËÓÎÏ·ÉèÖÃ£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDSettingsCommand 140      // ÉèÖÃÃüÁî£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDAnvilDamage 141          // ÌúÕèËğ»µ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCompletedUsingItem 142   // Íê³ÉÊ¹ÓÃÎïÆ·£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDNetworkSettings 143      // ÍøÂçÉèÖÃ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPlayerAuthInput 144      // Íæ¼ÒÈÏÖ¤ÊäÈë£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDCreativeContent 145      // ´´ÔìÄÚÈİ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPlayerEnchantOptions 146 // Íæ¼Ò¸½Ä§Ñ¡Ïî£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDItemStackRequest 147     // ÎïÆ·¶ÑÕ»ÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDItemStackResponse 148    // ÎïÆ·¶ÑÕ»ÏìÓ¦£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPlayerArmourDamage 149   // Íæ¼Ò¿ø¼×Ëğ»µ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCodeBuilder 150          // ´úÂë¹¹½¨Æ÷£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDUpdatePlayerGameType 151 // ¸üĞÂÍæ¼ÒÓÎÏ·ÀàĞÍ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDEmoteList 152            // ±íÇéÁĞ±í£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPositionTrackingDBServerBroadcast 153 // Î»ÖÃ¸ú×ÙÊı¾İ¿â·şÎñÆ÷¹ã²¥£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPositionTrackingDBClientRequest 154 // Î»ÖÃ¸ú×ÙÊı¾İ¿â¿Í»§¶ËÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDDebugInfo 155            // µ÷ÊÔĞÅÏ¢£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPacketViolationWarning 156 // Êı¾İ°üÎ¥¹æ¾¯¸æ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDMotionPredictionHints 157 // ÔË¶¯Ô¤²âÌáÊ¾£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDAnimateEntity 158        // ¶¯»­ÊµÌå£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCameraShake 159          // Ïà»úÕğ¶¯£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPlayerFog 160            // Íæ¼ÒÃÔÎí£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCorrectPlayerMovePrediction 161 // ¾ÀÕıÍæ¼ÒÒÆ¶¯Ô¤²â£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDItemComponent 162        // ÎïÆ·×é¼ş£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDFilterText 163           // ¹ıÂËÎÄ±¾£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDClientBoundDebugRenderer 164 // ¿Í»§¶Ë°ó¶¨µ÷ÊÔäÖÈ¾Æ÷£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSyncActorProperty 165    // Í¬²½ÊµÌåÊôĞÔ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDAddVolumeEntity 166      // Ìí¼ÓÌå»ıÊµÌå£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDRemoveVolumeEntity 167   // ÒÆ³ıÌå»ıÊµÌå£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSimulationType 168       // Ä£ÄâÀàĞÍ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDNPCDialogue 169          // NPC¶Ô»°£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDEducationResourceURI 170 // ½ÌÓı×ÊÔ´URI£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCreatePhoto 171          // ´´½¨ÕÕÆ¬£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDUpdateSubChunkBlocks 172 // ¸üĞÂ×ÓÇø¿é·½¿é£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPhotoInfoRequest 173     // ÕÕÆ¬ĞÅÏ¢ÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDSubChunk 174             // ×ÓÇø¿é£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSubChunkRequest 175      // ×ÓÇø¿éÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDClientStartItemCooldown 176 // ¿Í»§¶Ë¿ªÊ¼ÎïÆ·ÀäÈ´£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDScriptMessage 177        // ½Å±¾ÏûÏ¢£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDCodeBuilderSource 178    // ´úÂë¹¹½¨Æ÷Ô´£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDTickingAreasLoadStatus 179 // ticking ÇøÓò¼ÓÔØ×´Ì¬£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDDimensionData 180        // Î¬¶ÈÊı¾İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDAgentAction 181          // ´úÀí
-#define IDChangeMobProperty 182    // ¸Ä±äÉúÎïÊôĞÔ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDLessonProgress 183       // ¿Î³Ì½ø¶È£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDRequestAbility 184       // ÇëÇóÄÜÁ¦£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDRequestPermissions 185   // ÇëÇóÈ¨ÏŞ£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDToastRequest 186         // ÍÂË¾ÇëÇó£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDUpdateAbilities 187      // ¸üĞÂÄÜÁ¦£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDUpdateAdventureSettings 188 // ¸üĞÂÃ°ÏÕÉèÖÃ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDDeathInfo 189            // ËÀÍöĞÅÏ¢£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDEditorNetwork 190        // ±à¼­Æ÷ÍøÂç£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDFeatureRegistry 191      // ÌØĞÔ×¢²á±í£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDServerStats 192          // ·şÎñÆ÷Í³¼Æ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDRequestNetworkSettings 193 // ÇëÇóÍøÂçÉèÖÃ£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDGameTestRequest 194      // ÓÎÏ·²âÊÔÇëÇó£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDGameTestResults 195      // ÓÎÏ·²âÊÔ½á¹û£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDUpdateClientInputLocks 196 // ¸üĞÂ¿Í»§¶ËÊäÈëËø£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDClientCheatAbility 197   // ¿Í»§¶Ë×÷±×ÄÜÁ¦£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDCameraPresets 198        // Ïà»úÔ¤Éè£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDUnlockedRecipes 199      // ÒÑ½âËøÅä·½£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDPyRpc 200                // PythonÔ¶³Ì¹ı³Ìµ÷ÓÃ£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDChangeModel 201          // ¸Ä±äÄ£ĞÍ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDStoreBuySucc 202         // ÉÌµê¹ºÂò³É¹¦£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDNeteaseJson 203          // ÍøÒ× JSON£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDChangeModelTexture 204   // ¸Ä±äÄ£ĞÍÎÆÀí£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDChangeModelOffset 205    // ¸Ä±äÄ£ĞÍÆ«ÒÆ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDChangeModelBind 206      // ¸Ä±äÄ£ĞÍ°ó¶¨£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDHungerAttr 207           // ¼¢¶öÊôĞÔ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDSetDimensionLocalTime 208 // ÉèÖÃÎ¬¶È±¾µØÊ±¼ä£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDWithdrawFurnaceXp 209    // ÌáÈ¡ÈÛÂ¯¾­Ñé£¨¿Í»§¶Ë -> ·şÎñ¶Ë£©
-#define IDSetDimensionLocalWeather 210 // ÉèÖÃÎ¬¶È±¾µØÌìÆø£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCustomV1 223             // ×Ô¶¨Òå V1£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCombine 224              // ×éºÏ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDVConnection 225          // V Á¬½Ó£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDTransport 226            // ´«Êä£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCustomV2 227             // ×Ô¶¨Òå V2£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDConfirmSkin 228          // È·ÈÏÆ¤·ô£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDTransportNoCompress 229  // ÎŞÑ¹Ëõ´«Êä£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDMobEffectV2 230          // ÉúÎïĞ§¹û V2£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDMobBlockActorChanged 231 // ÉúÎï·½¿éÊµÌå¸Ä±ä£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDChangeActorMotion 232    // ¸Ä±äÊµÌåÔË¶¯£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDAnimateEmoteEntity 233   // ¶¯»­±íÇéÊµÌå£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCameraInstruction 300    // Ïà»úÖ¸Áî£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDCompressedBiomeDefinitionList 301 // Ñ¹ËõÉúÎïÈºÏµ¶¨ÒåÁĞ±í£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDTrimData 302             // ĞŞ¼ôÊı¾İ£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDOpenSign 303             // ´ò¿ª±êÖ¾£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
-#define IDAgentAnimation 304       // ´úÀí¶¯»­£¨·şÎñ¶Ë -> ¿Í»§¶Ë£©
+#define IDLevelEvent 25            // ä¸–ç•Œäº‹ä»¶ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDBlockEvent 26            // æ–¹å—äº‹ä»¶ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰[æ‰“å¼€ç®±å­./././...]
+#define IDActorEvent 27            // å®ä½“äº‹ä»¶ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰[ç‹¼æŠ–å¹²è‡ªå·±./././...]
+#define IDMobEffect 28             // ç”Ÿç‰©æ•ˆæœï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDUpdateAttributes 29      // æ›´æ–°å®ä½“å±æ€§ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰[ç§»åŠ¨é€Ÿåº¦./å¥åº·çŠ¶å†µ./...]
+#define IDInventoryTransaction 30  // ç‰©å“äº¤æ˜“ï¼ˆæœåŠ¡ç«¯ <- å®¢æˆ·ç«¯ï¼‰
+#define IDMobEquipment 31          // å®ä½“ç‰©å“æŒæœ‰ï¼ˆæœåŠ¡ç«¯ <-> å®¢æˆ·ç«¯ï¼‰[åƒµå°¸æ‰‹æŒçŸ³å‰‘././...]
+#define IDMobArmourEquipment 32    // è£…å¤‡ç©¿æˆ´ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰[ç©å®¶./åƒµå°¸./å…¶ä»–å®ä½“./...]
+#define IDInteract 33              // å®ä½“äº¤äº’ï¼ˆå¼ƒç”¨ï¼‰
+#define IDBlockPickRequest 34      // æ‹¾å–ç‰©å“è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDActorPickRequest 35      // æ‹¾å–å®ä½“è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDPlayerAction 36          // ç©å®¶è¡Œä¸ºï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDHurtArmour 38            // ç›”ç”²æŸå®³ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetActorData 39          // å®ä½“å…ƒæ•°æ®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰[å®ä½“æ˜¯å¦ç€ç«././...]
+#define IDSetActorMotion 40        // è®¾ç½®å®¢æˆ·ç«¯é€Ÿåº¦ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetActorLink 41          // è®¾ç½®å®ä½“ä¹˜éª‘ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetHealth 42             // è®¾ç½®ç©å®¶è¡€é‡ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetSpawnPosition 43      // è®¾ç½®ç©å®¶å‡ºç”Ÿç‚¹ä½ç½®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDAnimate 44               // åŠ¨ç”»æ•ˆæœï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDRespawn 45               // é‡ç”Ÿï¼ˆæœåŠ¡ç«¯ <-> å®¢æˆ·ç«¯ï¼‰
+#define IDContainerOpen 46         // æ‰“å¼€å®¹å™¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDContainerClose 47        // å…³é—­å®¹å™¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPlayerHotBar 48          // ç©å®¶å¿«æ·æ æ§½ä½ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDInventoryContent 49      // æ›´æ–°ç©å®¶èƒŒåŒ…ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDInventorySlot 50         // ç©å®¶èƒŒåŒ…å•æ§½ä½æ›´æ–°ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDContainerSetData 51      // å®¹å™¨è®¾ç½®æ•°æ®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCraftingData 52          // åˆæˆæ•°æ®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCraftingEvent 53         // åˆæˆäº‹ä»¶ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDGUIDataPickItem 54       // GUIæ•°æ®æ‹¾å–ç‰©å“ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDAdventureSettings 55     // å†’é™©è®¾ç½®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDBlockActorData 56        // æ–¹å—å®ä½“æ•°æ®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPlayerInput 57           // ç©å®¶è¾“å…¥ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDLevelChunk 58            // åŒºå—æ•°æ®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetCommandsEnabled 59    // è®¾ç½®å‘½ä»¤å¯ç”¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetDifficulty 60         // è®¾ç½®éš¾åº¦ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDChangeDimension 61       // æ”¹å˜ç»´åº¦ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetPlayerGameType 62     // è®¾ç½®ç©å®¶æ¸¸æˆç±»å‹ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPlayerList 63            // ç©å®¶åˆ—è¡¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSimpleEvent 64           // ç®€å•äº‹ä»¶ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDEvent 65                 // äº‹ä»¶ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSpawnExperienceOrb 66    // ç”Ÿæˆç»éªŒçƒï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDClientBoundMapItemData 67 // å®¢æˆ·ç«¯ç»‘å®šåœ°å›¾ç‰©å“æ•°æ®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDMapInfoRequest 68        // åœ°å›¾ä¿¡æ¯è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDRequestChunkRadius 69    // è¯·æ±‚åŒºå—åŠå¾„ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDChunkRadiusUpdated 70    // åŒºå—åŠå¾„æ›´æ–°ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDItemFrameDropItem 71     // ç‰©å“å±•ç¤ºæ¡†æ‰è½ç‰©å“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDGameRulesChanged 72      // æ¸¸æˆè§„åˆ™æ”¹å˜ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCamera 73                // ç›¸æœºï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDBossEvent 74             // Bossäº‹ä»¶ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDShowCredits 75           // æ˜¾ç¤º creditsï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDAvailableCommands 76     // å¯ç”¨å‘½ä»¤ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCommandRequest 77        // å‘½ä»¤è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDCommandBlockUpdate 78    // å‘½ä»¤å—æ›´æ–°ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDCommandOutput 79         // å‘½ä»¤è¾“å‡ºï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDUpdateTrade 80           // æ›´æ–°äº¤æ˜“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDUpdateEquip 81           // æ›´æ–°è£…å¤‡ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDResourcePackDataInfo 82  // èµ„æºåŒ…æ•°æ®ä¿¡æ¯ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDResourcePackChunkData 83 // èµ„æºåŒ…å—æ•°æ®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDResourcePackChunkRequest 84 // èµ„æºåŒ…å—è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDTransfer 85              // ä¼ è¾“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPlaySound 86             // æ’­æ”¾å£°éŸ³ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDStopSound 87             // åœæ­¢å£°éŸ³ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetTitle 88              // è®¾ç½®æ ‡é¢˜ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDAddBehaviourTree 89      // æ·»åŠ è¡Œä¸ºæ ‘ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDStructureBlockUpdate 90  // ç»“æ„æ–¹å—æ›´æ–°ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDShowStoreOffer 91        // æ˜¾ç¤ºå•†åº—ä¼˜æƒ ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPurchaseReceipt 92       // è´­ä¹°æ”¶æ®ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDPlayerSkin 93            // ç©å®¶çš®è‚¤ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDSubClientLogin 94        // å­å®¢æˆ·ç«¯ç™»å½•ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDAutomationClientConnect 95 // è‡ªåŠ¨åŒ–å®¢æˆ·ç«¯è¿æ¥ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDSetLastHurtBy 96         // è®¾ç½®æœ€åå—ä¼¤æ¥æºï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDBookEdit 97              // ä¹¦æœ¬ç¼–è¾‘ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDNPCRequest 98            // NPCè¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDPhotoTransfer 99         // ç…§ç‰‡ä¼ è¾“ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDModalFormRequest 100     // æ¨¡æ€è¡¨å•è¯·æ±‚ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDModalFormResponse 101    // æ¨¡æ€è¡¨å•å“åº”ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDServerSettingsRequest 102 // æœåŠ¡å™¨è®¾ç½®è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDServerSettingsResponse 103 // æœåŠ¡å™¨è®¾ç½®å“åº”ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDShowProfile 104          // æ˜¾ç¤ºèµ„æ–™ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDSetDefaultGameType 105   // è®¾ç½®é»˜è®¤æ¸¸æˆç±»å‹ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDRemoveObjective 106      // ç§»é™¤ç›®æ ‡ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetDisplayObjective 107  // è®¾ç½®æ˜¾ç¤ºç›®æ ‡ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetScore 108             // è®¾ç½®åˆ†æ•°ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDLabTable 109             // å®éªŒå®¤è¡¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDUpdateBlockSynced 110    // åŒæ­¥æ›´æ–°æ–¹å—ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDMoveActorDelta 111       // ç§»åŠ¨å®ä½“å¢é‡ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetScoreboardIdentity 112 // è®¾ç½®è®¡åˆ†æ¿èº«ä»½ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetLocalPlayerAsInitialised 113 // è®¾ç½®æœ¬åœ°ç©å®¶ä¸ºå·²åˆå§‹åŒ–ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDUpdateSoftEnum 114       // æ›´æ–°è½¯æšä¸¾ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDNetworkStackLatency 115  // ç½‘ç»œå †æ ˆå»¶è¿Ÿï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDScriptCustomEvent 117    // è„šæœ¬è‡ªå®šä¹‰äº‹ä»¶ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDSpawnParticleEffect 118  // ç”Ÿæˆç²’å­æ•ˆæœï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDAvailableActorIdentifiers 119 // å¯ç”¨å®ä½“æ ‡è¯†ç¬¦ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDLevelSoundEventV2 120    // ä¸–ç•Œå£°éŸ³äº‹ä»¶ V2ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDNetworkChunkPublisherUpdate 121 // ç½‘ç»œåŒºå—å‘å¸ƒè€…æ›´æ–°ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDBiomeDefinitionList 122  // ç”Ÿç‰©ç¾¤ç³»å®šä¹‰åˆ—è¡¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDLevelSoundEvent 123      // ä¸–ç•Œå£°éŸ³äº‹ä»¶ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDLevelEventGeneric 124    // ä¸–ç•Œäº‹ä»¶é€šç”¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDLecternUpdate 125        // è®²å°æ›´æ–°ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDAddEntity 127            // æ·»åŠ å®ä½“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDRemoveEntity 128         // ç§»é™¤å®ä½“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDClientCacheStatus 129    // å®¢æˆ·ç«¯ç¼“å­˜çŠ¶æ€ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDOnScreenTextureAnimation 130 // å±å¹•çº¹ç†åŠ¨ç”»ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDMapCreateLockedCopy 131  // åœ°å›¾åˆ›å»ºé”å®šå‰¯æœ¬ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDStructureTemplateDataRequest 132 // ç»“æ„æ¨¡æ¿æ•°æ®è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDStructureTemplateDataResponse 133 // ç»“æ„æ¨¡æ¿æ•°æ®å“åº”ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDClientCacheBlobStatus 135 // å®¢æˆ·ç«¯ç¼“å­˜å—çŠ¶æ€ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDClientCacheMissResponse 136 // å®¢æˆ·ç«¯ç¼“å­˜æœªå‘½ä¸­å“åº”ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDEducationSettings 137    // æ•™è‚²è®¾ç½®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDEmote 138                // è¡¨æƒ…ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDMultiPlayerSettings 139  // å¤šäººæ¸¸æˆè®¾ç½®ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDSettingsCommand 140      // è®¾ç½®å‘½ä»¤ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDAnvilDamage 141          // é“ç §æŸåï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCompletedUsingItem 142   // å®Œæˆä½¿ç”¨ç‰©å“ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDNetworkSettings 143      // ç½‘ç»œè®¾ç½®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPlayerAuthInput 144      // ç©å®¶è®¤è¯è¾“å…¥ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDCreativeContent 145      // åˆ›é€ å†…å®¹ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPlayerEnchantOptions 146 // ç©å®¶é™„é­”é€‰é¡¹ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDItemStackRequest 147     // ç‰©å“å †æ ˆè¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDItemStackResponse 148    // ç‰©å“å †æ ˆå“åº”ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPlayerArmourDamage 149   // ç©å®¶ç›”ç”²æŸåï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCodeBuilder 150          // ä»£ç æ„å»ºå™¨ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDUpdatePlayerGameType 151 // æ›´æ–°ç©å®¶æ¸¸æˆç±»å‹ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDEmoteList 152            // è¡¨æƒ…åˆ—è¡¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPositionTrackingDBServerBroadcast 153 // ä½ç½®è·Ÿè¸ªæ•°æ®åº“æœåŠ¡å™¨å¹¿æ’­ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPositionTrackingDBClientRequest 154 // ä½ç½®è·Ÿè¸ªæ•°æ®åº“å®¢æˆ·ç«¯è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDDebugInfo 155            // è°ƒè¯•ä¿¡æ¯ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPacketViolationWarning 156 // æ•°æ®åŒ…è¿è§„è­¦å‘Šï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDMotionPredictionHints 157 // è¿åŠ¨é¢„æµ‹æç¤ºï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDAnimateEntity 158        // åŠ¨ç”»å®ä½“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCameraShake 159          // ç›¸æœºéœ‡åŠ¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPlayerFog 160            // ç©å®¶è¿·é›¾ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCorrectPlayerMovePrediction 161 // çº æ­£ç©å®¶ç§»åŠ¨é¢„æµ‹ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDItemComponent 162        // ç‰©å“ç»„ä»¶ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDFilterText 163           // è¿‡æ»¤æ–‡æœ¬ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDClientBoundDebugRenderer 164 // å®¢æˆ·ç«¯ç»‘å®šè°ƒè¯•æ¸²æŸ“å™¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSyncActorProperty 165    // åŒæ­¥å®ä½“å±æ€§ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDAddVolumeEntity 166      // æ·»åŠ ä½“ç§¯å®ä½“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDRemoveVolumeEntity 167   // ç§»é™¤ä½“ç§¯å®ä½“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSimulationType 168       // æ¨¡æ‹Ÿç±»å‹ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDNPCDialogue 169          // NPCå¯¹è¯ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDEducationResourceURI 170 // æ•™è‚²èµ„æºURIï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCreatePhoto 171          // åˆ›å»ºç…§ç‰‡ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDUpdateSubChunkBlocks 172 // æ›´æ–°å­åŒºå—æ–¹å—ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPhotoInfoRequest 173     // ç…§ç‰‡ä¿¡æ¯è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDSubChunk 174             // å­åŒºå—ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSubChunkRequest 175      // å­åŒºå—è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDClientStartItemCooldown 176 // å®¢æˆ·ç«¯å¼€å§‹ç‰©å“å†·å´ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDScriptMessage 177        // è„šæœ¬æ¶ˆæ¯ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDCodeBuilderSource 178    // ä»£ç æ„å»ºå™¨æºï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDTickingAreasLoadStatus 179 // ticking åŒºåŸŸåŠ è½½çŠ¶æ€ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDDimensionData 180        // ç»´åº¦æ•°æ®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDAgentAction 181          // ä»£ç†
+#define IDChangeMobProperty 182    // æ”¹å˜ç”Ÿç‰©å±æ€§ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDLessonProgress 183       // è¯¾ç¨‹è¿›åº¦ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDRequestAbility 184       // è¯·æ±‚èƒ½åŠ›ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDRequestPermissions 185   // è¯·æ±‚æƒé™ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDToastRequest 186         // åå¸è¯·æ±‚ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDUpdateAbilities 187      // æ›´æ–°èƒ½åŠ›ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDUpdateAdventureSettings 188 // æ›´æ–°å†’é™©è®¾ç½®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDDeathInfo 189            // æ­»äº¡ä¿¡æ¯ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDEditorNetwork 190        // ç¼–è¾‘å™¨ç½‘ç»œï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDFeatureRegistry 191      // ç‰¹æ€§æ³¨å†Œè¡¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDServerStats 192          // æœåŠ¡å™¨ç»Ÿè®¡ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDRequestNetworkSettings 193 // è¯·æ±‚ç½‘ç»œè®¾ç½®ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDGameTestRequest 194      // æ¸¸æˆæµ‹è¯•è¯·æ±‚ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDGameTestResults 195      // æ¸¸æˆæµ‹è¯•ç»“æœï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDUpdateClientInputLocks 196 // æ›´æ–°å®¢æˆ·ç«¯è¾“å…¥é”ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDClientCheatAbility 197   // å®¢æˆ·ç«¯ä½œå¼Šèƒ½åŠ›ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDCameraPresets 198        // ç›¸æœºé¢„è®¾ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDUnlockedRecipes 199      // å·²è§£é”é…æ–¹ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDPyRpc 200                // Pythonè¿œç¨‹è¿‡ç¨‹è°ƒç”¨ï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDChangeModel 201          // æ”¹å˜æ¨¡å‹ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDStoreBuySucc 202         // å•†åº—è´­ä¹°æˆåŠŸï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDNeteaseJson 203          // ç½‘æ˜“ JSONï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDChangeModelTexture 204   // æ”¹å˜æ¨¡å‹çº¹ç†ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDChangeModelOffset 205    // æ”¹å˜æ¨¡å‹åç§»ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDChangeModelBind 206      // æ”¹å˜æ¨¡å‹ç»‘å®šï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDHungerAttr 207           // é¥¥é¥¿å±æ€§ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDSetDimensionLocalTime 208 // è®¾ç½®ç»´åº¦æœ¬åœ°æ—¶é—´ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDWithdrawFurnaceXp 209    // æå–ç†”ç‚‰ç»éªŒï¼ˆå®¢æˆ·ç«¯ -> æœåŠ¡ç«¯ï¼‰
+#define IDSetDimensionLocalWeather 210 // è®¾ç½®ç»´åº¦æœ¬åœ°å¤©æ°”ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCustomV1 223             // è‡ªå®šä¹‰ V1ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCombine 224              // ç»„åˆï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDVConnection 225          // V è¿æ¥ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDTransport 226            // ä¼ è¾“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCustomV2 227             // è‡ªå®šä¹‰ V2ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDConfirmSkin 228          // ç¡®è®¤çš®è‚¤ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDTransportNoCompress 229  // æ— å‹ç¼©ä¼ è¾“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDMobEffectV2 230          // ç”Ÿç‰©æ•ˆæœ V2ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDMobBlockActorChanged 231 // ç”Ÿç‰©æ–¹å—å®ä½“æ”¹å˜ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDChangeActorMotion 232    // æ”¹å˜å®ä½“è¿åŠ¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDAnimateEmoteEntity 233   // åŠ¨ç”»è¡¨æƒ…å®ä½“ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCameraInstruction 300    // ç›¸æœºæŒ‡ä»¤ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDCompressedBiomeDefinitionList 301 // å‹ç¼©ç”Ÿç‰©ç¾¤ç³»å®šä¹‰åˆ—è¡¨ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDTrimData 302             // ä¿®å‰ªæ•°æ®ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDOpenSign 303             // æ‰“å¼€æ ‡å¿—ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
+#define IDAgentAnimation 304       // ä»£ç†åŠ¨ç”»ï¼ˆæœåŠ¡ç«¯ -> å®¢æˆ·ç«¯ï¼‰
 
 
 #define PyRpcClientID 0x05db23ae
@@ -247,7 +247,7 @@ public:
 		if (v < (1 << 14)) return 2;
 		if (v < (1 << 21)) return 3;
 		if (v < (1 << 28)) return 4;
-		return 5;  // int32_t ×î¶à 5 ×Ö½Ú£¨º¬·ûºÅÎ»£©
+		return 5;  // int32_t æœ€å¤š 5 å­—èŠ‚ï¼ˆå«ç¬¦å·ä½ï¼‰
 	}
 
 };

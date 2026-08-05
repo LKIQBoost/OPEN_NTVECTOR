@@ -8,10 +8,14 @@ Program_arm64/
 .vs/
 .vscode/
 .idea/
+CMakeSettings.json
 *.user
 *.suo
 *.sdf
 *.ncb
+
+# Crash dumps
+application/RCa*
 
 # Compiled objects
 *.obj

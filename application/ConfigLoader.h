@@ -3,9 +3,7 @@
 #include <json/json.h>
 #define CONFIGE "client_cfg.json"
 #define SKINCONF "skin_data.json"
-#define OPTIONS "options.txt"
 #define FILE_FOUND "File not found: "
-#define FILE_LOAD "Loading Options from file: "
 #define FILE_CONFIG_LOAD "Loading Config from file: "
 #define FILE_SKIN_DATA_LOAD "Loading SkinData from file: "
 class ConfigLoader
@@ -13,27 +11,11 @@ class ConfigLoader
 public:
 	static bool use_mcp;
 	static std::string SkinData;
-    static void LoadConfig(const std::string& client_data, const std::string& options_data) {
+    static void LoadConfig(const std::string& client_data) {
 		LOG(LOG_FILE, "[ConfigLoader] Starting configuration load");
-		string options(OPTIONS);
 		string filefound(FILE_FOUND);
-		string fileload(FILE_LOAD);
 		string clientcfg(CONFIGE);
 		string akidtata(client_data);
-		if (FileUtils::fileExists(options)) {
-			LOG(LOG_FILE, "[ConfigLoader] Loading options from: ", options);
-			Logger::getInstance().log_(fileload + options);
-
-			FileStream fs;
-			fs.OpenFile(options_data);
-			while (true) {
-				Logger::getInstance().log_("Option loaded " + fs.ReadLine());
-				if (fs.eof())
-					break;
-			}
-		}
-		else
-			Logger::getInstance().log(LOG_ERROR, filefound + options);
 
 		if (FileUtils::fileExists(CONFIGE)) {
 			LOG(LOG_FILE, "[ConfigLoader] Loading client config from: ", clientcfg);

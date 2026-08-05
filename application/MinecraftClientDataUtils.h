@@ -35,7 +35,7 @@ public:
             root["PlatformOnlineId"] = "";
             root["CapeId"] = "-1";
             root["SkinAnimationData"] = "";
-            root["GameVersion"] = "1.21.90";
+            root["GameVersion"] = "1.21.120";
             root["LanguageCode"] = "zh_CN";
             root["SkinIID"] = "-1";
             root["SkinColor"] = "#0";

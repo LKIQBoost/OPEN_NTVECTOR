@@ -1,4 +1,4 @@
-﻿// application.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
+// application.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
 #define Py_NO_ENABLE_SHARED  // 彻底禁用动态链接
 #define PYTHON_STATIC        // 强制静态链接
 //#define Linker_NtUniSdk
@@ -57,7 +57,7 @@ NtUniSDK::INtUniSdkGamerInterface* ctx;
 
 
 #define VANILLA_MCP "vanilla.mcp"
-unsigned int MinecraftBedrockProtocolVersion = 819;
+unsigned int MinecraftBedrockProtocolVersion = 860;
 ClientInstance* g_client_instance;
 //ConnectInstance* RakNet_connect;
 //assert(false, "error error error error");
@@ -99,7 +99,6 @@ int main(int argc, char* argv[])
     std::string NUID = "";
 
     std::string client_data_path = "skin_data.json";
-    std::string options_path = "options.txt";
     std::string client_data = "";
     std::string operator_name = "";
 
@@ -247,6 +246,11 @@ int main(int argc, char* argv[])
                     config_file = parm[i + 1];
                 }
             }
+            if (parm[i] == "--protocol") {
+                if (!((i + 1) > (argc - 1))) {
+                    MinecraftBedrockProtocolVersion = std::stoul(parm[i + 1]);
+                }
+            }
 		}
 		if (!enableVTMode()) {
 			//std::cout << "警告: 无法启用ANSI支持，将无法打印日志！" << std::endl;
@@ -271,7 +275,7 @@ int main(int argc, char* argv[])
 #endif // DEBUG
 
         LOG(LOG_FILE, "[Main] Loading configuration...");
-        ConfigLoader::LoadConfig(client_data_path, options_path);
+        ConfigLoader::LoadConfig(client_data_path);
         LOG(LOG_FILE, "[Main] Configuration loaded successfully");
         if (FileUtils::fileExists(config_file)) {
             std::string loader_config = FileUtils::FileConetnt(config_file);
@@ -433,34 +437,6 @@ int main(int argc, char* argv[])
 				exit(0);
 			}
 			LOG(LOG_INFO, "[Main] ChainPair validation passed");
-			/*
-			BinaryWrite bw(10);
-			bw.WriteVarUInt(-1);
-			bw.WriteVarInt(-3);
-			cout << StringToHex_s((const char*)bw.data(), bw.size());
-			*/
-			/*
-			string inn;
-			cout << "输入皮服类型：1是64，2是128，3是64，32";
-			cin >> inn;
-			vector<uint8_t> in = FileUtils::readFileToBinary("data.png");
-			//const char* test_str = "framework/mod_log/__init__.mcs";
-			//uint32_t hash = MCPHash::StringID((unsigned char*)in.data(), in.size());
-			//printf("Hash value: 0x%08X\n", hash);
-			//string ss = HexToString(in);
-			//std::vector<uint8_t> vec(in.begin(), in.end());
-			if (inn == "1") {
-				in = SkinConverter::skinDataToPng(in, 64, 64);
-			}
-			else if (inn == "2") {
-				in = SkinConverter::skinDataToPng(in, 128, 128);
-			}
-			else if (inn == "3") {
-				in = SkinConverter::skinDataToPng(in, 64, 32);
-			}
-			cout << StringToHex_s((const char*)in.data(),in.size());
-			return 0;
-			*/
 			LOG(LOG_INFO, "[Main] Initializing OpenSSL...");
 			SSL_library_init();
 			OpenSSL_add_all_algorithms();
@@ -537,14 +513,3 @@ int main(int argc, char* argv[])
         //LOG(LOG_WARN, "[Main] No arguments provided, running in standalone mode");
 	}
 }
-
-// 运行程序: Ctrl + F5 或调试 >“开始执行(不调试)”菜单
-// 调试程序: F5 或调试 >“开始调试”菜单
-
-// 入门使用技巧: 
-//   1. 使用解决方案资源管理器窗口添加/管理文件
-//   2. 使用团队资源管理器窗口连接到源代码管理
-//   3. 使用输出窗口查看生成输出和其他消息
-//   4. 使用错误列表窗口查看错误
-//   5. 转到“项目”>“添加新项”以创建新的代码文件，或转到“项目”>“添加现有项”以将现有代码文件添加到项目
-//   6. 将来，若要再次打开此项目，请转到“文件”>“打开”>“项目”并选择 .sln 文件

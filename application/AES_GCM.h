@@ -6,27 +6,27 @@
 class AesGcm {
 public:
     AesGcm() {}
-    // ¹¹Ôìº¯Êý£¬½ÓÊÕÃÜÔ¿ºÍIV£¨³õÊ¼»¯ÏòÁ¿£©
+    // ï¿½ï¿½ï¿½ìº¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¿ï¿½ï¿½IVï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     AesGcm(const std::vector<unsigned char>& key, const std::vector<unsigned char>& iv, bool decrypt = false);
 
-    // ¼ÓÃÜº¯Êý
+    // ï¿½ï¿½ï¿½Üºï¿½ï¿½ï¿½
     bool encrypt(const std::vector<unsigned char>& plaintext,
         std::vector<unsigned char>& ciphertext);
     bool encrypt(std::vector<unsigned char>& data);
 
-    // ½âÃÜº¯Êý
+    // ï¿½ï¿½ï¿½Üºï¿½ï¿½ï¿½
     bool decrypt(const std::vector<unsigned char>& ciphertext);
 
-    // »ñÈ¡IV´óÐ¡£¨¾²Ì¬·½·¨£©
+    // ï¿½ï¿½È¡IVï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     static size_t getIvSize();
 
-    // »ñÈ¡±êÇ©´óÐ¡£¨¾²Ì¬·½·¨£©
+    // ï¿½ï¿½È¡ï¿½ï¿½Ç©ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     static size_t getTagSize();
 
-    // Éú³ÉËæ»úIV£¨¾²Ì¬·½·¨£©
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½IVï¿½ï¿½ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     static std::vector<unsigned char> generateRandomIv();
 
-    // Îö¹¹º¯Êý
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     ~AesGcm();
 
 private:
