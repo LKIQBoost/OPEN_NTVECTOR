@@ -1,2 +1,0 @@
-^L:\WORKING\PYTHON-2.7.18\PYTHON-2.7.18\MODULES\_CTYPES\LIBFFI_MSVC\WIN64.ASM
-ml64 /nologo /c /Zi /Fo "L:\Working\Python-2.7.18\Python-2.7.18\PCbuild\obj\amd64_Release\_ctypes\win64.obj" "L:\Working\Python-2.7.18\Python-2.7.18\Modules\_ctypes\libffi_msvc\win64.asm"
