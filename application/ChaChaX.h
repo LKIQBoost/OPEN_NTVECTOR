@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <cstdint>
 #include <string>
 #include <algorithm>
@@ -7,12 +7,12 @@
 
 #define CHACHA_ROUNDS 20
 
-// 12×Ö½ÚÄ¬ÈÏËæ»úÊı
+// 12å­—èŠ‚é»˜è®¤éšæœºæ•°
 static const uint8_t DEFAULT_NONCE[12] = {
     '1', '6', '3', ' ', 'N', 'e', 't', 'E', 'a', 's', 'e', '\n'
 };
 
-// 16×Ö½ÚÄ¬ÈÏ IV
+// 16å­—èŠ‚é»˜è®¤ IV
 static const uint8_t DEFAULT_IV[16] = {
    'e','x','p','a','n','d',' ','3','2','-','b','y','t','e',' ','k'
 };
@@ -24,7 +24,7 @@ private:
     uint32_t rounds;
     size_t block_pos;
 
-    // ChaCha ºËĞÄ quarterround
+    // ChaCha æ ¸å¿ƒ quarterround
     void chacha_quarterround(uint32_t x[16], int a, int b, int c, int d) {
         x[a] += x[b]; x[d] ^= x[a]; x[d] = (x[d] << 16) | (x[d] >> 16);
         x[c] += x[d]; x[b] ^= x[c]; x[b] = (x[b] << 12) | (x[b] >> 20);
@@ -32,12 +32,12 @@ private:
         x[c] += x[d]; x[b] ^= x[c]; x[b] = (x[b] << 7) | (x[b] >> 25);
     }
 
-    // ChaCha ¿éº¯Êı£¬Éú³É64×Ö½Ú keystream
+    // ChaCha å—å‡½æ•°ï¼Œç”Ÿæˆ64å­—èŠ‚ keystream
     void chacha_block(uint32_t state[16], uint8_t output[64]) {
         uint32_t working_state[16];
         memcpy(working_state, state, sizeof(working_state));
 
-        // Ã¿ÂÖÑ­»·Ö´ĞĞÁ½ÂÖ×éºÏ£¬ÂÖÊı²ÎÊıÈ·±£1ÂÖÒ²ÄÜÖ´ĞĞ
+        // æ¯è½®å¾ªç¯æ‰§è¡Œä¸¤è½®ç»„åˆï¼Œè½®æ•°å‚æ•°ç¡®ä¿1è½®ä¹Ÿèƒ½æ‰§è¡Œ
         for (int i = 0; i < rounds; i += 2) {
             // column rounds
             chacha_quarterround(working_state, 0, 4, 8, 12);
@@ -58,40 +58,40 @@ private:
     }
 
 public:
-    // ¹¹Ôìº¯Êı£º´«ÈëÂÖÊıºÍ Python bytes ÀàĞÍµÄ key
+    // æ„é€ å‡½æ•°ï¼šä¼ å…¥è½®æ•°å’Œ Python bytes ç±»å‹çš„ key
     ChaChaX(uint32_t lv, uint8_t* key_bytes) {
         rounds = lv;
-        block_pos = 64; // ³õÊ¼ÈÃµÚÒ»´Î processData Éú³ÉĞÂ¿é
+        block_pos = 64; // åˆå§‹è®©ç¬¬ä¸€æ¬¡ processData ç”Ÿæˆæ–°å—
 
 
-        // °²È«¿½±´ key£¨32×Ö½Ú£©
+        // å®‰å…¨æ‹·è´ keyï¼ˆ32å­—èŠ‚ï¼‰
         memcpy(state + 4, key_bytes, 32);
 
-        state[12] = 0; // ³õÊ¼¼ÆÊıÆ÷
+        state[12] = 0; // åˆå§‹è®¡æ•°å™¨
 
-        // ¿½±´Ä¬ÈÏ nonce£¨12×Ö½Ú£©
+        // æ‹·è´é»˜è®¤ nonceï¼ˆ12å­—èŠ‚ï¼‰
         memcpy(state + 13, DEFAULT_NONCE, sizeof(DEFAULT_NONCE));
 
-        // ¿½±´Ä¬ÈÏ IV£¨16×Ö½Ú£©
+        // æ‹·è´é»˜è®¤ IVï¼ˆ16å­—èŠ‚ï¼‰
         memcpy(state, DEFAULT_IV, sizeof(DEFAULT_IV));
     }
 
-    // ¼ÓÃÜ/½âÃÜº¯Êı£¬Ö±½Ó×÷ÓÃÓÚ×Ö½ÚÊı×é
+    // åŠ å¯†/è§£å¯†å‡½æ•°ï¼Œç›´æ¥ä½œç”¨äºå­—èŠ‚æ•°ç»„
     void processData(uint8_t* input, size_t length) {
         size_t processed = 0;
         while (processed < length) {
-            // Èç¹ûĞèÒªĞÂµÄÃÜÂë¿é
+            // å¦‚æœéœ€è¦æ–°çš„å¯†ç å—
             if (block_pos >= sizeof(block)) {
                 chacha_block(state, block);
                 block_pos = 0;
-                ++state[12]; // Ôö¼Ó¼ÆÊıÆ÷
+                ++state[12]; // å¢åŠ è®¡æ•°å™¨
             }
 
-            // ±¾´Î´¦Àí×Ö½ÚÊı
+            // æœ¬æ¬¡å¤„ç†å­—èŠ‚æ•°
             size_t bytes_available = sizeof(block) - block_pos;
             size_t bytes_to_process = (((bytes_available) < (length - processed)) ? (bytes_available) : (length - processed));
 
-            // Òì»ò²Ù×÷
+            // å¼‚æˆ–æ“ä½œ
             for (size_t i = 0; i < bytes_to_process; ++i) {
                 input[processed + i] ^= block[block_pos + i];
             }

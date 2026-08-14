@@ -1,17 +1,17 @@
-#pragma once
+ï»¿#pragma once
 #ifndef SOCKET_STATIC_H
 #define SOCKET_STATIC_H
 
 #include <Python.h>
 
-// ºËĞÄ£º¶¨Òå _socket Ä£¿éµÄ³õÊ¼»¯º¯Êı
+// æ ¸å¿ƒï¼šå®šä¹‰ _socket æ¨¡å—çš„åˆå§‹åŒ–å‡½æ•°
 PyMODINIT_FUNC init_socket(void);
 PyMODINIT_FUNC initselect(void);
 
-// ¶¨Òå socket Ä£¿éµÄ³õÊ¼»¯º¯Êı£¨Python²ãÃæµÄsocket.pyµÄC²¿·Ö£©
+// å®šä¹‰ socket æ¨¡å—çš„åˆå§‹åŒ–å‡½æ•°ï¼ˆPythonå±‚é¢çš„socket.pyçš„Céƒ¨åˆ†ï¼‰
 PyMODINIT_FUNC initsocket(void);
 
-// ¿ÉÑ¡£ºµ¼³öÖØÒªµÄ socket º¯Êı
+// å¯é€‰ï¼šå¯¼å‡ºé‡è¦çš„ socket å‡½æ•°
 PyObject* _socket_socket(int family, int type, int proto);
 int _socket_bind(PyObject* socket, const char* addr, int port);
 int _socket_listen(PyObject* socket, int backlog);

@@ -1,4 +1,4 @@
-#include "ClientInstance.h"
+ï»¿#include "ClientInstance.h"
 
 void ClientInstance::BaseTick()
 {
@@ -18,7 +18,7 @@ void ClientInstance::StartTick()
         LOG(LOG_WARN, "[ClientInstance] StartTick called but tick already running");
         return;
     }
-    m_is_disconnect = false;   // È·±£ĞÂÏß³ÌÄÜÕı³£ÅÜ
+    m_is_disconnect = false;   // ç¡®ä¿æ–°çº¿ç¨‹èƒ½æ­£å¸¸è·‘
     m_baseTick = std::thread(&ClientInstance::BaseTick, this);
 }
 void ClientInstance::SetTickHandle(std::function<void(ClientInstance*)> handel)

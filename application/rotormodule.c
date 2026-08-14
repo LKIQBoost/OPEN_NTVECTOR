@@ -183,26 +183,26 @@ rotorobj_new(int num_rotors, char* key)
 	xp->positions = NULL;
 	xp->advances = NULL;
 
-	if (!(xp->e_rotor = PyMem_NEW(unsigned char, num_rotors * xp->size)))
+	if (!(xp->e_rotor = (unsigned char*)PyMem_Malloc(num_rotors * xp->size * sizeof(unsigned char))))
 		goto finally;
-	if (!(xp->d_rotor = PyMem_NEW(unsigned char, num_rotors * xp->size)))
+	if (!(xp->d_rotor = (unsigned char*)PyMem_Malloc(num_rotors * xp->size * sizeof(unsigned char))))
 		goto finally;
-	if (!(xp->positions = PyMem_NEW(unsigned char, num_rotors)))
+	if (!(xp->positions = (unsigned char*)PyMem_Malloc(num_rotors * sizeof(unsigned char))))
 		goto finally;
-	if (!(xp->advances = PyMem_NEW(unsigned char, num_rotors)))
+	if (!(xp->advances = (unsigned char*)PyMem_Malloc(num_rotors * sizeof(unsigned char))))
 		goto finally;
 
 	return xp;
 
 	finally:
 	if (xp->e_rotor)
-		PyMem_DEL(xp->e_rotor);
+		PyMem_Free(xp->e_rotor);
 	if (xp->d_rotor)
-		PyMem_DEL(xp->d_rotor);
+		PyMem_Free(xp->d_rotor);
 	if (xp->positions)
-		PyMem_DEL(xp->positions);
+		PyMem_Free(xp->positions);
 	if (xp->advances)
-		PyMem_DEL(xp->advances);
+		PyMem_Free(xp->advances);
 	Py_DECREF(xp);
 	return (Rotorobj*)PyErr_NoMemory();
 }
@@ -448,13 +448,13 @@ static void
 rotor_dealloc(Rotorobj* xp)
 {
 	if (xp->e_rotor)
-		PyMem_DEL(xp->e_rotor);
+		PyMem_Free(xp->e_rotor);
 	if (xp->d_rotor)
-		PyMem_DEL(xp->d_rotor);
+		PyMem_Free(xp->d_rotor);
 	if (xp->positions)
-		PyMem_DEL(xp->positions);
+		PyMem_Free(xp->positions);
 	if (xp->advances)
-		PyMem_DEL(xp->advances);
+		PyMem_Free(xp->advances);
 	PyObject_Del(xp);
 }
 
@@ -462,21 +462,21 @@ static PyObject*
 rotorobj_encrypt(Rotorobj* self, PyObject* args)
 {
 	char* string = NULL;
-	int len = 0;
+	Py_ssize_t len = 0;
 	PyObject* rtn = NULL;
 	char* tmp;
 
-	if (!PyArg_ParseTuple(args, "s#:encrypt", &string, &len))
+	if (!PyArg_ParseTuple(args, "y#:encrypt", &string, &len))
 		return NULL;
-	if (!(tmp = PyMem_NEW(char, len + 5))) {
+	if (!(tmp = (char*)PyMem_Malloc(len + 5))) {
 		PyErr_NoMemory();
 		return NULL;
 	}
 	memset(tmp, '\0', len + 1);
 	memcpy(tmp, string, len);
 	RTR_e_region(self, (unsigned char*)tmp, len, TRUE);
-	rtn = PyString_FromStringAndSize(tmp, len);
-	PyMem_DEL(tmp);
+	rtn = PyBytes_FromStringAndSize(tmp, len);
+	PyMem_Free(tmp);
 	return(rtn);
 }
 
@@ -484,21 +484,21 @@ static PyObject*
 rotorobj_encrypt_more(Rotorobj* self, PyObject* args)
 {
 	char* string = NULL;
-	int len = 0;
+	Py_ssize_t len = 0;
 	PyObject* rtn = NULL;
 	char* tmp;
 
-	if (!PyArg_ParseTuple(args, "s#:encrypt_more", &string, &len))
+	if (!PyArg_ParseTuple(args, "y#:encrypt_more", &string, &len))
 		return NULL;
-	if (!(tmp = PyMem_NEW(char, len + 5))) {
+	if (!(tmp = (char*)PyMem_Malloc(len + 5))) {
 		PyErr_NoMemory();
 		return NULL;
 	}
 	memset(tmp, '\0', len + 1);
 	memcpy(tmp, string, len);
 	RTR_e_region(self, (unsigned char*)tmp, len, FALSE);
-	rtn = PyString_FromStringAndSize(tmp, len);
-	PyMem_DEL(tmp);
+	rtn = PyBytes_FromStringAndSize(tmp, len);
+	PyMem_Free(tmp);
 	return(rtn);
 }
 
@@ -506,21 +506,21 @@ static PyObject*
 rotorobj_decrypt(Rotorobj* self, PyObject* args)
 {
 	char* string = NULL;
-	int len = 0;
+	Py_ssize_t len = 0;
 	PyObject* rtn = NULL;
 	char* tmp;
 
-	if (!PyArg_ParseTuple(args, "s#:decrypt", &string, &len))
+	if (!PyArg_ParseTuple(args, "y#:decrypt", &string, &len))
 		return NULL;
-	if (!(tmp = PyMem_NEW(char, len + 5))) {
+	if (!(tmp = (char*)PyMem_Malloc(len + 5))) {
 		PyErr_NoMemory();
 		return NULL;
 	}
 	memset(tmp, '\0', len + 1);
 	memcpy(tmp, string, len);
 	RTR_d_region(self, (unsigned char*)tmp, len, TRUE);
-	rtn = PyString_FromStringAndSize(tmp, len);
-	PyMem_DEL(tmp);
+	rtn = PyBytes_FromStringAndSize(tmp, len);
+	PyMem_Free(tmp);
 	return(rtn);
 }
 
@@ -528,21 +528,21 @@ static PyObject*
 rotorobj_decrypt_more(Rotorobj* self, PyObject* args)
 {
 	char* string = NULL;
-	int len = 0;
+	Py_ssize_t len = 0;
 	PyObject* rtn = NULL;
 	char* tmp;
 
-	if (!PyArg_ParseTuple(args, "s#:decrypt_more", &string, &len))
+	if (!PyArg_ParseTuple(args, "y#:decrypt_more", &string, &len))
 		return NULL;
-	if (!(tmp = PyMem_NEW(char, len + 5))) {
+	if (!(tmp = (char*)PyMem_Malloc(len + 5))) {
 		PyErr_NoMemory();
 		return NULL;
 	}
 	memset(tmp, '\0', len + 1);
 	memcpy(tmp, string, len);
 	RTR_d_region(self, (unsigned char*)tmp, len, FALSE);
-	rtn = PyString_FromStringAndSize(tmp, len);
-	PyMem_DEL(tmp);
+	rtn = PyBytes_FromStringAndSize(tmp, len);
+	PyMem_Free(tmp);
 	return(rtn);
 }
 
@@ -570,32 +570,10 @@ rotorobj_methods[] = {
 };
 
 
-/* Return a rotor object's named attribute. */
-static PyObject*
-rotorobj_getattr(Rotorobj* s, char* name)
-{
-	return Py_FindMethod(rotorobj_methods, (PyObject*)s, name);
-}
-
-
 #ifdef __cplusplus
 inline
 #endif
-PyTypeObject Rotor_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/*ob_size*/
-	"rotor.rotor",			/*tp_name*/
-	sizeof(Rotorobj),		/*tp_size*/
-	0,				/*tp_itemsize*/
-	/* methods */
-	(destructor)rotor_dealloc,	/*tp_dealloc*/
-	0,				/*tp_print*/
-	(getattrfunc)rotorobj_getattr,	/*tp_getattr*/
-	0,				/*tp_setattr*/
-	0,				/*tp_compare*/
-	0,				/*tp_repr*/
-	0,                              /*tp_hash*/
-};
+PyTypeObject Rotor_Type = { PyVarObject_HEAD_INIT(NULL, 0) };
 
 
 static PyObject*
@@ -621,15 +599,26 @@ rotor_methods[] = {
 };
 
 
-//PyMODINIT_FUNC
-static void
-initrotor(void)
+// Module init (Python 3). Must stay static: rotormodule.c is #included
+// into PythonRuntime.h, which is compiled in several TUs.
+static struct PyModuleDef rotor_module = { PyModuleDef_HEAD_INIT, "rotor", NULL, -1, rotor_methods };
+static PyObject*
+PyInit_rotor(void)
 {
-	Rotor_Type.ob_type = &PyType_Type;
-	(void)Py_InitModule("rotor", rotor_methods);
+	Rotor_Type.tp_name = "rotor.rotor";
+	Rotor_Type.tp_basicsize = sizeof(Rotorobj);
+	Rotor_Type.tp_dealloc = (destructor)rotor_dealloc;
+	Rotor_Type.tp_methods = rotorobj_methods;
+	Rotor_Type.tp_new = PyType_GenericNew;
+	if (PyType_Ready(&Rotor_Type) < 0)
+		return NULL;
+	PyObject* module = PyModule_Create(&rotor_module);
+	if (!module)
+		return NULL;
 	if (PyErr_Warn(PyExc_DeprecationWarning,
 		"the rotor module uses an insecure algorithm "
 		"and is deprecated") < 0)
-		return;
+		return NULL;
+	return module;
 }
 

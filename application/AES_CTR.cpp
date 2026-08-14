@@ -1,21 +1,21 @@
-#include "AES_CTR.h"
+ï»¿#include "AES_CTR.h"
 #include <openssl/err.h>
 #include <algorithm>
 
 AES_CTR::AES_CTR(const std::vector<unsigned char>& key, const std::vector<unsigned char>& iv)
     : key_(key), iv_(iv), current_counter_(iv) {
 
-    // ¼ì²éÃÜÔ¿³¤¶ÈÊÇ·ñÓĞĞ§
+    // æ£€æŸ¥å¯†é’¥é•¿åº¦æ˜¯å¦æœ‰æ•ˆ
     if (key.size() != 16 && key.size() != 24 && key.size() != 32) {
         throw std::runtime_error("Invalid key size. Must be 16, 24 or 32 bytes.");
     }
 
-    // ¼ì²éIV³¤¶ÈÊÇ·ñÓĞĞ§
+    // æ£€æŸ¥IVé•¿åº¦æ˜¯å¦æœ‰æ•ˆ
     if (iv.size() != 16) {
         throw std::runtime_error("Invalid IV size. Must be 16 bytes.");
     }
 
-    // ³õÊ¼»¯OpenSSL¼ÓÃÜÉÏÏÂÎÄ
+    // åˆå§‹åŒ–OpenSSLåŠ å¯†ä¸Šä¸‹æ–‡
     ctx_ = EVP_CIPHER_CTX_new();
     if (!ctx_) {
         throw std::runtime_error("Failed to create EVP_CIPHER_CTX");
@@ -37,7 +37,7 @@ std::vector<unsigned char> AES_CTR::Process(const std::vector<unsigned char>& in
     padding.insert(padding.end(), input.begin(), input.end());
 
     int allsize = padding.size();
-    // ¸ù¾İÃÜÔ¿³¤¶ÈÑ¡ÔñÊÊµ±µÄÃÜÂë
+    // æ ¹æ®å¯†é’¥é•¿åº¦é€‰æ‹©é€‚å½“çš„å¯†ç 
     const EVP_CIPHER* cipher = nullptr;
     switch (key_.size()) {
     case 16: cipher = EVP_aes_128_ctr(); break;
@@ -46,16 +46,16 @@ std::vector<unsigned char> AES_CTR::Process(const std::vector<unsigned char>& in
     default: throw std::runtime_error("Invalid key size");
     }
 
-    // ³õÊ¼»¯¼ÓÃÜ²Ù×÷£¬Ê¹ÓÃµ±Ç°¼ÆÊıÆ÷
+    // åˆå§‹åŒ–åŠ å¯†æ“ä½œï¼Œä½¿ç”¨å½“å‰è®¡æ•°å™¨
     if (1 != EVP_EncryptInit_ex(ctx_, cipher, nullptr, key_.data(), current_counter_.data())) {
         throw std::runtime_error("EncryptInit failed");
     }
 
-    // Êä³ö»º³åÇø(¿ÉÄÜ±ÈÊäÈëÉÔ´ó)
+    // è¾“å‡ºç¼“å†²åŒº(å¯èƒ½æ¯”è¾“å…¥ç¨å¤§)
     std::vector<unsigned char> output(allsize + EVP_MAX_BLOCK_LENGTH);
     int len = 0;
 
-    // Ö´ĞĞ¼ÓÃÜ/½âÃÜ
+    // æ‰§è¡ŒåŠ å¯†/è§£å¯†
     if (1 != EVP_EncryptUpdate(ctx_, output.data(), &len, padding.data(), allsize)) {
         throw std::runtime_error("EncryptUpdate failed");
     }
@@ -65,13 +65,13 @@ std::vector<unsigned char> AES_CTR::Process(const std::vector<unsigned char>& in
         throw std::runtime_error("EncryptFinal failed");
     }
 
-    // µ÷ÕûÊä³ö´óĞ¡ÎªÊµ¼ÊÊı¾İ´óĞ¡
+    // è°ƒæ•´è¾“å‡ºå¤§å°ä¸ºå®é™…æ•°æ®å¤§å°
     output.erase(output.begin(), output.begin() + padding_);
     output.resize((len- padding_) + final_len);
 
     int used = allsize % 16;
-    // ¼ÆËã¼ÓÃÜµÄ¿éÊı²¢¸üĞÂ¼ÆÊıÆ÷
-    size_t blocks_used = (input.size() + 15 + padding_) / 16; // ÏòÉÏÈ¡Õû
+    // è®¡ç®—åŠ å¯†çš„å—æ•°å¹¶æ›´æ–°è®¡æ•°å™¨
+    size_t blocks_used = (input.size() + 15 + padding_) / 16; // å‘ä¸Šå–æ•´
     if (used != 0)
         blocks_used--;
     padding_ = used;
@@ -86,13 +86,13 @@ std::vector<unsigned char> AES_CTR::get_current_counter() const {
 
 void AES_CTR::increment_counter(size_t block) {
     for (int i = 0;i < block;i++) {
-        // ÒÔ´ó¶Ë·½Ê½µİÔö¼ÆÊıÆ÷
+        // ä»¥å¤§ç«¯æ–¹å¼é€’å¢è®¡æ•°å™¨
         for (int j = 15; j >= 0; --j) {
             if (j == 11)
                 break;
             if (++current_counter_[j] != 0)
                 break;
-            // Èç¹û×Ö½ÚÒç³ö£¬¼ÌĞø´¦ÀíÇ°Ò»¸ö×Ö½Ú
+            // å¦‚æœå­—èŠ‚æº¢å‡ºï¼Œç»§ç»­å¤„ç†å‰ä¸€ä¸ªå­—èŠ‚
         }
     }
 }

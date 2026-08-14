@@ -23,8 +23,64 @@ public:
         if (stbi_info(skin_path.c_str(), &width, &height, &channels)) {
             root["UIProfile"] = 0;
             root["CapeOnClassicSkin"] = false;
-            root["SkinResourcePatch"] = "ewogICAiZ2VvbWV0cnkiIDogewogICAgICAiZGVmYXVsdCIgOiAiZ2VvbWV0cnkuaHVtYW5vaWQuY3VzdG9tIgogICB9Cn0K";
-            root["SkinGeometryData"] = Base64Cpp::base64_encode(FileUtils::FileConetnt(model_path));
+            // 自动提取模型中的 geometry 标识符，支持自定义 4D 模型皮肤：
+            //   新格式  {"minecraft:geometry":[{"description":{"identifier":...}}]}
+            //   旧格式  {"geometry.xxx":{...}}  (网易/经典 4D 皮肤)
+            // 找不到时兜底为默认 geometry.humanoid.custom
+            std::string model_content = FileUtils::FileConetnt(model_path);
+            std::string default_geometry = "geometry.humanoid.custom";
+            Json::Value mroot;
+            Json::Reader mreader = Json::Reader();
+            if (mreader.parse(model_content, mroot)) {
+                if (mroot.isMember("minecraft:geometry") && mroot["minecraft:geometry"].isArray()
+                    && mroot["minecraft:geometry"].size() > 0) {
+                    // 新格式 {"minecraft:geometry":[...]}。
+                    // 注意原版 model.json 含 [geometry.cape, geometry.humanoid.custom, customSlim]，
+                    // 不能盲取 [0](那是披风)，必须优先选玩家几何体。
+                    // 优先级: humanoid.custom > 任意含 humanoid 的 > 数组第一个(单几何体4D皮肤)
+                    bool found = false;
+                    std::string selected;
+                    for (Json::Value::ArrayIndex i = 0; i < mroot["minecraft:geometry"].size() && !found; i++) {
+                        Json::Value& geom = mroot["minecraft:geometry"][i];
+                        if (geom.isMember("description") && geom["description"].isMember("identifier")
+                            && geom["description"]["identifier"].asString() == "geometry.humanoid.custom") {
+                            selected = "geometry.humanoid.custom";
+                            found = true;
+                        }
+                    }
+                    for (Json::Value::ArrayIndex i = 0; i < mroot["minecraft:geometry"].size() && !found; i++) {
+                        Json::Value& geom = mroot["minecraft:geometry"][i];
+                        if (geom.isMember("description") && geom["description"].isMember("identifier")) {
+                            std::string id = geom["description"]["identifier"].asString();
+                            if (id.find("humanoid") != std::string::npos) {
+                                selected = id;
+                                found = true;
+                            }
+                        }
+                    }
+                    for (Json::Value::ArrayIndex i = 0; i < mroot["minecraft:geometry"].size() && !found; i++) {
+                        Json::Value& geom = mroot["minecraft:geometry"][i];
+                        if (geom.isMember("description") && geom["description"].isMember("identifier")) {
+                            selected = geom["description"]["identifier"].asString();
+                            found = true;
+                        }
+                    }
+                    if (found) default_geometry = selected;
+                }
+                else {
+                    Json::Value::Members keys = mroot.getMemberNames();
+                    for (size_t i = 0; i < keys.size(); i++) {
+                        if (keys[i].compare(0, 9, "geometry.") == 0) {
+                            default_geometry = keys[i];
+                            break;
+                        }
+                    }
+                }
+            }
+            Json::Value patch;
+            patch["geometry"]["default"] = default_geometry;
+            root["SkinResourcePatch"] = Base64Cpp::base64_encode(write.write(patch));
+            root["SkinGeometryData"] = Base64Cpp::base64_encode(model_content);
             root["SkinImageWidth"] = width;
             root["CapeData"] = "";
             root["ThirdPartyNameOnly"] = false;

@@ -1,21 +1,21 @@
-#pragma once
+ï»¿#pragma once
 #include "PacketBase.h"
 
-// ÃüÁî·½¿éÄ£Ê½³£Á¿
-constexpr uint32_t CommandBlockModeImpulse = 0;    // Âö³åÄ£Ê½
-constexpr uint32_t CommandBlockModeRepeating = 1;  // Ñ­»·Ä£Ê½
-constexpr uint32_t CommandBlockModeChain = 2;      // Á´Ä£Ê½
+// å‘½ä»¤æ–¹å—æ¨¡å¼å¸¸é‡
+constexpr uint32_t CommandBlockModeImpulse = 0;    // è„‰å†²æ¨¡å¼
+constexpr uint32_t CommandBlockModeRepeating = 1;  // å¾ªç¯æ¨¡å¼
+constexpr uint32_t CommandBlockModeChain = 2;      // é“¾æ¨¡å¼
 
-// ·½¿éÎ»ÖÃ½á¹¹ (ÕûÊı×ø±ê)
+// æ–¹å—ä½ç½®ç»“æ„ (æ•´æ•°åæ ‡)
 struct BlockPos {
     int32_t x = 0;
     int32_t y = 0;
     int32_t z = 0;
 };
 
-// CommandBlockUpdate Êı¾İ°ü
-// ¿Í»§¶Ë·¢ËÍ´Ë°üÀ´¸üĞÂÖ¸¶¨Î»ÖÃµÄÃüÁî·½¿é
-// ÃüÁî·½¿é¿ÉÒÔÊÇÎïÀí·½¿é»ò¿ó³µÖĞµÄÃüÁî·½¿é
+// CommandBlockUpdate æ•°æ®åŒ…
+// å®¢æˆ·ç«¯å‘é€æ­¤åŒ…æ¥æ›´æ–°æŒ‡å®šä½ç½®çš„å‘½ä»¤æ–¹å—
+// å‘½ä»¤æ–¹å—å¯ä»¥æ˜¯ç‰©ç†æ–¹å—æˆ–çŸ¿è½¦ä¸­çš„å‘½ä»¤æ–¹å—
 class CommandBlockUpdate : public PacketBase
 {
 public:
@@ -23,27 +23,28 @@ public:
     void Deserializ(std::vector<unsigned char> pack) override;
     std::vector<unsigned char> Serializ() override;
 
-    // Êı¾İ°ü×Ö¶Î
-    bool Block = true;                    // ÊÇ·ñÎªÎïÀí·½¿é (false ±íÊ¾¿ó³µÖĞµÄÃüÁî·½¿é)
+    // æ•°æ®åŒ…å­—æ®µ
+    bool Block = true;                    // æ˜¯å¦ä¸ºç‰©ç†æ–¹å— (false è¡¨ç¤ºçŸ¿è½¦ä¸­çš„å‘½ä»¤æ–¹å—)
 
-    // ÒÔÏÂ×Ö¶Î½öµ± Block == true Ê±ÓĞĞ§
-    BlockPos Position;                    // ÃüÁî·½¿éÎ»ÖÃ
-    uint32_t Mode = 0;                    // ÃüÁî·½¿éÄ£Ê½ (Impulse/Repeating/Chain)
-    bool NeedsRedstone = false;           // ÊÇ·ñĞèÒªºìÊ¯¼¤»î
-    bool Conditional = false;             // ÊÇ·ñÎªÌõ¼şÄ£Ê½
+    // ä»¥ä¸‹å­—æ®µä»…å½“ Block == true æ—¶æœ‰æ•ˆ
+    BlockPos Position;                    // å‘½ä»¤æ–¹å—ä½ç½®
+    uint32_t Mode = 0;                    // å‘½ä»¤æ–¹å—æ¨¡å¼ (Impulse/Repeating/Chain)
+    bool NeedsRedstone = false;           // æ˜¯å¦éœ€è¦çº¢çŸ³æ¿€æ´»
+    bool Conditional = false;             // æ˜¯å¦ä¸ºæ¡ä»¶æ¨¡å¼
 
-    // ÒÔÏÂ×Ö¶Î½öµ± Block == false Ê±ÓĞĞ§
-    uint64_t MinecartEntityRuntimeID = 0; // ¿ó³µÊµÌåÔËĞĞÊ± ID
+    // ä»¥ä¸‹å­—æ®µä»…å½“ Block == false æ—¶æœ‰æ•ˆ
+    uint64_t MinecartEntityRuntimeID = 0; // çŸ¿è½¦å®ä½“è¿è¡Œæ—¶ ID
 
-    // Í¨ÓÃ×Ö¶Î
-    std::string Command;                  // ÃüÁîÄÚÈİ
-    std::string LastOutput;               // ÉÏ´ÎÊä³ö
-    std::string Name;                     // ÃüÁî·½¿éÃû³Æ (ĞüÍ£ÏÔÊ¾)
-    bool ShouldTrackOutput = false;       // ÊÇ·ñ¸ú×ÙÊä³ö
-    uint32_t TickDelay = 0;               // Ö´ĞĞÑÓ³Ù (tick, ÍøÒ×°æÎª uint32)
-    bool ExecuteOnFirstTick = false;      // ÊÇ·ñÔÚµÚÒ»¸ö tick Ö´ĞĞ
+    // é€šç”¨å­—æ®µ
+    std::string Command;                  // å‘½ä»¤å†…å®¹
+    std::string LastOutput;               // ä¸Šæ¬¡è¾“å‡º
+    std::string Name;                     // å‘½ä»¤æ–¹å—åç§° (æ‚¬åœæ˜¾ç¤º)
+    std::string FilteredName;             // è¿‡æ»¤åçš„åç§°ï¼ˆè„è¯è¿‡æ»¤ç‰ˆï¼Œå¯ä¸ºç©ºï¼‰
+    bool ShouldTrackOutput = false;       // æ˜¯å¦è·Ÿè¸ªè¾“å‡º
+    uint32_t TickDelay = 0;               // æ‰§è¡Œå»¶è¿Ÿ (tick, ç½‘æ˜“ç‰ˆä¸º uint32)
+    bool ExecuteOnFirstTick = false;      // æ˜¯å¦åœ¨ç¬¬ä¸€ä¸ª tick æ‰§è¡Œ
 
-    // ±ã½İ·½·¨
+    // ä¾¿æ·æ–¹æ³•
     bool IsImpulseMode() const { return Mode == CommandBlockModeImpulse; }
     bool IsRepeatingMode() const { return Mode == CommandBlockModeRepeating; }
     bool IsChainMode() const { return Mode == CommandBlockModeChain; }

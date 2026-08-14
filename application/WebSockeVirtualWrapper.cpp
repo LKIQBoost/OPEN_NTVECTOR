@@ -1,40 +1,40 @@
-#include "WebSockeVirtualWrapper.h"
+ï»¿#include "WebSockeVirtualWrapper.h"
 // WebSocketClient.cpp
 
-// ¹¹Ôìº¯Êý - Ö±½Ó´´½¨µ×²ãÊµÏÖ
+// æž„é€ å‡½æ•° - ç›´æŽ¥åˆ›å»ºåº•å±‚å®žçŽ°
 WebSocketClient::WebSocketClient(const std::string& serverIp,
     int serverPort,
     const std::string& protocol,
     const std::string& path)
     : m_impl(IWebSocketClient::Create(serverIp, serverPort, protocol, path)) {
-    // É¶Ò²²»ÓÃ¸É£¬È«²¿×ª·¢¸øm_impl
+    // å•¥ä¹Ÿä¸ç”¨å¹²ï¼Œå…¨éƒ¨è½¬å‘ç»™m_impl
 }
 
-// Îö¹¹º¯Êý
+// æžæž„å‡½æ•°
 WebSocketClient::~WebSocketClient() {
-    // m_impl ×Ô¶¯Ïú»Ù
+    // m_impl è‡ªåŠ¨é”€æ¯
 }
 
-// connect - ÍêÃÀ×ª·¢
+// connect - å®Œç¾Žè½¬å‘
 bool WebSocketClient::connect(OnDataReceived onDataCb, OnConnectionState onConnCb) {
     if (!m_impl) return false;
     return m_impl->connect(std::move(onDataCb), std::move(onConnCb));
 }
 
-// disconnect - ÍêÃÀ×ª·¢
+// disconnect - å®Œç¾Žè½¬å‘
 void WebSocketClient::disconnect() {
     if (m_impl) {
         m_impl->disconnect();
     }
 }
 
-// sendData - ÍêÃÀ×ª·¢
+// sendData - å®Œç¾Žè½¬å‘
 bool WebSocketClient::sendData(const std::string& data) {
     if (!m_impl) return false;
     return m_impl->sendData(data);
 }
 
-// isConnected - ÍêÃÀ×ª·¢
+// isConnected - å®Œç¾Žè½¬å‘
 bool WebSocketClient::isConnected() const {
     if (!m_impl) return false;
     return m_impl->isConnected();

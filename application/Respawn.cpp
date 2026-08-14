@@ -1,6 +1,6 @@
-#include "Respawn.h"
+ï»¿#include "Respawn.h"
 
-// ¸¨Öúº¯Êı£º¶ÁÈ¡ varuint64 (ÎŞ·ûºÅ±ä³¤ 64 Î»ÕûÊı)
+// è¾…åŠ©å‡½æ•°ï¼šè¯»å– varuint64 (æ— ç¬¦å·å˜é•¿ 64 ä½æ•´æ•°)
 static uint64_t ReadVarUInt64(BinaryReader& br) {
     uint64_t value;
     size_t len = BinaryWriter::varint_to_uint(
@@ -20,13 +20,13 @@ void Respawn::Deserializ(std::vector<unsigned char> pack)
 {
     BinaryReader br(pack.data(), pack.size());
 
-    // 1. ¶ÁÈ¡ Position (Vec3: 3 ¸ö float, Ğ¡¶Ë)
+    // 1. è¯»å– Position (Vec3: 3 ä¸ª float, å°ç«¯)
     Position = br.ReadVec3();
 
-    // 2. ¶ÁÈ¡ State (uint8)
+    // 2. è¯»å– State (uint8)
     State = br.ReadUInt8();
 
-    // 3. ¶ÁÈ¡ EntityRuntimeID (varuint64)
+    // 3. è¯»å– EntityRuntimeID (varuint64)
     EntityRuntimeID = ReadVarUInt64(br);
 }
 
@@ -35,13 +35,13 @@ std::vector<unsigned char> Respawn::Serializ()
     BinaryWriter bw(32);
 
     bw.WriteVarUInt32(ID());
-    // 1. Ğ´Èë Position
+    // 1. å†™å…¥ Position
     bw.WriteVec3(Position);
 
-    // 2. Ğ´Èë State
+    // 2. å†™å…¥ State
     bw.WriteUInt8(State);
 
-    // 3. Ğ´Èë EntityRuntimeID (varuint64)
+    // 3. å†™å…¥ EntityRuntimeID (varuint64)
     uint8_t varIntBuf[10];
     size_t len = BinaryWriter::uint_to_varint(EntityRuntimeID, varIntBuf);
     bw.Write(varIntBuf, len);

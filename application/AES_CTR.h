@@ -1,4 +1,4 @@
-#ifndef AES_CTR_H
+ï»¿#ifndef AES_CTR_H
 #define AES_CTR_H
 
 #include <vector>
@@ -8,43 +8,43 @@
 class AES_CTR {
 public:
     /**
-     * @brief ¹¹Ôìº¯Êı£¬Ê¹ÓÃÖ¸¶¨µÄÃÜÔ¿ºÍ³õÊ¼ÏòÁ¿³õÊ¼»¯AES-CTR
-     * @param key ¼ÓÃÜÃÜÔ¿(16,24»ò32×Ö½Ú)
-     * @param iv ³õÊ¼ÏòÁ¿(16×Ö½Ú)
-     * @throws std::runtime_error Èç¹ûÃÜÔ¿»òIV³¤¶ÈÎŞĞ§
+     * @brief æ„é€ å‡½æ•°ï¼Œä½¿ç”¨æŒ‡å®šçš„å¯†é’¥å’Œåˆå§‹å‘é‡åˆå§‹åŒ–AES-CTR
+     * @param key åŠ å¯†å¯†é’¥(16,24æˆ–32å­—èŠ‚)
+     * @param iv åˆå§‹å‘é‡(16å­—èŠ‚)
+     * @throws std::runtime_error å¦‚æœå¯†é’¥æˆ–IVé•¿åº¦æ— æ•ˆ
      */
     AES_CTR(const std::vector<unsigned char>& key, const std::vector<unsigned char>& iv);
 
     /**
-     * @brief Îö¹¹º¯Êı£¬ÇåÀíOpenSSL×ÊÔ´
+     * @brief ææ„å‡½æ•°ï¼Œæ¸…ç†OpenSSLèµ„æº
      */
     ~AES_CTR();
 
-    // ½ûÖ¹¿½±´¹¹ÔìºÍ¿½±´¸³Öµ
+    // ç¦æ­¢æ‹·è´æ„é€ å’Œæ‹·è´èµ‹å€¼
     AES_CTR(const AES_CTR&) = delete;
     AES_CTR& operator=(const AES_CTR&) = delete;
 
     /**
-     * @brief ¼ÓÃÜ»ò½âÃÜÊı¾İ(CTRÄ£Ê½ÏÂÁ½ÕßÏàÍ¬)
-     * @param input ÊäÈëÊı¾İ
-     * @return ´¦ÀíºóµÄÊı¾İ
-     * @throws std::runtime_error Èç¹û¼ÓÃÜ/½âÃÜ²Ù×÷Ê§°Ü
+     * @brief åŠ å¯†æˆ–è§£å¯†æ•°æ®(CTRæ¨¡å¼ä¸‹ä¸¤è€…ç›¸åŒ)
+     * @param input è¾“å…¥æ•°æ®
+     * @return å¤„ç†åçš„æ•°æ®
+     * @throws std::runtime_error å¦‚æœåŠ å¯†/è§£å¯†æ“ä½œå¤±è´¥
      */
     std::vector<unsigned char> Process(const std::vector<unsigned char>& input);
 
     /**
-     * @brief »ñÈ¡µ±Ç°¼ÆÊıÆ÷×´Ì¬£¬¿ÉÓÃÓÚ»Ö¸´¼ÓÃÜ½ø¶È
-     * @return µ±Ç°¼ÆÊıÆ÷Öµ
+     * @brief è·å–å½“å‰è®¡æ•°å™¨çŠ¶æ€ï¼Œå¯ç”¨äºæ¢å¤åŠ å¯†è¿›åº¦
+     * @return å½“å‰è®¡æ•°å™¨å€¼
      */
     std::vector<unsigned char> get_current_counter() const;
 
 private:
     void increment_counter(size_t block);
 
-    std::vector<unsigned char> key_;     // ¼ÓÃÜÃÜÔ¿
-    std::vector<unsigned char> iv_;      // ³õÊ¼ÏòÁ¿
-    std::vector<unsigned char> current_counter_; // µ±Ç°¼ÆÊıÆ÷×´Ì¬
-    EVP_CIPHER_CTX* ctx_ = nullptr;     // OpenSSL¼ÓÃÜÉÏÏÂÎÄ
+    std::vector<unsigned char> key_;     // åŠ å¯†å¯†é’¥
+    std::vector<unsigned char> iv_;      // åˆå§‹å‘é‡
+    std::vector<unsigned char> current_counter_; // å½“å‰è®¡æ•°å™¨çŠ¶æ€
+    EVP_CIPHER_CTX* ctx_ = nullptr;     // OpenSSLåŠ å¯†ä¸Šä¸‹æ–‡
     int padding_ = 0;
 };
 

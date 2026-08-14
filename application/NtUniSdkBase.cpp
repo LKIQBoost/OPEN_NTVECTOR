@@ -1,22 +1,22 @@
-#include "NtUniSdkBase.h"
+ï»¿#include "NtUniSdkBase.h"
 #include <cstdio>
 
 // ================================================================
-// ¾²Ì¬³ÉÔ±
+// é™æ€æˆå‘˜
 // ================================================================
 NtUniSdkBase* NtUniSdkBase::s_instance = nullptr;
 
 // ================================================================
-// ¹¹Ôì / Îö¹¹
+// æ„é€  / ææ„
 // ================================================================
 NtUniSdkBase::NtUniSdkBase() {
     s_instance = this;
 
-    // ÌîÂú 32 Ïî noop£¬·ÀÖ¹ SDK µ÷µ½Ô½½çÎ»ÖÃ
+    // å¡«æ»¡ 32 é¡¹ noopï¼Œé˜²æ­¢ SDK è°ƒåˆ°è¶Šç•Œä½ç½®
     for (int i = 0; i < 32; ++i)
         m_delVtbl[i] = (void*)s_del_noop;
 
-    // ÒÑÖª»Øµ÷Ë÷Òı
+    // å·²çŸ¥å›è°ƒç´¢å¼•
     m_delVtbl[0] = (void*)s_del_onInitFinish;       // onInitFinish
     m_delVtbl[1] = (void*)s_del_onLoginFinish;       // onLoginFinish
     m_delVtbl[2] = (void*)s_del_onLogoutFinish;      // onLogoutFinish
@@ -39,19 +39,19 @@ NtUniSdkBase::NtUniSdkBase() {
     m_sdk.setDelegate(&m_delegate);
     m_sdk.setLogHook(s_logHook);
 
-    // 3. mpay ±ØÌî²ÎÊı
+    // 3. mpay å¿…å¡«å‚æ•°
     char title[] = "Login";
     char dataPath[] = "mpay";
     m_sdk.setPtr("mpay_option_login_title", title);
     m_sdk.setPtr("mpay_option_data_path", dataPath);
 
-    // 4. ÒµÎñ²ÎÊı
+    // 4. ä¸šåŠ¡å‚æ•°
     m_sdk.setStr("JF_GAMEID", "x19");
     m_sdk.setStr("UNISDK_JF_GAS3", "1");
     m_sdk.setStr("JF_LOG_KEY", "3Cz7dGX2EYHORebBUBHwCZ7pltZ_4l-t");
     m_sdk.setStr("JF_PAY_LOG_URL", "https://applog.matrix.netease.com/client/sdk/pay_log");
 
-    // 5. mpay UI ²ÎÊı
+    // 5. mpay UI å‚æ•°
     m_sdk.setStr("MPAY_RESTYPE", "2");
     m_sdk.setStr("MPAY_DEVICE_UID", "device");
     m_sdk.setStr("MPAY_GAME_ICON_PATH", "game-icon");
@@ -76,7 +76,7 @@ NtUniSdkBase::~NtUniSdkBase() {
 }
 
 // ================================================================
-// ¾²Ì¬»Øµ÷Â·ÓÉ
+// é™æ€å›è°ƒè·¯ç”±
 // ================================================================
 void __cdecl NtUniSdkBase::s_logHook(const char* msg) {
     if (s_instance) s_instance->onLog(msg);
@@ -121,14 +121,14 @@ void __fastcall NtUniSdkBase::s_del_onCompactViewClosed(void* self, int code) {
 }
 
 void __fastcall NtUniSdkBase::s_del_noop(void* self) {
-    // ÍÌµôÎ´Öª»Øµ÷£¬·À±À
+    // åæ‰æœªçŸ¥å›è°ƒï¼Œé˜²å´©
 }
 
 // ================================================================
-// doLogin ¡ª¡ª ³õÊ¼»¯ + µ¯´° + ÏûÏ¢Ñ­»·£¬µÇÂ¼Íê³Éºó·µ»Ø
+// doLogin â€”â€” åˆå§‹åŒ– + å¼¹çª— + æ¶ˆæ¯å¾ªç¯ï¼Œç™»å½•å®Œæˆåè¿”å›
 // ================================================================
 bool NtUniSdkBase::doLogin() {
-    // 7. ¸¸´°¿Ú = ×ÀÃæ£¨²»ÓÃ´´½¨´°¿Ú£¬mpay ÄÃ×ÀÃæ×ö¶¨Î»»ù×¼£©
+    // 7. çˆ¶çª—å£ = æ¡Œé¢ï¼ˆä¸ç”¨åˆ›å»ºçª—å£ï¼Œmpay æ‹¿æ¡Œé¢åšå®šä½åŸºå‡†ï¼‰
     HWND desktop = GetDesktopWindow();
     m_sdk.setPtr("mpay_option_parent_hwnd", &desktop);
     // 8. ntLogin
@@ -136,8 +136,8 @@ bool NtUniSdkBase::doLogin() {
     //m_sdk.ntExtend("{\"methodId\":\"updateAgeTipsPosition\",\"anchor\":0,\"xGravity\":0,\"yGravity\":0,\"xOffset\":-9999,\"yOffset\":-9999,\"width\":1,\"height\":1}");
 
     m_Logout = false;
-    // 9. ÏûÏ¢Ñ­»·£º±ÃÏûÏ¢ + runLoop£¬Ö±µ½ onLoginFinish ±»»Øµ÷
-    MSG msg;// ÊÊÁäÌáÊ¾¿ÉÄÜÑÓ³Ù´´½¨£¬ÔÚÏûÏ¢Ñ­»·Àï¼ì²âÒ»´Î¾Í¹»
+    // 9. æ¶ˆæ¯å¾ªç¯ï¼šæ³µæ¶ˆæ¯ + runLoopï¼Œç›´åˆ° onLoginFinish è¢«å›è°ƒ
+    MSG msg;// é€‚é¾„æç¤ºå¯èƒ½å»¶è¿Ÿåˆ›å»ºï¼Œåœ¨æ¶ˆæ¯å¾ªç¯é‡Œæ£€æµ‹ä¸€æ¬¡å°±å¤Ÿ
     bool ageTipHidden = false;
 
     while (!m_Logout) {
@@ -170,7 +170,7 @@ void NtUniSdkBase::doLogout() {
 }
 
 // ================================================================
-// getter£¨µÇÂ¼³É¹¦ºóµ÷ÓÃ£©
+// getterï¼ˆç™»å½•æˆåŠŸåè°ƒç”¨ï¼‰
 // ================================================================
 const char* NtUniSdkBase::getSauth() const {
     return m_sdk.inst ? ((fn_getPropStr)m_sdk.vt[12])(m_sdk.inst, "SAUTH_JSON") : nullptr;

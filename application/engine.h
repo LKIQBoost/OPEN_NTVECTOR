@@ -7,15 +7,15 @@
 extern "C" {
 #endif
 
-	// µ¼³öº¯ÊýÉùÃ÷
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	void trigger_event(const char* event_name, PyObject* args_array);
 	void trigger_event_with_args(const char* event_name, int arg_count, ...);
 
-	// PythonÄ£¿é³õÊ¼»¯º¯Êý
-    void initengine(void);
-    void initclient_instance(void);
+	// Python module init (Python 3)
+    PyMODINIT_FUNC PyInit_engine(void);
+    PyMODINIT_FUNC PyInit_client_instance(void);
 
 #ifdef __cplusplus
 }
 #endif
-void initclient(void);
+PyMODINIT_FUNC PyInit__client(void);

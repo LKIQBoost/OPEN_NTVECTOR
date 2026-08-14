@@ -6,8 +6,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-	// PythonÄ£¿é³õÊ¼»¯º¯Êý
-	void init_chacha(void);
+	// PythonÄ£ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	PyMODINIT_FUNC PyInit__chacha(void);
 
 #ifdef __cplusplus
 }

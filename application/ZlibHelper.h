@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <iostream>
 #include <vector>
 #include <stdexcept>
@@ -7,12 +7,12 @@
 
 class ZlibHelper {
 public:
-    // Ñ¹ËõÊı¾İ£¨Ô­Ê¼DEFLATE¸ñÊ½£¬²»º¬zlibÍ·Î²£©
+    // å‹ç¼©æ•°æ®ï¼ˆåŸå§‹DEFLATEæ ¼å¼ï¼Œä¸å«zlibå¤´å°¾ï¼‰
     static std::vector<unsigned char> compress(const std::vector<unsigned char>& data, int level = Z_DEFAULT_COMPRESSION) {
         z_stream zs;
         memset(&zs, 0, sizeof(zs));
 
-        // Ê¹ÓÃ¸ºµÄwindowBitsÀ´»ñÈ¡Ô­Ê¼DEFLATE¸ñÊ½£¨ÎŞzlibÍ·Î²£©
+        // ä½¿ç”¨è´Ÿçš„windowBitsæ¥è·å–åŸå§‹DEFLATEæ ¼å¼ï¼ˆæ— zlibå¤´å°¾ï¼‰
         if (deflateInit2(&zs, level, Z_DEFLATED, -MAX_WBITS, 6, Z_DEFAULT_STRATEGY) != Z_OK) {
             throw std::runtime_error("deflateInit2 failed");
         }
@@ -46,12 +46,12 @@ public:
         return output;
     }
 
-    // ½âÑ¹Êı¾İ£¨Ô­Ê¼DEFLATE¸ñÊ½£©
+    // è§£å‹æ•°æ®ï¼ˆåŸå§‹DEFLATEæ ¼å¼ï¼‰
     static std::vector<unsigned char> decompress(const std::vector<unsigned char>& compressedData) {
         z_stream zs;
         memset(&zs, 0, sizeof(zs));
 
-        // Ê¹ÓÃ¸ºµÄwindowBitsÀ´´¦ÀíÔ­Ê¼DEFLATE¸ñÊ½
+        // ä½¿ç”¨è´Ÿçš„windowBitsæ¥å¤„ç†åŸå§‹DEFLATEæ ¼å¼
         if (inflateInit2(&zs, -MAX_WBITS) != Z_OK) {
             throw std::runtime_error("inflateInit2 failed");
         }
@@ -85,13 +85,13 @@ public:
         return output;
     }
 
-    // ×Ö·û´®Ñ¹ËõµÄ±ã½İ·½·¨
+    // å­—ç¬¦ä¸²å‹ç¼©çš„ä¾¿æ·æ–¹æ³•
     static std::vector<unsigned char> compressString(const std::string& str, int level = Z_DEFAULT_COMPRESSION) {
         std::vector<unsigned char> data(str.begin(), str.end());
         return compress(data, level);
     }
 
-    // ×Ö·û´®½âÑ¹µÄ±ã½İ·½·¨
+    // å­—ç¬¦ä¸²è§£å‹çš„ä¾¿æ·æ–¹æ³•
     static std::string decompressString(const std::vector<unsigned char>& compressedData) {
         auto decompressed = decompress(compressedData);
         return std::string(decompressed.begin(), decompressed.end());

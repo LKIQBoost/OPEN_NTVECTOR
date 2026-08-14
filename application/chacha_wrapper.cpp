@@ -120,47 +120,27 @@ extern "C" {
         {NULL, NULL, 0, NULL}
     };
 
-    // ���Ͷ���
-    PyTypeObject PyChaChaX_Type = {
-        PyObject_HEAD_INIT(NULL)
-        0,                         // ob_size
-        "_chacha.ChaChaX",         // tp_name
-        sizeof(PyChaChaX),         // tp_basicsize
-        0,                         // tp_itemsize
-        0,                         // tp_dealloc
-        0,                         // tp_print
-        0,                         // tp_getattr
-        0,                         // tp_setattr
-        0,                         // tp_compare
-        0,                         // tp_repr
-        0,                         // tp_as_number
-        0,                         // tp_as_sequence
-        0,                         // tp_as_mapping
-        0,                         // tp_hash
-        0,                         // tp_call
-        0,                         // tp_str
-        0,                         // tp_getattro
-        0,                         // tp_setattro
-        0,                         // tp_as_buffer
-        Py_TPFLAGS_DEFAULT,        // tp_flags
-        "ChaChaX wrapper object",  // tp_doc
-    };
+    // PyTypeObject (Python 3) - fields assigned in PyInit__chacha
+    PyTypeObject PyChaChaX_Type = { PyVarObject_HEAD_INIT(NULL, 0) };
 
-    // ģ���ʼ������
-    void init_chacha(void) {
-        // ��ʼ������
+    // Module init (Python 3)
+    static struct PyModuleDef _chacha_module = { PyModuleDef_HEAD_INIT, "_chacha", NULL, -1, ChaChaMethods };
+    PyMODINIT_FUNC PyInit__chacha(void) {
+        PyChaChaX_Type.tp_name = "_chacha.ChaChaX";
+        PyChaChaX_Type.tp_basicsize = sizeof(PyChaChaX);
+        PyChaChaX_Type.tp_flags = Py_TPFLAGS_DEFAULT;
+        PyChaChaX_Type.tp_doc = "ChaChaX wrapper object";
         PyChaChaX_Type.tp_new = PyType_GenericNew;
         if (PyType_Ready(&PyChaChaX_Type) < 0)
-            return;
+            return NULL;
 
-        // ����ģ��
-        PyObject* module = Py_InitModule("_chacha", ChaChaMethods);
+        PyObject* module = PyModule_Create(&_chacha_module);
         if (!module)
-            return;
+            return NULL;
 
-        // �������͵�ģ��
         Py_INCREF(&PyChaChaX_Type);
         PyModule_AddObject(module, "ChaChaX", (PyObject*)&PyChaChaX_Type);
+        return module;
     }
 
 #ifdef __cplusplus

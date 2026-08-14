@@ -1,4 +1,4 @@
-// MPayDelegate.cpp
+ï»¿// MPayDelegate.cpp
 #include "MPayDelegate.h"
 #include <chrono>
 #include <iomanip>
@@ -14,100 +14,100 @@ MPayDelegate::MPayDelegate(void* userData)
 //}
 
 
-// Ö»ÊµÏÖ×î»ù±¾µÄ·½·¨
+// åªå®ç°æœ€åŸºæœ¬çš„æ–¹æ³•
 void __cdecl  MPayDelegate::onInitFinish(int code) {
 }
 
 void __cdecl  MPayDelegate::onLoginFinish(int code) {
 }
 
-// [2] ÍË³öµÇÂ¼Íê³É
+// [2] é€€å‡ºç™»å½•å®Œæˆ
 void __cdecl MPayDelegate::onLogoutFinish(int code) {
 }
 
-// [3] ÓÃ»§µÇÂ¼³É¹¦£¨ÏêÏ¸£©
+// [3] ç”¨æˆ·ç™»å½•æˆåŠŸï¼ˆè¯¦ç»†ï¼‰
 void __cdecl MPayDelegate::onUserLogin(const char* userId, const char* session) {
-    // ÕâÀï¿ÉÒÔ±£´æÓÃ»§»á»°ĞÅÏ¢
+    // è¿™é‡Œå¯ä»¥ä¿å­˜ç”¨æˆ·ä¼šè¯ä¿¡æ¯
 }
 
-// [4] µÇÂ¼Ê§°Ü
+// [4] ç™»å½•å¤±è´¥
 void __cdecl MPayDelegate::onLoginFailed(int errorCode, const char* errorMsg) {
 }
 
-// [5] Ö§¸¶Íê³É
+// [5] æ”¯ä»˜å®Œæˆ
 void __cdecl MPayDelegate::onPayFinish(int code, const char* orderId) {
 }
 
-// [6] Ö§¸¶³É¹¦
+// [6] æ”¯ä»˜æˆåŠŸ
 void __cdecl MPayDelegate::onPaySuccess(const char* orderId, const char* productId, int amount) {
-    // ÕâÀïÓ¦¸Ã´¦ÀíÖ§¸¶³É¹¦Âß¼­£¬Èç·¢»õµÈ
+    // è¿™é‡Œåº”è¯¥å¤„ç†æ”¯ä»˜æˆåŠŸé€»è¾‘ï¼Œå¦‚å‘è´§ç­‰
 }
 
-// [7] Ö§¸¶Ê§°Ü
+// [7] æ”¯ä»˜å¤±è´¥
 void __cdecl MPayDelegate::onPayFailed(int errorCode, const char* errorMsg) {
 }
 
-// [8] Ö§¸¶È¡Ïû
+// [8] æ”¯ä»˜å–æ¶ˆ
 void __cdecl MPayDelegate::onPayCanceled() {
 }
 
-// [9] ¼ì²é¶©µ¥Íê³É
+// [9] æ£€æŸ¥è®¢å•å®Œæˆ
 void __cdecl MPayDelegate::onCheckOrderFinish(int errorCode, int orderStatus,
     const char* productId, uint32_t productCount,
     const char* orderId, const char* errReason) {
 }
 
-// [10] À©Õ¹¹¦ÄÜÍê³É
+// [10] æ‰©å±•åŠŸèƒ½å®Œæˆ
 void __cdecl MPayDelegate::onExtendFuncFinish(const char* json) {
-    // json¿ÉÄÜ°üº¬À©Õ¹¹¦ÄÜµÄ½á¹ûÊı¾İ
+    // jsonå¯èƒ½åŒ…å«æ‰©å±•åŠŸèƒ½çš„ç»“æœæ•°æ®
 }
 
-// [11] ½ô´ÕÊÓÍ¼¹Ø±Õ
+// [11] ç´§å‡‘è§†å›¾å…³é—­
 void __cdecl MPayDelegate::onCompactViewClosed(int code) {
-    // code: 0=Õı³£¹Ø±Õ, ÆäËû=´íÎóÂë
+    // code: 0=æ­£å¸¸å…³é—­, å…¶ä»–=é”™è¯¯ç 
 }
 
-// [12] ÈÕÖ¾»Øµ÷
+// [12] æ—¥å¿—å›è°ƒ
 void __cdecl MPayDelegate::onLog(const char* log) {
-    // ×¢Òâ£ºÕâ¸ö»Øµ÷¿ÉÄÜºÜÆµ·±£¬½÷É÷Êä³ö
+    // æ³¨æ„ï¼šè¿™ä¸ªå›è°ƒå¯èƒ½å¾ˆé¢‘ç¹ï¼Œè°¨æ…è¾“å‡º
     std::cout << log << std::endl;
 }
 
-// [13] ÓÃ»§ÇĞ»»
+// [13] ç”¨æˆ·åˆ‡æ¢
 void __cdecl MPayDelegate::onUserSwitch(const char* newUserId) {
 }
 
-// [14] ÊµÃûÈÏÖ¤»Øµ÷
+// [14] å®åè®¤è¯å›è°ƒ
 void __cdecl MPayDelegate::onRealNameAuth(int status) {
 }
 
-// [15] ÓÃ»§ÖĞĞÄ¹Ø±Õ
+// [15] ç”¨æˆ·ä¸­å¿ƒå…³é—­
 void __cdecl MPayDelegate::onUserCenterClosed() {
 }
 
-// [16] ÍË³öSDK
+// [16] é€€å‡ºSDK
 void __cdecl MPayDelegate::onSDKExit() {
 }
 
-// [17] ÍøÂç×´Ì¬±ä»¯
+// [17] ç½‘ç»œçŠ¶æ€å˜åŒ–
 void __cdecl MPayDelegate::onNetworkStatusChanged(int status) {
 }
 
-// [18] ÓÃ»§ĞÅÏ¢¸üĞÂ
+// [18] ç”¨æˆ·ä¿¡æ¯æ›´æ–°
 void __cdecl MPayDelegate::onUserInfoUpdated(const char* json) {
-    // json°üº¬ÓÃ»§ĞÅÏ¢£¬ÈçêÇ³Æ¡¢Í·ÏñµÈ
+    // jsonåŒ…å«ç”¨æˆ·ä¿¡æ¯ï¼Œå¦‚æ˜µç§°ã€å¤´åƒç­‰
 }
 
-// [19] Ö§¸¶ÊÓÍ¼ÏÔÊ¾/Òş²Ø
+// [19] æ”¯ä»˜è§†å›¾æ˜¾ç¤º/éšè—
 void __cdecl MPayDelegate::onPayViewVisible(bool visible) {
 }
 
-// [20] ÉÌÆ·ĞÅÏ¢¸üĞÂ
+// [20] å•†å“ä¿¡æ¯æ›´æ–°
 void __cdecl MPayDelegate::onProductInfoUpdated(const char* json) {
-    // json°üº¬ÉÌÆ·ĞÅÏ¢ÁĞ±í
+    // jsonåŒ…å«å•†å“ä¿¡æ¯åˆ—è¡¨
 }
 
-// ¹¤¾ßº¯ÊıÊµÏÖ
+// å·¥å…·å‡½æ•°å®ç°
 void MPayDelegate::SetUserData(void* userData) {
     m_userData = userData;
 }

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include "json/json.h"
 #include <string>
 #include "httplib.h"
@@ -34,10 +34,10 @@ struct ChainPair
 
 class LoginAuth {
 public:
-    // ¹«Íø·ş:HTTP ÇëÇó mojang/ÍøÒ×ÈÏÖ¤·ş,±¾µØ reissue Á´
+    // å…¬ç½‘æœ:HTTP è¯·æ±‚ mojang/ç½‘æ˜“è®¤è¯æœ,æœ¬åœ° reissue é“¾
     static LoginSession Login(const ChainPair& pair, const std::string& rawSkinData);
 
-    // P2P/LAN(NetherNet):±¾µØ×ÔÇ©,²»µ÷ HTTP
+    // P2P/LAN(NetherNet):æœ¬åœ°è‡ªç­¾,ä¸è°ƒ HTTP
     static LoginSession LoginLocal(const std::string& displayName,
         const std::string& userId,
         const std::string& rawSkinData, std::string uuid = "", std::string player_uid = "");
@@ -56,12 +56,12 @@ private:
         EVP_PKEY* ecKey,
         const std::string& publicKeyBase64);
 
-    // ¡ï ĞÂÔö:LAN Ä£Ê½×ÔÇ©Ö¤ÊéÁ´
+    // â˜… æ–°å¢:LAN æ¨¡å¼è‡ªç­¾è¯ä¹¦é“¾
     static std::string BuildLocalChain(const std::string& displayName,
         const std::string& userId,
         EVP_PKEY* ecKey,
         const std::string& publicKeyBase64, std::string& uuid, std::string& player_uid);
 
-    // ¡ï ĞÂÔö:»ùÓÚ userId Éú³ÉÎÈ¶¨µÄ UUID
+    // â˜… æ–°å¢:åŸºäº userId ç”Ÿæˆç¨³å®šçš„ UUID
     static std::string GenerateIdentityUuid(const std::string& userId);
 };

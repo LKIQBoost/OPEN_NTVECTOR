@@ -1,17 +1,63 @@
+// windows.h must come first in this TU so the Windows SDK headers parse before
+// any `using namespace std;` (from project headers) can make std::byte collide
+// with the SDK's `byte` typedef.
+#include <windows.h>
 #include "PythonRuntime.h"
 #include "fopmodule.h"
-#include "ctypes.h"
 #include "TanGame.h"
 #include "utility.h"
 #include "setting.h"
 #include "mod_log.h"
 #include "engine.h"
 #include "pkt_module.h"
-#include "socket_static.h"
 #include "Logger.h"
 
 #include "MPayWrapper.h"
-extern "C" void initeasy_utils(void);
+extern "C" PyObject* PyInit_easy_utils(void);
+
+// Point PYTHONHOME at the bundled python312/ directory next to Program.exe
+// (CommunityBot-style deployment). Without this the embedded interpreter
+// cannot find its stdlib once the exe is copied elsewhere.
+static void SetPythonHome()
+{
+#ifdef _WIN32
+    char exe[MAX_PATH] = { 0 };
+    DWORD n = GetModuleFileNameA(NULL, exe, MAX_PATH);
+    // Full stdlib runtime is deployed in python312/ next to the exe
+    // (python312/Lib + python312/DLLs + python312/Lib/site-packages).
+    // python312.dll stays in the exe dir (import-lib loading).
+    std::string home = "python312";
+    if (n > 0) {
+        std::string p(exe);
+        size_t s = p.find_last_of("\\/");
+        if (s != std::string::npos) home = p.substr(0, s) + "\\python312";
+    }
+    std::wstring whome;
+    int wlen = MultiByteToWideChar(CP_ACP, 0, home.c_str(), -1, NULL, 0);
+    if (wlen > 0) {
+        whome.resize(wlen);
+        MultiByteToWideChar(CP_ACP, 0, home.c_str(), -1, &whome[0], wlen);
+        Py_SetPythonHome(whome.c_str());
+    }
+#else
+    Py_SetPythonHome(L".");
+#endif
+}
+
+// Register a freshly created Py3 module into sys.modules so `import name` works.
+static void RegisterModule(PyObject* m, const char* name)
+{
+    if (m) {
+        if (PyDict_SetItemString(PyImport_GetModuleDict(), name, m) < 0) {
+            PyErr_Print();
+        }
+        Py_DECREF(m);
+    }
+    else {
+        LOG(LOG_ERROR, "[PythonRuntime] initModules failed: ", name);
+        PyErr_Print();
+    }
+}
 
 std::string PythonRuntime::m_script_path;
 std::map<std::string, MCPFileSystem> PythonRuntime::mod_file_system_map;
@@ -300,11 +346,10 @@ void PythonRuntime::startUp()
 	memset(src, '\0', sizeof(src));
 	Logger::getInstance().log(LOG_INFO, "Python Initialize.");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] startUp - Calling Py_Initialize()");
+	SetPythonHome();
 	Py_Initialize();
-	if (!PyEval_ThreadsInitialized()) {
-		PyEval_InitThreads();  // ��ʼ���߳�֧��
-		PyEval_SaveThread();        // ��ؼ�2���ͷ����̳߳��е�GIL���������߳��ܻ�ȡ������
-	}
+	// Py3: the GIL is auto-initialized; release it so worker threads can acquire it.
+	PyEval_SaveThread();
 	PyGILState_STATE state = PyGILState_Ensure();
 	LOG(LOG_SCRIPTING, "[PythonRuntime] startUp - Initializing built-in modules");
 	initModules();
@@ -319,8 +364,8 @@ void PythonRuntime::startUp()
 			puts((string("[python] Use mcp init at \"") + VANILLA_MCP + '\"').data());
 		}
 		if (Params::logger) {
-			PyRun_SimpleStringFlags("print 'Python', sys.version_info", nullptr);
-			PyRun_SimpleStringFlags("print sys.path", nullptr);
+			PyRun_SimpleStringFlags("print('Python', sys.version_info)", nullptr);
+			PyRun_SimpleStringFlags("print(sys.path)", nullptr);
 		}
 
 
@@ -332,7 +377,7 @@ void PythonRuntime::startUp()
 		PyObject* sys_path = nullptr;
 		PythonRuntime::getGlobal("sys", "path", &sys_path);
 		if (Params::logger)
-			PyRun_SimpleStringFlags("print sys.path", nullptr);
+			PyRun_SimpleStringFlags("print(sys.path)", nullptr);
 
 		if (sys_path && PyList_Check(sys_path)) {
 			// �������·��
@@ -360,7 +405,7 @@ void PythonRuntime::startUp()
 			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)sunshine_path.c_str());
 		}
 		if (Params::logger)
-			PyRun_SimpleStringFlags("print sys.path", nullptr);
+			PyRun_SimpleStringFlags("print(sys.path)", nullptr);
 		LOG(LOG_FILE, "[PythonRuntime] startUp - Loading MCP file: ", VANILLA_MCP);
 		MCPFileSystem PublicMCP(VANILLA_MCP);
 		//PythonRuntime::McpList.push_back(PublicMCP);
@@ -392,8 +437,8 @@ void PythonRuntime::startUp()
 		LOG(LOG_SCRIPTING, "[PythonRuntime] startUp - Using Python source mode");
 		if (Params::logger) {
 			puts("[python] Use python source at \"source\"");
-			PyRun_SimpleStringFlags("print 'Python', sys.version_info", nullptr);
-			PyRun_SimpleStringFlags("print sys.path", nullptr);
+			PyRun_SimpleStringFlags("print('Python', sys.version_info)", nullptr);
+			PyRun_SimpleStringFlags("print(sys.path)", nullptr);
 		}
 		// �����ű�·��
 		std::string script_path = "./source";
@@ -403,38 +448,25 @@ void PythonRuntime::startUp()
 		PyObject* sys_path = nullptr;
 		PythonRuntime::getGlobal("sys", "path", &sys_path);
 		if (Params::logger)
-			PyRun_SimpleStringFlags("print sys.path", nullptr);
+			PyRun_SimpleStringFlags("print(sys.path)", nullptr);
 
 		if (sys_path && PyList_Check(sys_path)) {
-			// �������·��
-			PyList_SetSlice(sys_path, 0, PyList_Size(sys_path), nullptr);
+			// NOTE: do NOT clear sys.path here in Py3 - it would erase the
+			// stdlib search paths and break every standard-library import.
+			// Just append our framework/plugin paths below.
 
 			// ���Ӹ���ģ��·��
 			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)m_script_path.c_str());
 
-			std::string minecraft_path = m_script_path + "/minecraft";
-			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)minecraft_path.c_str());
-
-			std::string framework_path = m_script_path + "/framework";
-			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)framework_path.c_str());
-
-			std::string lib_path = m_script_path + "/lib";
-			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)lib_path.c_str());
-
-			std::string lobby_path = m_script_path + "/lobby";
-			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)lobby_path.c_str());
-
-			std::string mod_path = m_script_path + "/mod";
-			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)mod_path.c_str());
-
-			std::string sunshine_path = m_script_path + "/sunshine";
-			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)sunshine_path.c_str());
-
 			std::string scripts_path = "./scripts";
 			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)scripts_path.c_str());
+
+			// site-packages so third-party libraries (requests, etc.) are importable.
+			std::string site_path = "./python312/Lib/site-packages";
+			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)site_path.c_str());
 		}
 		if (Params::logger)
-			PyRun_SimpleStringFlags("print sys.path", nullptr);
+			PyRun_SimpleStringFlags("print(sys.path)", nullptr);
 		//PyRun_SimpleString((StringSplitUtils::escape_backslashes("sys.path.append('./source')")).data());
 		PyRun_SimpleString("import init");
 		//PyImport_ImportModule("init");
@@ -446,45 +478,38 @@ void PythonRuntime::startUp()
 
 void PythonRuntime::initModules()
 {
+    // Python 3: each PyInit_X() creates the module; RegisterModule puts it
+    // into sys.modules so `import name` works. socket/select/ctypes are no
+    // longer registered here - Python 3.12 provides them from its stdlib.
     LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing client_instance module");
-    initclient_instance();
+    RegisterModule(PyInit_client_instance(), "client_instance");
     LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing easy_utils module");
-    initeasy_utils();
-    LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing client module");
-    initclient();
+    RegisterModule(PyInit_easy_utils(), "easy_utils");
+    LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing _client module");
+    RegisterModule(PyInit__client(), "_client");
     LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing tan_game module");
     register_tan_lobby_game_module();
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing websocket module");
-	initwebsocket();
+	RegisterModule(PyInit__websocket(), "_websocket");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing aes module");
-	initaes();
+	RegisterModule(PyInit_aes(), "aes");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing chacha module");
-	init_chacha();
+	RegisterModule(PyInit__chacha(), "_chacha");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing raknet module");
-	init_raknet();
+	RegisterModule(PyInit__raknet(), "_raknet");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing utility module");
-	initutility();
+	RegisterModule(PyInit_utility(), "utility");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing setting module");
-	initsetting();
+	RegisterModule(PyInit_setting(), "setting");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing mod_log module");
-	initmod_log();
-#if !defined(_DEBUG) && defined(_WIN32)
-	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing socket module");
-	init_socket();
-    LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing select module");
-    initselect();
-#endif
-#ifdef _WIN32
-    LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing ctypes module");
-    init_ctypes();
-#endif
+	RegisterModule(PyInit_mod_log(), "mod_log");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing engine module");
-	initengine();
+	RegisterModule(PyInit_engine(), "engine");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing rotor module");
-	initrotor();
+	RegisterModule(PyInit_rotor(), "rotor");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing fop module");
-	initfop();
+	RegisterModule(PyInit_fop(), "fop");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing pkt module");
-	initpkt();
+	RegisterModule(PyInit_pkt(), "pkt");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - All modules initialized");
 }

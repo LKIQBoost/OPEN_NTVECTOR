@@ -1,4 +1,4 @@
-#include "Logger.h"
+ï»¿#include "Logger.h"
 #include <iostream>
 
 Logger& Logger::getInstance() {
@@ -7,7 +7,7 @@ Logger& Logger::getInstance() {
 }
 
 Logger::Logger() {
-    // ³õÊ¼»¯Àà±ğÃû³ÆÓ³Éä
+    // åˆå§‹åŒ–ç±»åˆ«åç§°æ˜ å°„
     categoryNames_ = {
         {LOG_INFO,      "INFO"},
         {LOG_WARN,      "WARN"},
@@ -43,7 +43,7 @@ Logger::Logger() {
         {LOG_EDITOR,    "EDITOR"}
     };
 
-    // ÉèÖÃÄ¬ÈÏÑÕÉ«
+    // è®¾ç½®é»˜è®¤é¢œè‰²
     categoryColors_ = {
         {LOG_INFO,      ConsoleColor::BRIGHT_WHITE},
         {LOG_WARN,      ConsoleColor::BRIGHT_YELLOW},
@@ -51,10 +51,10 @@ Logger::Logger() {
         {LOG_PLATFORM,  ConsoleColor::RESET},
         {LOG_SYSTEM,    ConsoleColor::RESET},
         {LOG_NETWORK,   ConsoleColor::RESET}
-        // ÆäËûÀà±ğÊ¹ÓÃÄ¬ÈÏÑÕÉ«
+        // å…¶ä»–ç±»åˆ«ä½¿ç”¨é»˜è®¤é¢œè‰²
     };
 
-    enabledCategories_ = 0xFFFFFFFF; // Ä¬ÈÏÆôÓÃËùÓĞÀà±ğ
+    enabledCategories_ = 0xFFFFFFFF; // é»˜è®¤å¯ç”¨æ‰€æœ‰ç±»åˆ«
 }
 
 void Logger::initialize(uint32_t enabledCategories) {
@@ -81,7 +81,7 @@ void Logger::logv(uint32_t category, const char* format, ...) {
     va_list args;
     va_start(args, format);
 
-    // ¼ÆËãĞèÒªµÄ»º³åÇø´óĞ¡
+    // è®¡ç®—éœ€è¦çš„ç¼“å†²åŒºå¤§å°
     va_list args_copy;
     va_copy(args_copy, args);
     int size = vsnprintf(nullptr, 0, format, args_copy);
@@ -91,7 +91,7 @@ void Logger::logv(uint32_t category, const char* format, ...) {
         std::vector<char> buffer(size + 1);
         vsnprintf(buffer.data(), buffer.size(), format, args);
 
-        // µ÷ÓÃÄ£°å log º¯Êı£¬°Ñ¸ñÊ½»¯ºóµÄ×Ö·û´®´«½øÈ¥
+        // è°ƒç”¨æ¨¡æ¿ log å‡½æ•°ï¼ŒæŠŠæ ¼å¼åŒ–åçš„å­—ç¬¦ä¸²ä¼ è¿›å»
         log(category, std::string(buffer.data()));
     }
 

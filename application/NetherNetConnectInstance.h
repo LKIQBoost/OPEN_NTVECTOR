@@ -1,6 +1,6 @@
-#pragma once
+ï»¿#pragma once
 #include "ConnectInstance.h"
-#include "TanGame.h"   // ÄãµÄ TanLobbyGameCtx
+#include "TanGame.h"   // ä½ çš„ TanLobbyGameCtx
 
 class NetherNetConnectInstance : public ConnectInstance {
 public:
@@ -21,17 +21,17 @@ public:
     int WritePacket(std::vector<uint8_t> Packet) override;
 
 private:
-    // ÔÚ DataChannel ÉÏÊÕµ½Êı¾İÊ±µ÷
+    // åœ¨ DataChannel ä¸Šæ”¶åˆ°æ•°æ®æ—¶è°ƒ
     void onDataChannelMessage(const std::vector<uint8_t>& data);
 
-    // ·¢Êı¾İÓÃµÄÄÚ²¿·½·¨,¸ú¸¸ÀàµÄ SendPacket Ò»ÑùµÄ¼ÓÃÜ/Ñ¹Ëõ´¦Àí,µ«²»¼Ó 0xFE,²»×ß RakNet
+    // å‘æ•°æ®ç”¨çš„å†…éƒ¨æ–¹æ³•,è·Ÿçˆ¶ç±»çš„ SendPacket ä¸€æ ·çš„åŠ å¯†/å‹ç¼©å¤„ç†,ä½†ä¸åŠ  0xFE,ä¸èµ° RakNet
     void flushSendBuffer();
     void sendThread();
 
-    // NetherNet ctx ³ÖÓĞ
+    // NetherNet ctx æŒæœ‰
     std::shared_ptr<TanLobbyGameCtx> m_nethernet_ctx;
 
-    // NetherNet Á¬½Ó²ÎÊı
+    // NetherNet è¿æ¥å‚æ•°
     std::string m_host_nethernet_id;
     std::string m_from_nethernet_id;
     std::string m_md5_token_b64;
@@ -39,7 +39,7 @@ private:
     int m_signaling_port;
     uint32_t m_user_id;
 
-    // ÊÕµ½ DataChannel onOpen ºó¿ªÊ¼×ßÎÕÊÖ
+    // æ”¶åˆ° DataChannel onOpen åå¼€å§‹èµ°æ¡æ‰‹
     std::atomic<bool> m_dc_opened{ false };
 
     std::thread m_send_thread_nn;

@@ -24,7 +24,7 @@ private:
 };
 
 
-// Ç°ÏòÉùÃ÷
+// Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 static void WebSocket_dealloc(PyObject* self);
 static PyObject* WebSocket_new(PyTypeObject* type, PyObject* args, PyObject* kwds);
 static int WebSocket_init(PyObject* self, PyObject* args, PyObject* kwds);
@@ -33,30 +33,30 @@ static PyObject* WebSocket_send(PyObject* self, PyObject* args);
 static PyObject* WebSocket_close(PyObject* self, PyObject* args);
 static PyObject* WebSocket_get_id(PyObject* self, void* closure);
 
-// ÒÆ³ýÈ«¾ÖmapºÍmutex£¨¸ÄÎª´æÔÚselfÖÐ£©
+// ï¿½Æ³ï¿½È«ï¿½ï¿½mapï¿½ï¿½mutexï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½selfï¿½Ð£ï¿½
 static int g_next_id = 1000;
 static int _self_event_id = 0;
 PythonEventEngine g_event_engine;
 
-// Éú³ÉÎ¨Ò»ID
+// ï¿½ï¿½ï¿½ï¿½Î¨Ò»ID
 static int generate_id() {
     return g_next_id++;
 }
 
-// WebSocket¶ÔÏó½á¹¹£¨ºËÐÄÐÞ¸Ä£ºÖ±½Ó´æ´¢WebSocketClientÖ¸Õë£©
+// WebSocketï¿½ï¿½ï¿½ï¿½á¹¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸Ä£ï¿½Ö±ï¿½Ó´æ´¢WebSocketClientÖ¸ï¿½ë£©
 typedef struct {
     PyObject_HEAD
         int id;
     char* ip;
     int port;
     char* path;
-    // ºËÐÄÐÞ¸Ä£º½«WebSocketClientÖ±½Ó´æÔÚ¶ÔÏóÖÐ£¬Ìæ´úÈ«¾Ömap
-    WebSocketClient* ws_client;  // ´æ´¢¿Í»§¶ËÊµÀý
-    EventWebSocketWrapper* ws_event_wrapper;  //´æ´¢¿Í»§¶ËÊÂ¼þ°ü×°
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸Ä£ï¿½ï¿½ï¿½WebSocketClientÖ±ï¿½Ó´ï¿½ï¿½Ú¶ï¿½ï¿½ï¿½ï¿½Ð£ï¿½ï¿½ï¿½ï¿½È«ï¿½ï¿½map
+    WebSocketClient* ws_client;  // ï¿½æ´¢ï¿½Í»ï¿½ï¿½ï¿½Êµï¿½ï¿½
+    EventWebSocketWrapper* ws_event_wrapper;  //ï¿½æ´¢ï¿½Í»ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½×°
 } WebSocketObject;
 
 
-// ·½·¨¶¨Òå
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 static PyMethodDef WebSocket_methods[] = {
     {"connect", (PyCFunction)WebSocket_connect, METH_VARARGS, "Connect to server"},
     {"send", (PyCFunction)WebSocket_send, METH_VARARGS, "Send data"},
@@ -64,75 +64,27 @@ static PyMethodDef WebSocket_methods[] = {
     {NULL, NULL, 0, NULL}
 };
 
-// ÊôÐÔ¶¨Òå
+// ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½
 static PyGetSetDef WebSocket_getsetters[] = {
     {(char*)"event_id", (getter)WebSocket_get_id, NULL, (char*)"Event ID", NULL},
     {NULL}
 };
 
-// ÍêÕûµÄPyTypeObject¶¨Òå£¨Python 2.7¸ñÊ½£©
-static PyTypeObject WebSocketType = {
-    PyObject_HEAD_INIT(NULL)           // PyObject_VAR_HEAD
-    0,                                  // ob_size (deprecated)
-    "_websocket.WebSocket",              // tp_name
-    sizeof(WebSocketObject),             // tp_basicsize
-    0,                                  // tp_itemsize
-    (destructor)WebSocket_dealloc,       // tp_dealloc
-    0,                                  // tp_print
-    0,                                  // tp_getattr
-    0,                                  // tp_setattr
-    0,                                  // tp_compare
-    0,                                  // tp_repr
-    0,                                  // tp_as_number
-    0,                                  // tp_as_sequence
-    0,                                  // tp_as_mapping
-    0,                                  // tp_hash
-    0,                                  // tp_call
-    0,                                  // tp_str
-    0,                                  // tp_getattro
-    0,                                  // tp_setattro
-    0,                                  // tp_as_buffer
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  // tp_flags
-    "WebSocket client",                  // tp_doc
-    0,                                  // tp_traverse
-    0,                                  // tp_clear
-    0,                                  // tp_richcompare
-    0,                                  // tp_weaklistoffset
-    0,                                  // tp_iter
-    0,                                  // tp_iternext
-    WebSocket_methods,                   // tp_methods
-    0,                                  // tp_members
-    WebSocket_getsetters,                // tp_getset
-    0,                                  // tp_base
-    0,                                  // tp_dict
-    0,                                  // tp_descr_get
-    0,                                  // tp_descr_set
-    0,                                  // tp_dictoffset
-    (initproc)WebSocket_init,            // tp_init
-    0,                                  // tp_alloc
-    WebSocket_new,                       // tp_new
-    0,                                  // tp_free (Python will set)
-    0,                                  // tp_is_gc
-    0,                                  // tp_bases
-    0,                                  // tp_mro
-    0,                                  // tp_cache
-    0,                                  // tp_subclasses
-    0,                                  // tp_weaklist
-    0,                                  // tp_del
-    0,                                  // tp_version_tag
-};
+// PyTypeObject (Python 3) - fields are assigned in PyInit__websocket to avoid
+// depending on the exact 3.12 struct layout.
+static PyTypeObject WebSocketType = { PyVarObject_HEAD_INIT(NULL, 0) };
 
-// Îö¹¹º¯Êý£¨ºËÐÄÐÞ¸Ä£ºÊÍ·ÅselfÖÐµÄWebSocketClient£©
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸Ä£ï¿½ï¿½Í·ï¿½selfï¿½Ðµï¿½WebSocketClientï¿½ï¿½
 static void WebSocket_dealloc(PyObject* self) {
     WebSocketObject* ws_obj = (WebSocketObject*)self;
 
-    // ÊÍ·ÅWebSocketClientÊµÀý
+    // ï¿½Í·ï¿½WebSocketClientÊµï¿½ï¿½
     if (ws_obj->ws_client) {
         delete ws_obj->ws_client;
         ws_obj->ws_client = nullptr;
     }
 
-    // ÊÍ·Å×Ö·û´®×ÊÔ´
+    // ï¿½Í·ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½Ô´
     if (ws_obj->ip) {
         free(ws_obj->ip);
         ws_obj->ip = NULL;
@@ -142,11 +94,11 @@ static void WebSocket_dealloc(PyObject* self) {
         ws_obj->path = NULL;
     }
 
-    // µ÷ÓÃPythonÄÚÖÃµÄÊÍ·ÅÂß¼­
+    // ï¿½ï¿½ï¿½ï¿½Pythonï¿½ï¿½ï¿½Ãµï¿½ï¿½Í·ï¿½ï¿½ß¼ï¿½
     Py_TYPE(self)->tp_free(self);
 }
 
-// ¹¹Ôìº¯Êý
+// ï¿½ï¿½ï¿½ìº¯ï¿½ï¿½
 static PyObject* WebSocket_new(PyTypeObject* type, PyObject* args, PyObject* kwds) {
     WebSocketObject* self = (WebSocketObject*)type->tp_alloc(type, 0);
     if (self) {
@@ -154,32 +106,32 @@ static PyObject* WebSocket_new(PyTypeObject* type, PyObject* args, PyObject* kwd
         self->ip = NULL;
         self->port = 0;
         self->path = NULL;
-        self->ws_client = nullptr;  // ³õÊ¼»¯¿Í»§¶ËÖ¸Õë
-        self->ws_event_wrapper = nullptr;  // ³õÊ¼»¯¿Í»§¶ËÖ¸Õë
+        self->ws_client = nullptr;  // ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
+        self->ws_event_wrapper = nullptr;  // ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
     }
     return (PyObject*)self;
 }
 
-// ³õÊ¼»¯º¯Êý£¨ºËÐÄÐÞ¸Ä£º´´½¨WebSocketClient²¢´æÈëself£©
+// ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸Ä£ï¿½ï¿½ï¿½ï¿½ï¿½WebSocketClientï¿½ï¿½ï¿½ï¿½ï¿½ï¿½selfï¿½ï¿½
 static int WebSocket_init(PyObject* self, PyObject* args, PyObject* kwds) {
     WebSocketObject* ws_obj = (WebSocketObject*)self;
     const char* ip = NULL;
     int port = 0;
     const char* path = NULL;
 
-    // ½âÎö²ÎÊý
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     if (!PyArg_ParseTuple(args, "sis", &ip, &port, &path)) {
         PyErr_SetString(PyExc_TypeError, "Expected: (str ip, int port, str path)");
         return -1;
     }
 
-    // ¸³Öµ»ù´¡ÊôÐÔ
+    // ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     ws_obj->ip = strdup(ip);
     ws_obj->port = port;
     ws_obj->path = strdup(path);
     ws_obj->id = generate_id();
 
-    // ºËÐÄÐÞ¸Ä£º´´½¨WebSocketClient²¢´æÈëself£¨Ìæ´úÈ«¾Ömap£©
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸Ä£ï¿½ï¿½ï¿½ï¿½ï¿½WebSocketClientï¿½ï¿½ï¿½ï¿½ï¿½ï¿½selfï¿½ï¿½ï¿½ï¿½ï¿½È«ï¿½ï¿½mapï¿½ï¿½
     ws_obj->ws_client = new WebSocketClient(ip, port, "Minecraft-Bedrock", path);
     ws_obj->ws_event_wrapper = new EventWebSocketWrapper()
     ;
@@ -188,22 +140,22 @@ static int WebSocket_init(PyObject* self, PyObject* args, PyObject* kwds) {
     return 0;
 }
 
-// ÐÞ¸Ä WebSocket_connect ·½·¨ÖÐµÄ std::bind µ÷ÓÃÒÔÈ·±£ÀàÐÍÆ¥Åä  
+// ï¿½Þ¸ï¿½ WebSocket_connect ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ std::bind ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¥ï¿½ï¿½  
 static PyObject* WebSocket_connect(PyObject* self, PyObject* args) {  
    WebSocketObject* ws_obj = (WebSocketObject*)self;  
 
-   // ½âÎö¿Õ²ÎÊý  
+   // ï¿½ï¿½ï¿½ï¿½ï¿½Õ²ï¿½ï¿½ï¿½  
    if (!PyArg_ParseTuple(args, "")) {  
        return NULL;  
    }  
 
-   // ¼ì²é¿Í»§¶ËÊÇ·ñ´æÔÚ  
+   // ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½  
    if (!ws_obj->ws_client || !(ws_obj->ws_client)) {  
        PyErr_SetString(PyExc_RuntimeError, "WebSocket client not initialized");  
        return NULL;  
    }  
 
-   // ºËÐÄÐÞ¸Ä£ºÊ¹ÓÃ lambda °ü×° std::bind ÒÔÈ·±£ÀàÐÍÆ¥Åä  
+   // ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸Ä£ï¿½Ê¹ï¿½ï¿½ lambda ï¿½ï¿½×° std::bind ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¥ï¿½ï¿½  
    auto onDataReceivedWrapper = [wrapper = ws_obj->ws_event_wrapper](const std::string& content, size_t size) {  
        wrapper->onDataReceived(content, size);  
    };  
@@ -213,42 +165,42 @@ static PyObject* WebSocket_connect(PyObject* self, PyObject* args) {
        std::bind(&EventWebSocketWrapper::onConnection, ws_obj->ws_event_wrapper, std::placeholders::_1)  
    );  
 
-   // °´ÒªÇóÖ±½Ó·µ»Ø 0£¨¶ÔÓ¦ Python µÄ False£©  
+   // ï¿½ï¿½Òªï¿½ï¿½Ö±ï¿½Ó·ï¿½ï¿½ï¿½ 0ï¿½ï¿½ï¿½ï¿½Ó¦ Python ï¿½ï¿½ Falseï¿½ï¿½  
    return PyBool_FromLong(0);  
 }
 
-// send·½·¨£¨ÊÊÅäself´æ´¢µÄ¿Í»§¶Ë£©
+// sendï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½selfï¿½æ´¢ï¿½Ä¿Í»ï¿½ï¿½Ë£ï¿½
 static PyObject* WebSocket_send(PyObject* self, PyObject* args) {
     WebSocketObject* ws_obj = (WebSocketObject*)self;
     const char* data = NULL;
     int len = 0;
 
-    // ½âÎö²ÎÊý
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     if (!PyArg_ParseTuple(args, "s#", &data, &len)) {
         return NULL;
     }
 
-    // ¼ì²é¿Í»§¶ËÊÇ·ñ´æÔÚ
+    // ï¿½ï¿½ï¿½Í»ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½
     if (!ws_obj->ws_client || !(ws_obj->ws_client)) {
         PyErr_SetString(PyExc_RuntimeError, "WebSocket client not found");
         return NULL;
     }
 
-    // ·¢ËÍÊý¾Ý
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     bool result = (ws_obj->ws_client)->sendData(std::string(data, len));
     return PyBool_FromLong(result ? 1 : 0);
 }
 
-// close·½·¨£¨ÊÊÅäself´æ´¢µÄ¿Í»§¶Ë£©
+// closeï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½selfï¿½æ´¢ï¿½Ä¿Í»ï¿½ï¿½Ë£ï¿½
 static PyObject* WebSocket_close(PyObject* self, PyObject* args) {
     WebSocketObject* ws_obj = (WebSocketObject*)self;
 
-    // ½âÎö¿Õ²ÎÊý
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Õ²ï¿½ï¿½ï¿½
     if (!PyArg_ParseTuple(args, "")) {
         return NULL;
     }
 
-    // ¹Ø±ÕÁ¬½Ó
+    // ï¿½Ø±ï¿½ï¿½ï¿½ï¿½ï¿½
     if (ws_obj->ws_client && (ws_obj->ws_client)) {
         (ws_obj->ws_client)->disconnect();
     }
@@ -256,13 +208,13 @@ static PyObject* WebSocket_close(PyObject* self, PyObject* args) {
     Py_RETURN_NONE;
 }
 
-// »ñÈ¡event_idÊôÐÔ
+// ï¿½ï¿½È¡event_idï¿½ï¿½ï¿½ï¿½
 static PyObject* WebSocket_get_id(PyObject* self, void* closure) {
     WebSocketObject* ws_obj = (WebSocketObject*)self;
-    return PyInt_FromLong(ws_obj->id);
+    return PyLong_FromLong(ws_obj->id);
 }
 
-// Ä£¿é¼¶º¯Êý£ºget_websocket
+// Ä£ï¿½é¼¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½get_websocket
 static PyObject* get_websocket(PyObject* self, PyObject* args) {
 
     //std::unique_ptr<WebSocketClient> wsc = std::make_unique<WebSocketClient>("45.253.177.75", 8899, "Minecraft-Bedrock", "/4034328500471339769/2881323365/1MYbM/W6znswDilR/8NBNA==/lqb546Yzvm5HL93jAL3BZw==");
@@ -284,7 +236,7 @@ static PyObject* get_websocket(PyObject* self, PyObject* args) {
     return obj;
 }
 
-// Ä£¿é¼¶º¯Êý£ºdelete£¨ÊÊÅäself´æ´¢µÄ¿Í»§¶Ë£©
+// Ä£ï¿½é¼¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½deleteï¿½ï¿½ï¿½ï¿½ï¿½ï¿½selfï¿½æ´¢ï¿½Ä¿Í»ï¿½ï¿½Ë£ï¿½
 static PyObject* delete_websocket(PyObject* self, PyObject* args) {
     PyObject* obj = NULL;
 
@@ -292,7 +244,7 @@ static PyObject* delete_websocket(PyObject* self, PyObject* args) {
         return NULL;
     }
 
-    // ¼ì²éÀàÐÍ
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     if (!PyObject_TypeCheck(obj, &WebSocketType)) {
         PyErr_SetString(PyExc_TypeError, "Expected WebSocket object");
         return NULL;
@@ -300,7 +252,7 @@ static PyObject* delete_websocket(PyObject* self, PyObject* args) {
 
     WebSocketObject* ws_obj = (WebSocketObject*)obj;
 
-    // ÊÍ·Å¿Í»§¶ËÊµÀý
+    // ï¿½Í·Å¿Í»ï¿½ï¿½ï¿½Êµï¿½ï¿½
     if (ws_obj->ws_client) {
         delete ws_obj->ws_client;
         ws_obj->ws_client = nullptr;
@@ -313,27 +265,33 @@ static PyObject* delete_websocket(PyObject* self, PyObject* args) {
     Py_RETURN_NONE;
 }
 
-// Ä£¿é·½·¨±í
+// Ä£ï¿½é·½ï¿½ï¿½ï¿½ï¿½
 static PyMethodDef ModuleMethods[] = {
     {"get_websocket", get_websocket, METH_VARARGS, "Create WebSocket"},
     {"delete", delete_websocket, METH_VARARGS, "Delete WebSocket"},
     {NULL, NULL, 0, NULL}
 };
 
-// Ä£¿é³õÊ¼»¯
-void initwebsocket(void) {
-    // È·±£ÀàÐÍÒÑ×¼±¸ºÃ
+// Module init (Python 3)
+static struct PyModuleDef _websocket_module = { PyModuleDef_HEAD_INIT, "_websocket", NULL, -1, ModuleMethods };
+PyMODINIT_FUNC PyInit__websocket(void) {
+    WebSocketType.tp_name = "_websocket.WebSocket";
+    WebSocketType.tp_basicsize = sizeof(WebSocketObject);
+    WebSocketType.tp_dealloc = (destructor)WebSocket_dealloc;
+    WebSocketType.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+    WebSocketType.tp_doc = "WebSocket client";
+    WebSocketType.tp_methods = WebSocket_methods;
+    WebSocketType.tp_getset = WebSocket_getsetters;
+    WebSocketType.tp_init = (initproc)WebSocket_init;
+    WebSocketType.tp_new = WebSocket_new;
     if (PyType_Ready(&WebSocketType) < 0) {
-        return;
+        return NULL;
     }
-
-    // ´´½¨Ä£¿é
-    PyObject* module = Py_InitModule3("_websocket", ModuleMethods, "WebSocket module");
+    PyObject* module = PyModule_Create(&_websocket_module);
     if (!module) {
-        return;
+        return NULL;
     }
-
-    // Ìí¼ÓWebSocketÀàÐÍµ½Ä£¿é
     Py_INCREF(&WebSocketType);
     PyModule_AddObject(module, "WebSocket", (PyObject*)&WebSocketType);
+    return module;
 }

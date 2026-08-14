@@ -1,9 +1,9 @@
-#include "ZlibStreamCompressor.h"
+ï»¿#include "ZlibStreamCompressor.h"
 #include <stdexcept>
 #include <cstring>
 
 ZlibStreamCompressor::ZlibStreamCompressor(int level){
-    // ¹Ø¼ü²½Öè£ºÓÃ memset ÇåÁãÕû¸ö½á¹¹Ìå£¨±ÜÃâËæ»úÖµ£©
+    // å…³é”®æ­¥éª¤ï¼šç”¨ memset æ¸…é›¶æ•´ä¸ªç»“æ„ä½“ï¼ˆé¿å…éšæœºå€¼ï¼‰
     memset(&zs_c, 0, sizeof(z_stream));
     memset(&zs_d, 0, sizeof(z_stream));
     initCompressor(level);
@@ -73,7 +73,7 @@ std::vector<uint8_t> ZlibStreamCompressor::Decompress(std::vector<uint8_t> data)
 
 void ZlibStreamCompressor::initCompressor(int level) {
     CompressBuffer = new Byte[0x20000];
-    // Ê¹ÓÃÔ­Ê¼DEFLATE¸ñÊ½£¨ÎŞzlibÍ·Î²£©
+    // ä½¿ç”¨åŸå§‹DEFLATEæ ¼å¼ï¼ˆæ— zlibå¤´å°¾ï¼‰
     if (deflateInit2(&zs_c, level, Z_DEFLATED, -MAX_WBITS,
         8, Z_DEFAULT_STRATEGY) != Z_OK) {
         throw std::runtime_error("deflateInit2 failed");
@@ -82,7 +82,7 @@ void ZlibStreamCompressor::initCompressor(int level) {
 
 void ZlibStreamCompressor::initDecompressor() {
     DecompressBuffer = new Byte[0x10000];
-    // ´¦ÀíÔ­Ê¼DEFLATE¸ñÊ½
+    // å¤„ç†åŸå§‹DEFLATEæ ¼å¼
     if (inflateInit2(&zs_d, -15) != Z_OK) {
         throw std::runtime_error("inflateInit2 failed");
     }

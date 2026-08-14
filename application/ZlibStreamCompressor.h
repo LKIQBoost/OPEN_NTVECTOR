@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <vector>
 //#define ZLIB_WINAPI
@@ -10,11 +10,11 @@ public:
     explicit ZlibStreamCompressor(int level = Z_DEFAULT_COMPRESSION);
     ~ZlibStreamCompressor();
 
-    // ´¦ÀíÊı¾İ¿é£¬·µ»Ø´¦ÀíºóµÄÊı¾İ
+    // å¤„ç†æ•°æ®å—ï¼Œè¿”å›å¤„ç†åçš„æ•°æ®
     std::vector<uint8_t> Compress(std::vector<uint8_t> data) override;
     std::vector<uint8_t> Decompress(std::vector<uint8_t> data) override;
 
-    // ½ûÓÃ¿½±´ºÍ¸³Öµ
+    // ç¦ç”¨æ‹·è´å’Œèµ‹å€¼
     ZlibStreamCompressor(const ZlibStreamCompressor&) = delete;
     ZlibStreamCompressor& operator=(const ZlibStreamCompressor&) = delete;
 

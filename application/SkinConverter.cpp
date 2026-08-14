@@ -1,4 +1,4 @@
-#include "SkinConverter.h"
+ï»¿#include "SkinConverter.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image.h"
@@ -15,7 +15,7 @@ std::vector<uint8_t> SkinConverter::pngToSkinData(const std::vector<uint8_t>& pn
         &width,
         &height,
         &channels,
-        STBI_rgb_alpha // Ç¿ÖÆ×ª»»ÎªRGBA
+        STBI_rgb_alpha // å¼ºåˆ¶è½¬æ¢ä¸ºRGBA
     );
 
     if (!image) {
@@ -37,7 +37,7 @@ std::vector<uint8_t> SkinConverter::skinDataToPng(const std::vector<uint8_t>& sk
 
     std::vector<uint8_t> pngData;
 
-    // Ê¹ÓÃstb_image_write½«RGBAÊı¾İĞ´ÈëÄÚ´æÖĞµÄPNG
+    // ä½¿ç”¨stb_image_writeå°†RGBAæ•°æ®å†™å…¥å†…å­˜ä¸­çš„PNG
     stbi_write_png_to_func(
         [](void* context, void* data, int size) {
             auto& buffer = *static_cast<std::vector<uint8_t>*>(context);
@@ -61,8 +61,8 @@ std::vector<uint8_t> SkinConverter::skinDataToPng(const std::vector<uint8_t>& sk
 }
 
 bool SkinConverter::isValidSkinSize(int width, int height) {
-    return (width == 64 && height == 32) ||  // ´«Í³Æ¤·ô
-        (width == 64 && height == 64) ||  // ¸ßÇåÆ¤·ô
-        (width == 128 && height == 64) || // ¿íÆ¤·ô
-        (width == 128 && height == 128);  // ×î¸ßÇåÆ¤·ô
+    return (width == 64 && height == 32) ||  // ä¼ ç»Ÿçš®è‚¤
+        (width == 64 && height == 64) ||  // é«˜æ¸…çš®è‚¤
+        (width == 128 && height == 64) || // å®½çš®è‚¤
+        (width == 128 && height == 128);  // æœ€é«˜æ¸…çš®è‚¤
 }

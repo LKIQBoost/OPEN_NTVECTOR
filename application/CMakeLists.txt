@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 
+# Python 3.12 embedding (local python.org install)
+set(PY312_HOME "C:/Users/admin/AppData/Local/Programs/Python/Python312")
+
 # 收集所有源文件
 file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
@@ -34,11 +37,13 @@ add_executable(Program ${APP_SOURCES} ${APP_HEADERS})
 # 编译定义
 target_compile_definitions(Program PRIVATE
     OPENSSL_STATIC
-    Py_NO_ENABLE_SHARED
-    PYTHON_STATIC
+    Py_ENABLE_SHARED
     RTC_STATIC
     JUICE_STATIC
     _RAKNET_LIB
+    # Python 3: 使用 s#/y# 格式时必须有此宏，否则运行期抛
+    # "PY_SSIZE_T_CLEAN macro must be defined for '#' formats"
+    PY_SSIZE_T_CLEAN
 )
 
 if(WIN32)
@@ -69,6 +74,7 @@ target_include_directories(Program PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/SLikeNet-master/Source/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/zlib-1.3.1
     ${CMAKE_CURRENT_SOURCE_DIR}/include/pybind11
+    ${PY312_HOME}/include
 )
 
 # 链接库 — 全部从源码编译
@@ -81,10 +87,7 @@ target_link_libraries(Program PRIVATE
     OpenSSL::SSL
     OpenSSL::Crypto
     jsoncpp_static
-    python27
-    python__socket
-    python_select
-    python__ctypes
+    ${PY312_HOME}/libs/python312.lib
     datachannel-static
     juice-static
     srtp2

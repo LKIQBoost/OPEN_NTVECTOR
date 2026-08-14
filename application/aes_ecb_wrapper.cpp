@@ -4,17 +4,17 @@
 #include <openssl/evp.h>
 #include <openssl/err.h>
 
-// AES-128-ECB ¼ÓÃÜº¯Êý
+// AES-128-ECB ï¿½ï¿½ï¿½Üºï¿½ï¿½ï¿½
 static PyObject* aes_ecb128encrypt(PyObject* self, PyObject* args) {
     const char* key;
     const char* data;
-    int key_len, data_len;
+    Py_ssize_t key_len, data_len;
 
-    if (!PyArg_ParseTuple(args, "s#s#", &key, &key_len, &data, &data_len)) {
+    if (!PyArg_ParseTuple(args, "y#y#", &key, &key_len, &data, &data_len)) {
         return NULL;
     }
 
-    // ¼ì²é³¤¶È
+    // length check
     if (key_len != 16) {
         PyErr_SetString(PyExc_ValueError, "Key must be 16 bytes");
         return NULL;
@@ -24,10 +24,10 @@ static PyObject* aes_ecb128encrypt(PyObject* self, PyObject* args) {
         return NULL;
     }
 
-    // ×¼±¸Êä³ö
+    // output buffer
     unsigned char output[16];
 
-    // OpenSSL ¼ÓÃÜ
+    // OpenSSL ï¿½ï¿½ï¿½ï¿½
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to create cipher context");
@@ -51,17 +51,17 @@ static PyObject* aes_ecb128encrypt(PyObject* self, PyObject* args) {
 
     EVP_CIPHER_CTX_free(ctx);
 
-    // ·µ»Ø bytes
+    // ï¿½ï¿½ï¿½ï¿½ bytes
     return PyBytes_FromStringAndSize((char*)output, 16);
 }
 
-// AES-128-ECB ½âÃÜº¯Êý
+// AES-128-ECB ï¿½ï¿½ï¿½Üºï¿½ï¿½ï¿½
 static PyObject* aes_ecb128decrypt(PyObject* self, PyObject* args) {
     const char* key;
     const char* data;
-    int key_len, data_len;
+    Py_ssize_t key_len, data_len;
 
-    if (!PyArg_ParseTuple(args, "s#s#", &key, &key_len, &data, &data_len)) {
+    if (!PyArg_ParseTuple(args, "y#y#", &key, &key_len, &data, &data_len)) {
         return NULL;
     }
 
@@ -102,18 +102,18 @@ static PyObject* aes_ecb128decrypt(PyObject* self, PyObject* args) {
     return PyBytes_FromStringAndSize((char*)output, 16);
 }
 
-// Ä£¿é·½·¨±í
+// Ä£ï¿½é·½ï¿½ï¿½ï¿½ï¿½
 static PyMethodDef AesMethods[] = {
     {"ecb128encrypt", aes_ecb128encrypt, METH_VARARGS, "AES-128-ECB encrypt (16 bytes key, 16 bytes data)"},
     {"ecb128decrypt", aes_ecb128decrypt, METH_VARARGS, "AES-128-ECB decrypt (16 bytes key, 16 bytes data)"},
     {NULL, NULL, 0, NULL}
 };
 
-// Ä£¿é³õÊ¼»¯º¯Êý (Python 2.7)
-PyMODINIT_FUNC initaes(void) {
-    Py_InitModule("aes", AesMethods);
-
-    // ³õÊ¼»¯ OpenSSL
+// Module init (Python 3)
+static struct PyModuleDef aes_module = { PyModuleDef_HEAD_INIT, "aes", NULL, -1, AesMethods };
+PyMODINIT_FUNC PyInit_aes(void) {
+    // init OpenSSL
     OpenSSL_add_all_algorithms();
     ERR_load_crypto_strings();
+    return PyModule_Create(&aes_module);
 }

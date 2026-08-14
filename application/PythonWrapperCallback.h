@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <functional>
 #include <vector>
 #include <cstdint>
@@ -31,7 +31,7 @@ public:
         for (auto it = eventHandlers.begin(); it != eventHandlers.end(); ) {
             auto& handlers = it->second;
 
-            // ÇåÀíÄÚ²¿ vector
+            // æ¸…ç†å†…éƒ¨ vector
             for (size_t j = 0; j < handlers.size(); ) {
                 if (!handlers[j].isKernel()) {
                     handlers.erase(handlers.begin() + j);
@@ -41,7 +41,7 @@ public:
                 }
             }
 
-            // ¿ÕÁË¾ÍÉ¾µôÕâÒ»Ïî£¬erase »á·µ»ØĞÂµü´úÆ÷
+            // ç©ºäº†å°±åˆ æ‰è¿™ä¸€é¡¹ï¼Œerase ä¼šè¿”å›æ–°è¿­ä»£å™¨
             if (handlers.empty()) {
                 it = eventHandlers.erase(it);
             }
@@ -55,7 +55,7 @@ public:
         for (auto it = eventHandlers.begin(); it != eventHandlers.end(); ) {
             auto& handlers = it->second;
 
-            // ÇåÀíÄÚ²¿ vector
+            // æ¸…ç†å†…éƒ¨ vector
             for (size_t j = 0; j < handlers.size(); ) {
                 if (handlers[j].isKernel()) {
                     handlers.erase(handlers.begin() + j);
@@ -65,7 +65,7 @@ public:
                 }
             }
 
-            // ¿ÕÁË¾ÍÉ¾µôÕâÒ»Ïî£¬erase »á·µ»ØĞÂµü´úÆ÷
+            // ç©ºäº†å°±åˆ æ‰è¿™ä¸€é¡¹ï¼Œerase ä¼šè¿”å›æ–°è¿­ä»£å™¨
             if (handlers.empty()) {
                 it = eventHandlers.erase(it);
             }

@@ -1,4 +1,4 @@
-#include "BinaryWriter.h"
+ï»¿#include "BinaryWriter.h"
 #include "EndianUtils.h"
 #include <algorithm> // for std::move
 #include <cstring>   // for memcpy
@@ -6,23 +6,23 @@
 class BinaryReader
 {
 public:
-    // ¹¹Ôìº¯Êı
+    // æ„é€ å‡½æ•°
     explicit BinaryReader(void* data, int length);
 
-    // Îö¹¹º¯Êı
+    // ææ„å‡½æ•°
     ~BinaryReader();
 
-    // ½ûÖ¹¿½±´¹¹ÔìºÍ¿½±´¸³Öµ
+    // ç¦æ­¢æ‹·è´æ„é€ å’Œæ‹·è´èµ‹å€¼
     BinaryReader(const BinaryReader&) = delete;
     BinaryReader& operator=(const BinaryReader&) = delete;
 
-    // ÒÆ¶¯¹¹Ôìº¯Êı
+    // ç§»åŠ¨æ„é€ å‡½æ•°
     BinaryReader(BinaryReader&& other) noexcept;
 
-    // ÒÆ¶¯¸³ÖµÔËËã·û
+    // ç§»åŠ¨èµ‹å€¼è¿ç®—ç¬¦
     BinaryReader& operator=(BinaryReader&& other) noexcept;
 
-    // Ğ´ÈëÊı¾İµ½buffer
+    // å†™å…¥æ•°æ®åˆ°buffer
     void* Read(size_t size);
     int ReadInt32();
     unsigned int ReadUInt32();
@@ -46,17 +46,17 @@ public:
     Vec3 ReadVec3();
     Vec2 ReadVec2();
     Vec3d ReadVec3d();
-    // ÔÚÔ­ÓĞº¯ÊıºóÃæÌí¼Ó
+    // åœ¨åŸæœ‰å‡½æ•°åé¢æ·»åŠ 
     float ReadFloat();
     double ReadDouble();
 
-    // ÎïÆ·Ïà¹Ø¶ÁÈ¡º¯Êı
+    // ç‰©å“ç›¸å…³è¯»å–å‡½æ•°
     void ReadItemStack(ItemStack& item);
     void ReadItemInstance(ItemInstance& item);
     void ReadNBTData(std::unordered_map<std::string, std::string>& nbt);
     void ReadStringVector(std::vector<std::string>& strings);
 
-    // ¸¨Öú¶ÁÈ¡º¯Êı
+    // è¾…åŠ©è¯»å–å‡½æ•°
     uint32_t ReadVarInt32(int32_t& value);
     uint32_t ReadVarUInt32(uint32_t& value);
     void ReadBool(bool& value);
@@ -67,16 +67,16 @@ public:
 
 
 
-    // »ñÈ¡bufferÖĞµÄÊı¾İÖ¸Õë
+    // è·å–bufferä¸­çš„æ•°æ®æŒ‡é’ˆ
     const uint8_t* data() const;
 
-    size_t m_pointer;    // µ±Ç°»º³åÇøÈİÁ¿
+    size_t m_pointer;    // å½“å‰ç¼“å†²åŒºå®¹é‡
 private:
     void* m_reade(size_t size);
-    uint8_t* m_buffer;    // Êı¾İ»º³åÇø
-    size_t m_size;        // µ±Ç°Êı¾İ´óĞ¡
+    uint8_t* m_buffer;    // æ•°æ®ç¼“å†²åŒº
+    size_t m_size;        // å½“å‰æ•°æ®å¤§å°
 
-    // ÄÚ²¿À©Èİº¯Êı
+    // å†…éƒ¨æ‰©å®¹å‡½æ•°
     //void grow(size_t minCapacity);
 };
 

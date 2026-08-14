@@ -1,18 +1,18 @@
-// WebSocketClient.h - ÓÃ»§Ö±½ÓÊ¹ÓÃµÄÀà
+ï»¿// WebSocketClient.h - ç”¨æˆ·ç›´æ¥ä½¿ç”¨çš„ç±»
 #pragma once
 #include <string>
 #include <functional>
 #include <memory>
 #include "WebSocketClient.h"
 
-// ÍêÈ«Ò»ÑùµÄAPI·ç¸ñ£¬µ«µ×²ãµ÷ÓÃIWebSocketClient
+// å®Œå…¨ä¸€æ ·çš„APIé£æ ¼ï¼Œä½†åº•å±‚è°ƒç”¨IWebSocketClient
 class WebSocketClient {
 public:
-    // »Øµ÷ÀàĞÍ¶¨Òå - ºÍÔ­À´Ò»Ä£Ò»Ñù
+    // å›è°ƒç±»å‹å®šä¹‰ - å’ŒåŸæ¥ä¸€æ¨¡ä¸€æ ·
     using OnDataReceived = std::function<void(const std::string&, size_t)>;
     using OnConnectionState = std::function<void(bool)>;
 
-    // ¹¹Ôìº¯Êı - ºÍÔ­À´Ò»Ä£Ò»Ñù£¡
+    // æ„é€ å‡½æ•° - å’ŒåŸæ¥ä¸€æ¨¡ä¸€æ ·ï¼
     WebSocketClient(const std::string& serverIp,
         int serverPort,
         const std::string& protocol = "ws-protocol",
@@ -20,19 +20,19 @@ public:
 
     ~WebSocketClient();
 
-    // ½ûÖ¹¿½±´ - ºÍÔ­À´Ò»Ä£Ò»Ñù
+    // ç¦æ­¢æ‹·è´ - å’ŒåŸæ¥ä¸€æ¨¡ä¸€æ ·
     WebSocketClient(const WebSocketClient&) = delete;
     WebSocketClient& operator=(const WebSocketClient&) = delete;
     WebSocketClient(WebSocketClient&&) = delete;
     WebSocketClient& operator=(WebSocketClient&&) = delete;
 
-    // ½Ó¿Úº¯Êı - ºÍÔ­À´Ò»Ä£Ò»Ñù
+    // æ¥å£å‡½æ•° - å’ŒåŸæ¥ä¸€æ¨¡ä¸€æ ·
     bool connect(OnDataReceived onDataCb = nullptr, OnConnectionState onConnCb = nullptr);
     void disconnect();
     bool sendData(const std::string& data);
     bool isConnected() const;
 
 private:
-    // Î¨Ò»µÄ²»Í¬£ºµ×²ãÓÃIWebSocketClient
+    // å”¯ä¸€çš„ä¸åŒï¼šåº•å±‚ç”¨IWebSocketClient
     std::unique_ptr<IWebSocketClient> m_impl;
 };

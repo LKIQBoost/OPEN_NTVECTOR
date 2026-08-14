@@ -1,9 +1,9 @@
-#include "EasyUtils.h"
+ï»¿#include "EasyUtils.h"
 #pragma once
 using namespace std;
 class Easy {
 public:
-	// ÓÃÓÚÌî³äËæ»ú×Ö½ÚµÄº¯Êı
+	// ç”¨äºå¡«å……éšæœºå­—èŠ‚çš„å‡½æ•°
 	static std::string fillRandomBytes(const std::string& text, size_t target_length) {
 		if (target_length <= text.length()) {
 			throw std::invalid_argument("Target length must be greater than original string length");
@@ -14,11 +14,11 @@ public:
 
 		size_t bytes_to_fill = target_length - text.length();
 
-		// Ê¹ÓÃËæ»úÉè±¸×÷ÎªËæ»úÊıÖÖ×Ó
+		// ä½¿ç”¨éšæœºè®¾å¤‡ä½œä¸ºéšæœºæ•°ç§å­
 		std::random_device rd;
 		std::mt19937 gen(rd());
 
-		// ĞŞÕı£ºÊ¹ÓÃ int ¶ø²»ÊÇ uint8_t£¬È»ºó×ª»»Îª char
+		// ä¿®æ­£ï¼šä½¿ç”¨ int è€Œä¸æ˜¯ uint8_tï¼Œç„¶åè½¬æ¢ä¸º char
 		std::uniform_int_distribution<int> dist(0, 255);
 
 		for (size_t i = 0; i < bytes_to_fill; ++i) {
@@ -29,7 +29,7 @@ public:
 	}
 	static std::string to_binary_string(const std::string&str) {
 		std::string binary;
-		binary.reserve(str.size() * 8); // Ã¿¸ö×Ö·û8Î»+1¿Õ¸ñ
+		binary.reserve(str.size() * 8); // æ¯ä¸ªå­—ç¬¦8ä½+1ç©ºæ ¼
 
 		for (const auto& ch : str) {
 			unsigned char c = static_cast<unsigned char>(ch);
@@ -52,18 +52,18 @@ public:
             0x289B7EC6, 0xEAA127FA, 0xD4EF3085, 0x04881D05, 0x21E1CDE6, 0xC33707D6, 0xF4D50D87, 0x455A14ED
         };
 
-        // Ìî³ä×Ö·û´®
+        // å¡«å……å­—ç¬¦ä¸²
         std::string padded = message;
         while (padded.length() % 4 != 0) padded += '0';
 
-        // ·Ö×é´¦Àí
+        // åˆ†ç»„å¤„ç†
         std::vector<uint32_t> group;
         const uint8_t* bytes = reinterpret_cast<const uint8_t*>(padded.c_str());
         for (size_t i = 0; i < padded.length(); i += 4) {
             group.push_back((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]);
         }
 
-        // Ìî³äµ½64±¶Êı
+        // å¡«å……åˆ°64å€æ•°
         while (group.size() % 64 != 0) group.push_back(0xABCDE987);
 
         uint32_t shiftBase = shiftTable[offset];
@@ -87,7 +87,7 @@ public:
             }
         }
 
-        // Ğ¡¶ËĞòÊä³ö
+        // å°ç«¯åºè¾“å‡º
         char result[16];
         for (int i = 0; i < 4; i++) {
             result[i] = hA >> (i * 8);
@@ -177,7 +177,7 @@ public:
         params.append("0eGsBkhl");
         params.append(url);
         unsigned char md[16];
-        // ¼ÆËã MD5 Öµ
+        // è®¡ç®— MD5 å€¼
 
         MD5((unsigned char*)params.data(), params.length(), md);
         string md5hex = StringToHex_s((char*)md, 16);
@@ -217,7 +217,7 @@ public:
         params.append("0eGsBkhl");
         params.append(url);
         unsigned char md[16];
-        // ¼ÆËã MD5 Öµ
+        // è®¡ç®— MD5 å€¼
 
         MD5((unsigned char*)params.data(), params.length(), md);
         string md5hex = StringToHex_s((char*)md, 16);
@@ -313,7 +313,7 @@ public:
 			return;
 		}
 		char aeskey[16];
-		//Ë÷Òıµ½Ä©Î²×Ö½Ú
+		//ç´¢å¼•åˆ°æœ«å°¾å­—èŠ‚
 		unsigned char keya = data.data()[inlen - 1];
 		int keyp = keya >> 4;
 		if (keyp > 16)
@@ -352,7 +352,7 @@ public:
 		out->assign(outdata, aeslen - dst_index - 128);
 		delete[] indata;
 		delete[] outdata;
-		// ½â³ıPKCS7PaddingÌî³ä
+		// è§£é™¤PKCS7Paddingå¡«å……
 		return;
 	}
 	static std::string encrypt_with_tail(const std::string& input) {
@@ -361,7 +361,7 @@ public:
 		}
 
 		try {
-			// »ñÈ¡Ëæ»úÌî³ä
+			// è·å–éšæœºå¡«å……
 			auto pad = GetRandomIV(16);
 			if (!pad || pad->length() != 16) {
 				return "";
@@ -370,20 +370,20 @@ public:
 			std::string inputdata = input;
 			inputdata.append(*pad);
 
-			// ¼ÆËãÌî³ä³¤¶È - ÁãÌî³äµ½16×Ö½Ú±¶Êı
+			// è®¡ç®—å¡«å……é•¿åº¦ - é›¶å¡«å……åˆ°16å­—èŠ‚å€æ•°
 			size_t body_length = inputdata.length();
 			size_t m = body_length % 16;
 			size_t length = (m == 0) ? body_length : ((body_length / 16 + 1) * 16);
 
-			// ÁãÌî³ä
+			// é›¶å¡«å……
 			if (m != 0) {
 				inputdata.append(16 - m, '\0');
 			}
 
-			// ·ÖÅäÊä³ö»º³åÇø
+			// åˆ†é…è¾“å‡ºç¼“å†²åŒº
 			std::vector<unsigned char> oute(length + 17, 0);
 
-			// ÉèÖÃ¼ÓÃÜÃÜÔ¿
+			// è®¾ç½®åŠ å¯†å¯†é’¥
 			AES_KEY encrypt_key;
 			std::random_device seed;
 			std::ranlux48 engine(seed());
@@ -394,16 +394,16 @@ public:
 				return "";
 			}
 
-			// »ñÈ¡Ëæ»úIV
+			// è·å–éšæœºIV
 			auto iv = GetRandomIV(16);
 			if (!iv || iv->length() != 16) {
 				return "";
 			}
 
-			// ¸´ÖÆIVµ½Êä³ö
+			// å¤åˆ¶IVåˆ°è¾“å‡º
 			memcpy(oute.data(), iv->c_str(), 16);
 
-			// ¼ÓÃÜÊı¾İ
+			// åŠ å¯†æ•°æ®
 			std::vector<unsigned char> outdata(length, 0);
 			AES_cbc_encrypt(
 				reinterpret_cast<const unsigned char*>(inputdata.data()),
@@ -414,7 +414,7 @@ public:
 				AES_ENCRYPT
 			);
 
-			// ×éºÏÊä³ö
+			// ç»„åˆè¾“å‡º
 			memcpy(oute.data() + 16, outdata.data(), length);
 			oute[length + 16] = static_cast<unsigned char>((random << 4) + 4);
 
@@ -432,7 +432,7 @@ public:
 		}
 
 		try {
-			// ÊäÈëÑéÖ¤
+			// è¾“å…¥éªŒè¯
 			size_t inlen = input.length();
 			if (inlen < 33) {
 				return "";
@@ -447,7 +447,7 @@ public:
 				return "";
 			}
 
-			// ÌáÈ¡ÃÜÔ¿Ë÷Òı
+			// æå–å¯†é’¥ç´¢å¼•
 			unsigned char keya = static_cast<unsigned char>(input[inlen - 1]);
 			int keyp = keya >> 4;
 
@@ -455,7 +455,7 @@ public:
 				return "";
 			}
 
-			// ÉèÖÃ½âÃÜÃÜÔ¿
+			// è®¾ç½®è§£å¯†å¯†é’¥
 			unsigned char aeskey[16];
 			memcpy(aeskey, neteasehttpkey[keyp], 16);
 
@@ -464,18 +464,18 @@ public:
 				return "";
 			}
 
-			// ÌáÈ¡IV
+			// æå–IV
 			unsigned char aesiv[16];
 			memcpy(aesiv, input.data(), 16);
 
-			// ·ÖÅä»º³åÇø
+			// åˆ†é…ç¼“å†²åŒº
 			std::vector<unsigned char> indata(aeslen);
 			std::vector<unsigned char> outdata(aeslen);
 
-			// ¸´ÖÆ¼ÓÃÜÊı¾İ
+			// å¤åˆ¶åŠ å¯†æ•°æ®
 			memcpy(indata.data(), input.data() + 16, aeslen);
 
-			// ½âÃÜÊı¾İ
+			// è§£å¯†æ•°æ®
 			AES_cbc_encrypt(
 				indata.data(),
 				outdata.data(),
@@ -485,7 +485,7 @@ public:
 				AES_DECRYPT
 			);
 
-			// ÒÆ³ıÁãÌî³ä - ´ÓÄ©Î²¿ªÊ¼ÒÆ³ıÁ¬ĞøµÄÁã×Ö½Ú
+			// ç§»é™¤é›¶å¡«å…… - ä»æœ«å°¾å¼€å§‹ç§»é™¤è¿ç»­çš„é›¶å­—èŠ‚
 			size_t data_length = aeslen;
 			for (int i = aeslen - 1; i >= 0; --i) {
 				if (outdata[i] == 0) {
@@ -495,18 +495,18 @@ public:
 					break;
 				}
 
-				// °²È«ÏŞÖÆ£º×î¶àÒÆ³ı16¸ö×Ö½ÚµÄÌî³ä
+				// å®‰å…¨é™åˆ¶ï¼šæœ€å¤šç§»é™¤16ä¸ªå­—èŠ‚çš„å¡«å……
 				if (aeslen - data_length >= 16) {
 					break;
 				}
 			}
 
-			// ÑéÖ¤½âÃÜºóµÄÊı¾İ³¤¶È
-			if (data_length <= 16) { // ÖÁÉÙÓ¦¸Ã°üº¬Ô­Ê¼Êı¾İ+16×Ö½ÚËæ»úÌî³ä
+			// éªŒè¯è§£å¯†åçš„æ•°æ®é•¿åº¦
+			if (data_length <= 16) { // è‡³å°‘åº”è¯¥åŒ…å«åŸå§‹æ•°æ®+16å­—èŠ‚éšæœºå¡«å……
 				return "";
 			}
 
-			// ÒÆ³ıÎ²²¿µÄ16×Ö½ÚËæ»úÌî³ä
+			// ç§»é™¤å°¾éƒ¨çš„16å­—èŠ‚éšæœºå¡«å……
 			if (data_length < 16) {
 				return "";
 			}
@@ -522,13 +522,13 @@ public:
 	static std::string base64url_decode_s(const std::string input) {
 		std::string base64 = input;
 
-		// Ìæ»»URL°²È«µÄ×Ö·û
+		// æ›¿æ¢URLå®‰å…¨çš„å­—ç¬¦
 		for (auto& c : base64) {
 			if (c == '-') c = '+';
 			if (c == '_') c = '/';
 		}
 
-		// Ìí¼ÓÌî³ä×Ö·û
+		// æ·»åŠ å¡«å……å­—ç¬¦
 		switch (base64.size() % 4) {
 		case 2: base64 += "=="; break;
 		case 3: base64 += "="; break;
@@ -538,13 +538,13 @@ public:
 	static std::string base64url_encode_s(const std::string input) {
 		std::string base64 = input;
 
-		// Ìæ»»URL°²È«µÄ×Ö·û
+		// æ›¿æ¢URLå®‰å…¨çš„å­—ç¬¦
 		for (auto& c : base64) {
 			if (c == '+') c = '-';
 			if (c == '/') c = '_';
 		}
 
-		// É¾³ıÌî³ä×Ö·û
+		// åˆ é™¤å¡«å……å­—ç¬¦
 		int len = base64.length();
 		while (true) {
 			if (base64[len - 1] == '=')
@@ -576,7 +576,7 @@ public:
 		int lineWidth = 64) {
 		std::string pem = header + "\n";
 
-		// °´¹Ì¶¨¿í¶È·Ö¸îÃÜÔ¿
+		// æŒ‰å›ºå®šå®½åº¦åˆ†å‰²å¯†é’¥
 		for (size_t i = 0; i < key.size(); i += lineWidth) {
 			pem += key.substr(i, lineWidth) + "\n";
 		}
@@ -585,27 +585,27 @@ public:
 		return pem;
 	}
 
-	// ½«PEM¸ñÊ½×ª»»Îªµ¥ĞĞÃÜÔ¿
+	// å°†PEMæ ¼å¼è½¬æ¢ä¸ºå•è¡Œå¯†é’¥
 	static std::string convertFromPEM(const std::string& pem) {
 		std::string key;
 		size_t beginPos = pem.find("-----BEGIN");
 		size_t endPos = pem.find("-----END");
 
 		if (beginPos == std::string::npos || endPos == std::string::npos) {
-			return pem; // Èç¹û²»ÊÇPEM¸ñÊ½£¬Ô­Ñù·µ»Ø
+			return pem; // å¦‚æœä¸æ˜¯PEMæ ¼å¼ï¼ŒåŸæ ·è¿”å›
 		}
 
-		// ÕÒµ½µÚÒ»¸ö»»ĞĞ·ûºóµÄÄÚÈİ
+		// æ‰¾åˆ°ç¬¬ä¸€ä¸ªæ¢è¡Œç¬¦åçš„å†…å®¹
 		size_t keyStart = pem.find('\n', beginPos) + 1;
 		size_t keyEnd = pem.rfind('\n', endPos);
 
 		if (keyStart >= keyEnd) {
-			return ""; // ÎŞĞ§¸ñÊ½
+			return ""; // æ— æ•ˆæ ¼å¼
 		}
 
 		std::string keyContent = pem.substr(keyStart, keyEnd - keyStart);
 
-		// ÒÆ³ıËùÓĞ»»ĞĞ·ûºÍ¿Õ¸ñ
+		// ç§»é™¤æ‰€æœ‰æ¢è¡Œç¬¦å’Œç©ºæ ¼
 		keyContent.erase(std::remove(keyContent.begin(), keyContent.end(), '\n'), keyContent.end());
 		keyContent.erase(std::remove(keyContent.begin(), keyContent.end(), '\r'), keyContent.end());
 		keyContent.erase(std::remove(keyContent.begin(), keyContent.end(), ' '), keyContent.end());

@@ -6,13 +6,13 @@
 extern "C" {
 #endif
 
-	// µ¼³öº¯ÊýÉùÃ÷
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	PyObject* decrypt_with_tail(PyObject* self, PyObject* args);
 	PyObject* encrypt_with_tail(PyObject* self, PyObject* args);
 
-	// PythonÄ£¿é³õÊ¼»¯º¯Êý
+	// PythonÄ£ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	//PyMODINIT_FUNC initengine(void);
-	void initutility(void);
+	PyMODINIT_FUNC PyInit_utility(void);
 
 #ifdef __cplusplus
 }

@@ -726,8 +726,10 @@ void register_tan_lobby_game_module() {
         rtc::InitLogger(rtc::LogLevel::Debug);
     }
     LOG(LOG_SCRIPTING, "[PythonRuntime] Registering tan_lobby_game_clicpp_wrapper module...");
+    // pybind11 2.13 placement-news the PyModuleDef onto the passed pointer, so a
+    // nullptr here would write to address 0 and crash. Pass a real allocation.
     py::module m = py::module::create_extension_module(
-        "tan_lobby_game_clicpp_wrapper", "Tan Lobby Game C++ Wrapper", nullptr);
+        "tan_lobby_game_clicpp_wrapper", "Tan Lobby Game C++ Wrapper", new PyModuleDef());
 
     py::class_<TanLobbyGameCtx, std::shared_ptr<TanLobbyGameCtx>>(m, "TanLobbyGameCtx")
         .def("startUp", &TanLobbyGameCtx::startUp,

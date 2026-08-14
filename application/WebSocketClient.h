@@ -1,23 +1,23 @@
-// websocket_client_interface.h
+ï»¿// websocket_client_interface.h
 #pragma once
 #include <string>
 #include <functional>
 #include <memory>
 /*
-ÕâÊÇÒ»¸ö¿Õ¿Ç»ùÀàÖªµÀ°É
-ÒòÎªÉµ±Æpython2.7Ì«Éµ±ÆÁË
-ËùÒÔÓÃÁËÕâÑùÒ»¸öµó×êµÄ·½·¨È¥µ÷ÓÃwebsocket
-ÎÒÊÇÌì²Å£¡
+è¿™æ˜¯ä¸€ä¸ªç©ºå£³åŸºç±»çŸ¥é“å§
+å› ä¸ºå‚»é€¼python2.7å¤ªå‚»é€¼äº†
+æ‰€ä»¥ç”¨äº†è¿™æ ·ä¸€ä¸ªåˆé’»çš„æ–¹æ³•å»è°ƒç”¨websocket
+æˆ‘æ˜¯å¤©æ‰ï¼
 */
 
-// ¿Õ¿Ç»ùÀà - ÍêÈ«²»°üº¬ libwebsockets µÄÈÎºÎºÛ¼£
+// ç©ºå£³åŸºç±» - å®Œå…¨ä¸åŒ…å« libwebsockets çš„ä»»ä½•ç—•è¿¹
 class IWebSocketClient {
 public:
-    // »Øµ÷ÀàĞÍ¶¨Òå
+    // å›è°ƒç±»å‹å®šä¹‰
     using OnDataReceived = std::function<void(const std::string&, size_t)>;
     using OnConnectionState = std::function<void(bool)>;
 
-    // ¹¤³§º¯Êı - Î¨Ò»´´½¨ÊµÀıµÄ·½Ê½
+    // å·¥å‚å‡½æ•° - å”¯ä¸€åˆ›å»ºå®ä¾‹çš„æ–¹å¼
     static std::unique_ptr<IWebSocketClient> Create(
         const std::string& serverIp,
         int serverPort,
@@ -26,7 +26,7 @@ public:
 
     virtual ~IWebSocketClient() = default;
 
-    // ´¿Ğé½Ó¿Ú
+    // çº¯è™šæ¥å£
     virtual bool connect(OnDataReceived onDataCb = nullptr,
         OnConnectionState onConnCb = nullptr) = 0;
     virtual void disconnect() = 0;
@@ -34,7 +34,7 @@ public:
     virtual bool isConnected() const = 0;
 
 protected:
-    // ½ûÖ¹Íâ²¿Ö±½Ó¹¹Ôì/¿½±´
+    // ç¦æ­¢å¤–éƒ¨ç›´æ¥æ„é€ /æ‹·è´
     IWebSocketClient() = default;
     IWebSocketClient(const IWebSocketClient&) = delete;
     IWebSocketClient& operator=(const IWebSocketClient&) = delete;

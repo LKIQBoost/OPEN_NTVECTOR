@@ -1,34 +1,34 @@
-#pragma once
+ï»¿#pragma once
 #include <vector>
 #include <cstdint>
 
 class SkinConverter {
 public:
-    // ½ûÓÃÊµÀı»¯
+    // ç¦ç”¨å®ä¾‹åŒ–
     SkinConverter() = delete;
 
     /**
-     * ½«PNGÊı¾İ×ª»»ÎªSkinData (RGBA¸ñÊ½)
-     * @param pngData PNGÎÄ¼şµÄ¶ş½øÖÆÊı¾İ
-     * @param width [out] Êä³öÍ¼ÏñµÄ¿í¶È
-     * @param height [out] Êä³öÍ¼ÏñµÄ¸ß¶È
-     * @return SkinDataµÄRGBA×Ö½ÚÊı¾İ£¬Èç¹ûÊ§°Ü·µ»Ø¿Õvector
+     * å°†PNGæ•°æ®è½¬æ¢ä¸ºSkinData (RGBAæ ¼å¼)
+     * @param pngData PNGæ–‡ä»¶çš„äºŒè¿›åˆ¶æ•°æ®
+     * @param width [out] è¾“å‡ºå›¾åƒçš„å®½åº¦
+     * @param height [out] è¾“å‡ºå›¾åƒçš„é«˜åº¦
+     * @return SkinDataçš„RGBAå­—èŠ‚æ•°æ®ï¼Œå¦‚æœå¤±è´¥è¿”å›ç©ºvector
      */
     static std::vector<uint8_t> pngToSkinData(const std::vector<uint8_t>& pngData,
         int& width, int& height);
 
     /**
-     * ½«SkinData×ª»»ÎªPNGÊı¾İ
-     * @param skinData RGBA¸ñÊ½µÄSkinData
-     * @param width Í¼ÏñµÄ¿í¶È
-     * @param height Í¼ÏñµÄ¸ß¶È
-     * @return PNGÎÄ¼şµÄ¶ş½øÖÆÊı¾İ£¬Èç¹ûÊ§°Ü·µ»Ø¿Õvector
+     * å°†SkinDataè½¬æ¢ä¸ºPNGæ•°æ®
+     * @param skinData RGBAæ ¼å¼çš„SkinData
+     * @param width å›¾åƒçš„å®½åº¦
+     * @param height å›¾åƒçš„é«˜åº¦
+     * @return PNGæ–‡ä»¶çš„äºŒè¿›åˆ¶æ•°æ®ï¼Œå¦‚æœå¤±è´¥è¿”å›ç©ºvector
      */
     static std::vector<uint8_t> skinDataToPng(const std::vector<uint8_t>& skinData,
         int width, int height);
 
     /**
-     * ¼ì²éÊÇ·ñÎªÓĞĞ§µÄMinecraftÆ¤·ô³ß´ç
+     * æ£€æŸ¥æ˜¯å¦ä¸ºæœ‰æ•ˆçš„Minecraftçš®è‚¤å°ºå¯¸
      */
     static bool isValidSkinSize(int width, int height);
 };

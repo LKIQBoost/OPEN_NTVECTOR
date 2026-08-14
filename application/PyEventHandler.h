@@ -74,14 +74,14 @@ public:
                 PyGILState_Release(state);
                 return;
             }
-            PyObject* str = PyString_FromStringAndSize(_data.c_str(), _data.size());
+            PyObject* str = PyBytes_FromStringAndSize(_data.c_str(), (Py_ssize_t)_data.size());
 
             PyObject* args = PyTuple_New(1);
             PyTuple_SetItem(args, 0, str);
             
             PyObject* result = PyObject_CallObject(handle, args);
             if (result == NULL) {
-                PyErr_Print(); // ´òÓ¡PythonÒì³£
+                PyErr_Print(); // ï¿½ï¿½Ó¡Pythonï¿½ì³£
             }
             else {
                 Py_DECREF(result);

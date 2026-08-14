@@ -7,44 +7,44 @@
 #include <string.h>
 
 
-// 2. ´´½¨ÊµÀý£ºraknet.get_raknet()
+// 2. ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½raknet.get_raknet()
 static PyObject*
 raknet_get_client(PyObject* self, PyObject* args)
 {
-    // ·ÖÅäC½á¹¹ÌåÄÚ´æ
+    // ï¿½ï¿½ï¿½ï¿½Cï¿½á¹¹ï¿½ï¿½ï¿½Ú´ï¿½
     ClientInstance* inst = new ClientInstance();
     if (!inst) {
         PyErr_SetString(PyExc_MemoryError, "Failed to allocate RakNet instance");
         return NULL;
     }
 
-    // ½«CÖ¸Õë°ü×°³ÉPyCObject·µ»Ø£¨Python²ã³ÖÓÐÕâ¸ö°ü×°¶ÔÏó£©
-    return PyCObject_FromVoidPtr(inst, NULL);
+    // ï¿½ï¿½CÖ¸ï¿½ï¿½ï¿½×°ï¿½ï¿½PyCObjectï¿½ï¿½ï¿½Ø£ï¿½Pythonï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×°ï¿½ï¿½ï¿½ï¿½
+    return PyCapsule_New(inst, "client", NULL);
 }
 /*
-// 3. »ñÈ¡ÊôÐÔ£ºraknet.get(self) ¡ú ÕâÀïÒÔget_port_ipÎªÀý
+// 3. ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ô£ï¿½raknet.get(self) ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½get_port_ipÎªï¿½ï¿½
 static PyObject*
 raknet_get_port_ip(PyObject* self, PyObject* args)
 {
-    // ½âÎöPython²ã´«ÈëµÄPyCObject£¨¼´RakNetÊµÀý°ü×°¶ÔÏó£©
+    // ï¿½ï¿½ï¿½ï¿½Pythonï¿½ã´«ï¿½ï¿½ï¿½PyCObjectï¿½ï¿½ï¿½ï¿½RakNetÊµï¿½ï¿½ï¿½ï¿½×°ï¿½ï¿½ï¿½ï¿½
     PyObject* py_inst;
     if (!PyArg_ParseTuple(args, "O", &py_inst)) {
         return NULL;
     }
 
-    // ´ÓPyCObjectÖÐÌáÈ¡C²ãÖ¸Õë
-    RakNetInstance* inst = (RakNetInstance*)PyCObject_AsVoidPtr(py_inst);
+    // ï¿½ï¿½PyCObjectï¿½ï¿½ï¿½ï¿½È¡Cï¿½ï¿½Ö¸ï¿½ï¿½
+    RakNetInstance* inst = (RakNetInstance*)PyCapsule_GetPointer(py_inst, "client");
     if (!inst) {
         PyErr_SetString(PyExc_ValueError, "Invalid RakNet instance");
         return NULL;
     }
 
-    // ·µ»ØÊôÐÔÔª×é£¨¶Ë¿Ú¡¢IP£©
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôªï¿½é£¨ï¿½Ë¿Ú¡ï¿½IPï¿½ï¿½
     return Py_BuildValue("is", inst->port, inst->server_ip);
 }
 */
 /*
-// 4. ÉèÖÃÊôÐÔ£ºraknet.set**(self, **) ¡ú ÕâÀïÒÔset_port_ipÎªÀý
+// 4. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½raknet.set**(self, **) ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½set_port_ipÎªï¿½ï¿½
 static PyObject*
 raknet_set_port_ip(PyObject* self, PyObject* args)
 {
@@ -52,28 +52,28 @@ raknet_set_port_ip(PyObject* self, PyObject* args)
     int port;
     char* server_ip;
 
-    // ½âÎö²ÎÊý£ºÊµÀý¡¢¶Ë¿Ú¡¢IP
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½Ë¿Ú¡ï¿½IP
     if (!PyArg_ParseTuple(args, "Ois", &py_inst, &port, &server_ip)) {
         return NULL;
     }
 
-    // ÌáÈ¡C²ãÖ¸Õë
-    RakNetInstance* inst = (RakNetInstance*)PyCObject_AsVoidPtr(py_inst);
+    // ï¿½ï¿½È¡Cï¿½ï¿½Ö¸ï¿½ï¿½
+    RakNetInstance* inst = (RakNetInstance*)PyCapsule_GetPointer(py_inst, "client");
     if (!inst) {
         PyErr_SetString(PyExc_ValueError, "Invalid RakNet instance");
         return NULL;
     }
 
-    // ÉèÖÃÊôÐÔ£¨×¢Òâ×Ö·û´®ÄÚ´æ¹ÜÀí£©
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½×¢ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½Ú´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     inst->port = port;
-    free(inst->server_ip);          // ÊÍ·Å¾ÉIP
-    inst->server_ip = strdup(server_ip);  // ¿½±´ÐÂIP
+    free(inst->server_ip);          // ï¿½Í·Å¾ï¿½IP
+    inst->server_ip = strdup(server_ip);  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½IP
 
     Py_RETURN_NONE;
 }
 */
 /*
-// 5. Ïú»ÙÊµÀý£ºraknet.delete(self)
+// 5. ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½raknet.delete(self)
 static PyObject*
 raknet_delete(PyObject* self, PyObject* args)
 {
@@ -82,20 +82,20 @@ raknet_delete(PyObject* self, PyObject* args)
         return NULL;
     }
 
-    // ÌáÈ¡C²ãÖ¸Õë
-    RakNetInstance* inst = (RakNetInstance*)PyCObject_AsVoidPtr(py_inst);
+    // ï¿½ï¿½È¡Cï¿½ï¿½Ö¸ï¿½ï¿½
+    RakNetInstance* inst = (RakNetInstance*)PyCapsule_GetPointer(py_inst, "client");
     if (!inst) {
         PyErr_SetString(PyExc_ValueError, "Invalid RakNet instance");
         return NULL;
     }
 
-    // ÊÍ·ÅC½á¹¹ÌåÄÚ²¿×ÊÔ´
+    // ï¿½Í·ï¿½Cï¿½á¹¹ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½Ô´
     free(inst->server_ip);
-    // ÊÍ·Å½á¹¹Ìå±¾Éí
+    // ï¿½Í·Å½á¹¹ï¿½å±¾ï¿½ï¿½
     free(inst);
 
-    // Çå¿ÕPyCObjectµÄÖ¸Õë£¨±ÜÃâÖØ¸´ÊÍ·Å£©
-    PyCObject_SetVoidPtr(py_inst, NULL);
+    // ï¿½ï¿½ï¿½PyCObjectï¿½ï¿½Ö¸ï¿½ë£¨ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½Í·Å£ï¿½
+    PyCapsule_SetPointer(py_inst, NULL);
 
     Py_RETURN_NONE;
 }
@@ -106,13 +106,13 @@ disconnect(PyObject* self, PyObject* args)
 {
     PyObject* py_inst;
 
-    // ½âÎö²ÎÊý£ºÊµÀý¡¢¶Ë¿Ú¡¢IP
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½Ë¿Ú¡ï¿½IP
     if (!PyArg_ParseTuple(args, "O", &py_inst)) {
         return NULL;
     }
 
-    // ÌáÈ¡C²ãÖ¸Õë
-    ClientInstance* inst = (ClientInstance*)PyCObject_AsVoidPtr(py_inst);
+    // ï¿½ï¿½È¡Cï¿½ï¿½Ö¸ï¿½ï¿½
+    ClientInstance* inst = (ClientInstance*)PyCapsule_GetPointer(py_inst, "client");
     if (!inst) {
         PyErr_SetString(PyExc_ValueError, "Invalid RakNet instance");
         return NULL;
@@ -126,7 +126,7 @@ startUp(PyObject* self, PyObject* args)
 {
     PyObject* py_inst;
     char* MD5Token;
-    int length;
+    Py_ssize_t length;
     char* DisplayName;
     char* UserID;
     char* EngineVersion;
@@ -135,7 +135,7 @@ startUp(PyObject* self, PyObject* args)
     char* NeteaseServerID;
     char* ServerIP;
     int port;
-    if (!PyArg_ParseTuple(args, "Os#sssssssi", &py_inst, &MD5Token, &length,
+    if (!PyArg_ParseTuple(args, "Oy#sssssssi", &py_inst, &MD5Token, &length,
         &DisplayName, &UserID, &EngineVersion, &PatchVersion,
         &AuthServerUrl, &ServerIP, &NeteaseServerID, &port)) {
         return NULL;
@@ -150,13 +150,13 @@ startUp(PyObject* self, PyObject* args)
     Pair.UserID = UserID;
     Pair.NeteaseServerID = NeteaseServerID;
 
-    ClientInstance* inst = (ClientInstance*)PyCObject_AsVoidPtr(py_inst);
+    ClientInstance* inst = (ClientInstance*)PyCapsule_GetPointer(py_inst, "client");
     if (!inst) {
         PyErr_SetString(PyExc_ValueError, "Invalid Client instance");
         return NULL;
     }
 
-    // ¡ï ÐÂÁ÷³Ì:ÏÈ Login ÔÙ startUp
+    // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:ï¿½ï¿½ Login ï¿½ï¿½ startUp
     LoginSession session = LoginAuth::Login(Pair, ConfigLoader::SkinData);
     if (!session.valid()) {
         PyErr_SetString(PyExc_RuntimeError, "Login failed");
@@ -174,8 +174,8 @@ client_delete(PyObject* self, PyObject* args)
         return NULL;
     }
 
-    // ÌáÈ¡C²ãÖ¸Õë
-    ClientInstance* inst = (ClientInstance*)PyCObject_AsVoidPtr(py_inst);
+    // ï¿½ï¿½È¡Cï¿½ï¿½Ö¸ï¿½ï¿½
+    ClientInstance* inst = (ClientInstance*)PyCapsule_GetPointer(py_inst, "client");
     if (!inst) {
         PyErr_SetString(PyExc_ValueError, "Invalid RakNet instance");
         return NULL;
@@ -183,23 +183,25 @@ client_delete(PyObject* self, PyObject* args)
     inst->disconnect();
     free(inst);
 
-    // Çå¿ÕPyCObjectµÄÖ¸Õë£¨±ÜÃâÖØ¸´ÊÍ·Å£©
-    PyCObject_SetVoidPtr(py_inst, NULL);
+    // ï¿½ï¿½ï¿½PyCObjectï¿½ï¿½Ö¸ï¿½ë£¨ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½Í·Å£ï¿½
+    PyCapsule_SetPointer(py_inst, NULL);
 
     Py_RETURN_NONE;
 }
 
-// 6. ·½·¨ÁÐ±í£ºÓ³ÉäPythonµ÷ÓÃÃûµ½Cº¯Êý
+// 6. ï¿½ï¿½ï¿½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½Ó³ï¿½ï¿½Pythonï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½ï¿½
 static PyMethodDef RakNetMethods[] = {
     {"get_client",  raknet_get_client, METH_NOARGS, "Create a new Client instance"},
     {"startUp", startUp, METH_VARARGS, ""},
     {"disconnect", disconnect, METH_VARARGS, ""},
     {"delete",      client_delete,      METH_VARARGS, "Destroy Client instance"},
-    {NULL, NULL, 0, NULL}  // ½áÊø±ê¼Ç
+    {NULL, NULL, 0, NULL}  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 
-// 7. Ä£¿é³õÊ¼»¯£¨Python 2.7 ¹Ì¶¨¸ñÊ½£ºinit+Ä£¿éÃû£©
-static void _initclient(void)
+// Module init (Python 3) - this whole file is dead code (never registered),
+// kept only so it still compiles. The live _client lives in engine.cpp.
+static struct PyModuleDef _client_module = { PyModuleDef_HEAD_INIT, "_client", NULL, -1, RakNetMethods };
+static PyObject* _initclient(void)
 {
-    (void)Py_InitModule("_client", RakNetMethods);
+    return PyModule_Create(&_client_module);
 }

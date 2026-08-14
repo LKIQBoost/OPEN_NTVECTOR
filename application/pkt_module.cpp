@@ -53,14 +53,14 @@ static int encode_varint(unsigned int val, unsigned char* out) {
 
 static PyObject* pkt_read_byte(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     CHECK_BOUNDS(off, 1, dlen);
     return Py_BuildValue("(ii)", (unsigned char)data[off], off + 1);
 }
 
 static PyObject* pkt_read_bool(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     CHECK_BOUNDS(off, 1, dlen);
     PyObject* val = data[off] ? Py_True : Py_False;
     Py_INCREF(val);
@@ -69,7 +69,7 @@ static PyObject* pkt_read_bool(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_read_varint(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     unsigned int val;
     int new_off = decode_varint((const unsigned char*)data, dlen, off, &val);
     if (new_off < 0) {
@@ -81,7 +81,7 @@ static PyObject* pkt_read_varint(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_read_svarint(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     int val;
     int new_off = decode_signed_varint((const unsigned char*)data, dlen, off, &val);
     if (new_off < 0) {
@@ -93,7 +93,7 @@ static PyObject* pkt_read_svarint(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_read_string(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     unsigned int slen;
     int new_off = decode_varint((const unsigned char*)data, dlen, off, &slen);
     if (new_off < 0) {
@@ -101,13 +101,14 @@ static PyObject* pkt_read_string(PyObject* self, PyObject* args) {
         return NULL;
     }
     CHECK_BOUNDS(new_off, (Py_ssize_t)slen, dlen);
-    PyObject* s = PyString_FromStringAndSize(data + new_off, slen);
+    // MCPE string fields are UTF-8 text: return a proper Py3 str (decoded).
+    PyObject* s = PyUnicode_DecodeUTF8(data + new_off, (Py_ssize_t)slen, "surrogateescape");
     return Py_BuildValue("(Oi)", s, new_off + (int)slen);
 }
 
 static PyObject* pkt_read_u16(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     CHECK_BOUNDS(off, 2, dlen);
     unsigned short val;
     memcpy(&val, data + off, 2);
@@ -116,7 +117,7 @@ static PyObject* pkt_read_u16(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_read_u32(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     CHECK_BOUNDS(off, 4, dlen);
     unsigned int val;
     memcpy(&val, data + off, 4);
@@ -125,7 +126,7 @@ static PyObject* pkt_read_u32(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_read_i32(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     CHECK_BOUNDS(off, 4, dlen);
     int val;
     memcpy(&val, data + off, 4);
@@ -134,7 +135,7 @@ static PyObject* pkt_read_i32(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_read_u64(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     CHECK_BOUNDS(off, 8, dlen);
     unsigned long long val;
     memcpy(&val, data + off, 8);
@@ -143,7 +144,7 @@ static PyObject* pkt_read_u64(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_read_i64(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     CHECK_BOUNDS(off, 8, dlen);
     long long val;
     memcpy(&val, data + off, 8);
@@ -152,7 +153,7 @@ static PyObject* pkt_read_i64(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_read_f32(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     CHECK_BOUNDS(off, 4, dlen);
     float val;
     memcpy(&val, data + off, 4);
@@ -161,7 +162,7 @@ static PyObject* pkt_read_f32(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_read_f64(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
     CHECK_BOUNDS(off, 8, dlen);
     double val;
     memcpy(&val, data + off, 8);
@@ -170,9 +171,9 @@ static PyObject* pkt_read_f64(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_read_bytes(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off; int count;
-    if (!PyArg_ParseTuple(args, "s#ii", &data, &dlen, &off, &count)) return NULL;
+    if (!PyArg_ParseTuple(args, "y#ii", &data, &dlen, &off, &count)) return NULL;
     CHECK_BOUNDS(off, count, dlen);
-    PyObject* s = PyString_FromStringAndSize(data + off, count);
+    PyObject* s = PyBytes_FromStringAndSize(data + off, count);
     return Py_BuildValue("(Oi)", s, off + count);
 }
 
@@ -186,7 +187,7 @@ static PyObject* pkt_unpack(PyObject* self, PyObject* args) {
     const char* fmt;
     const char* data; Py_ssize_t dlen;
     int off;
-    if (!PyArg_ParseTuple(args, "ss#i", &fmt, &data, &dlen, &off)) return NULL;
+    if (!PyArg_ParseTuple(args, "sy#i", &fmt, &data, &dlen, &off)) return NULL;
 
     const unsigned char* buf = (const unsigned char*)data;
     int fmtlen = (int)strlen(fmt);
@@ -198,7 +199,7 @@ static PyObject* pkt_unpack(PyObject* self, PyObject* args) {
         switch (fmt[fi]) {
         case 'b': {
             CHECK_BOUNDS(off, 1, dlen);
-            val = PyInt_FromLong(buf[off++]);
+            val = PyLong_FromLong(buf[off++]);
             break;
         }
         case '?': {
@@ -220,7 +221,7 @@ static PyObject* pkt_unpack(PyObject* self, PyObject* args) {
             int n = decode_signed_varint(buf, dlen, off, &v);
             if (n < 0) { Py_DECREF(result); PyErr_SetString(PyExc_ValueError, "pkt: invalid svarint"); return NULL; }
             off = n;
-            val = PyInt_FromLong(v);
+            val = PyLong_FromLong(v);
             break;
         }
         case 's': {
@@ -231,20 +232,20 @@ static PyObject* pkt_unpack(PyObject* self, PyObject* args) {
                 PyErr_SetString(PyExc_ValueError, "pkt: invalid string");
                 return NULL;
             }
-            val = PyString_FromStringAndSize(data + n, slen);
+            val = PyUnicode_DecodeUTF8(data + n, (Py_ssize_t)slen, "surrogateescape");
             off = n + (int)slen;
             break;
         }
         case 'h': {
             CHECK_BOUNDS(off, 2, dlen);
             unsigned short v; memcpy(&v, data + off, 2);
-            val = PyInt_FromLong(v); off += 2;
+            val = PyLong_FromLong(v); off += 2;
             break;
         }
         case 'H': {
             CHECK_BOUNDS(off, 2, dlen);
             short v; memcpy(&v, data + off, 2);
-            val = PyInt_FromLong(v); off += 2;
+            val = PyLong_FromLong(v); off += 2;
             break;
         }
         case 'i': {
@@ -256,7 +257,7 @@ static PyObject* pkt_unpack(PyObject* self, PyObject* args) {
         case 'I': {
             CHECK_BOUNDS(off, 4, dlen);
             int v; memcpy(&v, data + off, 4);
-            val = PyInt_FromLong(v); off += 4;
+            val = PyLong_FromLong(v); off += 4;
             break;
         }
         case 'q': {
@@ -293,7 +294,7 @@ static PyObject* pkt_unpack(PyObject* self, PyObject* args) {
         Py_DECREF(val);
     }
 
-    PyList_Append(result, PyInt_FromLong(off));
+    PyList_Append(result, PyLong_FromLong(off));
     PyObject* tuple = PyList_AsTuple(result);
     Py_DECREF(result);
     return tuple;
@@ -305,14 +306,14 @@ static PyObject* pkt_write_byte(PyObject* self, PyObject* args) {
     int val;
     if (!PyArg_ParseTuple(args, "i", &val)) return NULL;
     unsigned char b = (unsigned char)val;
-    return PyString_FromStringAndSize((const char*)&b, 1);
+    return PyBytes_FromStringAndSize((const char*)&b, 1);
 }
 
 static PyObject* pkt_write_bool(PyObject* self, PyObject* args) {
     PyObject* val;
     if (!PyArg_ParseTuple(args, "O", &val)) return NULL;
     unsigned char b = PyObject_IsTrue(val) ? 1 : 0;
-    return PyString_FromStringAndSize((const char*)&b, 1);
+    return PyBytes_FromStringAndSize((const char*)&b, 1);
 }
 
 static PyObject* pkt_write_varint(PyObject* self, PyObject* args) {
@@ -320,7 +321,7 @@ static PyObject* pkt_write_varint(PyObject* self, PyObject* args) {
     if (!PyArg_ParseTuple(args, "I", &val)) return NULL;
     unsigned char buf[5];
     int n = encode_varint(val, buf);
-    return PyString_FromStringAndSize((const char*)buf, n);
+    return PyBytes_FromStringAndSize((const char*)buf, n);
 }
 
 static PyObject* pkt_write_string(PyObject* self, PyObject* args) {
@@ -328,8 +329,8 @@ static PyObject* pkt_write_string(PyObject* self, PyObject* args) {
     if (!PyArg_ParseTuple(args, "s#", &s, &slen)) return NULL;
     unsigned char lenbuf[5];
     int n = encode_varint((unsigned int)slen, lenbuf);
-    PyObject* result = PyString_FromStringAndSize((const char*)lenbuf, n);
-    PyString_ConcatAndDel(&result, PyString_FromStringAndSize(s, slen));
+    PyObject* result = PyBytes_FromStringAndSize((const char*)lenbuf, n);
+    PyBytes_ConcatAndDel(&result, PyBytes_FromStringAndSize(s, slen));
     return result;
 }
 
@@ -337,37 +338,37 @@ static PyObject* pkt_write_u16(PyObject* self, PyObject* args) {
     int val;
     if (!PyArg_ParseTuple(args, "i", &val)) return NULL;
     unsigned short v = (unsigned short)val;
-    return PyString_FromStringAndSize((const char*)&v, 2);
+    return PyBytes_FromStringAndSize((const char*)&v, 2);
 }
 
 static PyObject* pkt_write_u32(PyObject* self, PyObject* args) {
     unsigned int val;
     if (!PyArg_ParseTuple(args, "I", &val)) return NULL;
-    return PyString_FromStringAndSize((const char*)&val, 4);
+    return PyBytes_FromStringAndSize((const char*)&val, 4);
 }
 
 static PyObject* pkt_write_i32(PyObject* self, PyObject* args) {
     int val;
     if (!PyArg_ParseTuple(args, "i", &val)) return NULL;
-    return PyString_FromStringAndSize((const char*)&val, 4);
+    return PyBytes_FromStringAndSize((const char*)&val, 4);
 }
 
 static PyObject* pkt_write_u64(PyObject* self, PyObject* args) {
     unsigned long long val;
     if (!PyArg_ParseTuple(args, "K", &val)) return NULL;
-    return PyString_FromStringAndSize((const char*)&val, 8);
+    return PyBytes_FromStringAndSize((const char*)&val, 8);
 }
 
 static PyObject* pkt_write_f32(PyObject* self, PyObject* args) {
     float val;
     if (!PyArg_ParseTuple(args, "f", &val)) return NULL;
-    return PyString_FromStringAndSize((const char*)&val, 4);
+    return PyBytes_FromStringAndSize((const char*)&val, 4);
 }
 
 static PyObject* pkt_write_f64(PyObject* self, PyObject* args) {
     double val;
     if (!PyArg_ParseTuple(args, "d", &val)) return NULL;
-    return PyString_FromStringAndSize((const char*)&val, 8);
+    return PyBytes_FromStringAndSize((const char*)&val, 8);
 }
 
 // ── batch pack ──────────────────────────────────────────────
@@ -379,7 +380,8 @@ static PyObject* pkt_pack(PyObject* self, PyObject* args) {
         PyErr_SetString(PyExc_TypeError, "pkt.pack requires format string");
         return NULL;
     }
-    const char* fmt = PyString_AsString(PyTuple_GetItem(args, 0));
+    PyObject* fmt_obj = PyTuple_GetItem(args, 0);
+    const char* fmt = PyUnicode_AsUTF8(fmt_obj);
     if (!fmt) return NULL;
 
     int fmtlen = (int)strlen(fmt);
@@ -396,59 +398,60 @@ static PyObject* pkt_pack(PyObject* self, PyObject* args) {
 
         switch (fmt[fi]) {
         case 'b': {
-            unsigned char b = (unsigned char)PyInt_AsLong(arg);
-            chunk = PyString_FromStringAndSize((const char*)&b, 1);
+            unsigned char b = (unsigned char)PyLong_AsLong(arg);
+            chunk = PyBytes_FromStringAndSize((const char*)&b, 1);
             break;
         }
         case '?': {
             unsigned char b = PyObject_IsTrue(arg) ? 1 : 0;
-            chunk = PyString_FromStringAndSize((const char*)&b, 1);
+            chunk = PyBytes_FromStringAndSize((const char*)&b, 1);
             break;
         }
         case 'v': {
             unsigned int v = (unsigned int)PyLong_AsUnsignedLong(arg);
-            if (PyErr_Occurred()) { v = (unsigned int)PyInt_AsLong(arg); PyErr_Clear(); }
+            if (PyErr_Occurred()) { v = (unsigned int)PyLong_AsLong(arg); PyErr_Clear(); }
             unsigned char buf[5];
             int n = encode_varint(v, buf);
-            chunk = PyString_FromStringAndSize((const char*)buf, n);
+            chunk = PyBytes_FromStringAndSize((const char*)buf, n);
             break;
         }
         case 's': {
+            // accept a Py3 str (UTF-8) and encode length + utf8 bytes
             Py_ssize_t slen;
-            const char* s;
-            if (PyString_AsStringAndSize(arg, (char**)&s, &slen) < 0) {
+            const char* s = PyUnicode_AsUTF8AndSize(arg, &slen);
+            if (!s) {
                 Py_DECREF(parts); return NULL;
             }
             unsigned char lenbuf[5];
             int n = encode_varint((unsigned int)slen, lenbuf);
-            chunk = PyString_FromStringAndSize((const char*)lenbuf, n);
-            PyString_ConcatAndDel(&chunk, PyString_FromStringAndSize(s, slen));
+            chunk = PyBytes_FromStringAndSize((const char*)lenbuf, n);
+            PyBytes_ConcatAndDel(&chunk, PyBytes_FromStringAndSize(s, slen));
             break;
         }
         case 'h': {
-            unsigned short v = (unsigned short)PyInt_AsLong(arg);
-            chunk = PyString_FromStringAndSize((const char*)&v, 2);
+            unsigned short v = (unsigned short)PyLong_AsLong(arg);
+            chunk = PyBytes_FromStringAndSize((const char*)&v, 2);
             break;
         }
         case 'i': {
             unsigned int v = (unsigned int)PyLong_AsUnsignedLong(arg);
-            if (PyErr_Occurred()) { v = (unsigned int)PyInt_AsLong(arg); PyErr_Clear(); }
-            chunk = PyString_FromStringAndSize((const char*)&v, 4);
+            if (PyErr_Occurred()) { v = (unsigned int)PyLong_AsLong(arg); PyErr_Clear(); }
+            chunk = PyBytes_FromStringAndSize((const char*)&v, 4);
             break;
         }
         case 'I': {
-            int v = (int)PyInt_AsLong(arg);
-            chunk = PyString_FromStringAndSize((const char*)&v, 4);
+            int v = (int)PyLong_AsLong(arg);
+            chunk = PyBytes_FromStringAndSize((const char*)&v, 4);
             break;
         }
         case 'f': {
             float v = (float)PyFloat_AsDouble(arg);
-            chunk = PyString_FromStringAndSize((const char*)&v, 4);
+            chunk = PyBytes_FromStringAndSize((const char*)&v, 4);
             break;
         }
         case 'd': {
             double v = PyFloat_AsDouble(arg);
-            chunk = PyString_FromStringAndSize((const char*)&v, 8);
+            chunk = PyBytes_FromStringAndSize((const char*)&v, 8);
             break;
         }
         default:
@@ -460,8 +463,8 @@ static PyObject* pkt_pack(PyObject* self, PyObject* args) {
         Py_DECREF(chunk);
     }
 
-    PyObject* empty = PyString_FromStringAndSize("", 0);
-    PyObject* result = _PyString_Join(empty, parts);
+    PyObject* empty = PyBytes_FromStringAndSize("", 0);
+    PyObject* result = _PyBytes_Join(empty, parts);
     Py_DECREF(empty);
     Py_DECREF(parts);
     return result;
@@ -471,8 +474,8 @@ static PyObject* pkt_pack(PyObject* self, PyObject* args) {
 
 static PyObject* pkt_remaining(PyObject* self, PyObject* args) {
     const char* data; Py_ssize_t dlen; int off;
-    if (!PyArg_ParseTuple(args, "s#i", &data, &dlen, &off)) return NULL;
-    return PyInt_FromLong(dlen - off);
+    if (!PyArg_ParseTuple(args, "y#i", &data, &dlen, &off)) return NULL;
+    return PyLong_FromLong(dlen - off);
 }
 
 // ── module def ──────────────────────────────────────────────
@@ -507,6 +510,8 @@ static PyMethodDef PktMethods[] = {
     {NULL, NULL, 0, NULL}
 };
 
-void initpkt(void) {
-    (void)Py_InitModule("pkt", PktMethods);
+// Module init (Python 3)
+static struct PyModuleDef pkt_module = { PyModuleDef_HEAD_INIT, "pkt", NULL, -1, PktMethods };
+PyMODINIT_FUNC PyInit_pkt(void) {
+    return PyModule_Create(&pkt_module);
 }

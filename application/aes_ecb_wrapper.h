@@ -1,6 +1,7 @@
 #ifndef AES_ECB_H
 #define AES_ECB_H
 
+#include <Python.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -8,8 +9,8 @@
 extern "C" {
 #endif
 
-// ³õÊ¼»¯OpenSSL£¨Ïß³Ì°²È«£¬¿É¶à´Îµ÷ÓÃ£©
-void initaes(void);
+// ï¿½ï¿½Ê¼ï¿½ï¿½OpenSSLï¿½ï¿½ï¿½ß³Ì°ï¿½È«ï¿½ï¿½ï¿½É¶ï¿½Îµï¿½ï¿½Ã£ï¿½
+PyMODINIT_FUNC PyInit_aes(void);
 
 #ifdef __cplusplus
 }

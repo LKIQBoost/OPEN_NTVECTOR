@@ -1,4 +1,4 @@
-#include "BinaryReader.h"
+ï»¿#include "BinaryReader.h"
 BinaryReader::BinaryReader(void* data, int length)
     : m_buffer(nullptr), m_size(0), m_pointer(0) {
     if (length == 0)
@@ -49,7 +49,7 @@ void* BinaryReader::m_reade(size_t size) {
     m_pointer += size;
     return p;
 }
-// ½á¹¹Ìå¶ÁÈ¡
+// ç»“æ„ä½“è¯»å–
 Vec3 BinaryReader::ReadVec3() {
     Vec3* data = (Vec3*)m_reade(sizeof(Vec3));
     return data ? *data : Vec3{ 0, 0, 0 };
@@ -184,7 +184,7 @@ double BinaryReader::ReadDouble() {
     return *data;
 }
 
-// ¶ÁÈ¡×Ö·û´®ÏòÁ¿
+// è¯»å–å­—ç¬¦ä¸²å‘é‡
 void BinaryReader::ReadStringVector(std::vector<std::string>& strings) {
     int32_t count = 0;
     ReadVarInt32(count);
@@ -199,7 +199,7 @@ void BinaryReader::ReadStringVector(std::vector<std::string>& strings) {
     }
 }
 
-// ¶ÁÈ¡NBTÊı¾İ£¨¼ò»¯°æ±¾£©
+// è¯»å–NBTæ•°æ®ï¼ˆç®€åŒ–ç‰ˆæœ¬ï¼‰
 void BinaryReader::ReadNBTData(std::unordered_map<std::string, std::string>& nbt) {
     nbt.clear();
 
@@ -208,13 +208,13 @@ void BinaryReader::ReadNBTData(std::unordered_map<std::string, std::string>& nbt
         return;
     }
 
-    // ¼òµ¥ÊµÏÖ£º¶ÁÈ¡ÎÄ±¾¸ñÊ½
+    // ç®€å•å®ç°ï¼šè¯»å–æ–‡æœ¬æ ¼å¼
     std::vector<uint8_t> nbtBytes(length);
     memcpy(nbtBytes.data(), Read(length), length);
 
     std::string nbtText(reinterpret_cast<char*>(nbtBytes.data()), length);
 
-    // ½âÎö¼üÖµ¶Ô£¨¼òµ¥ÊµÏÖ£©
+    // è§£æé”®å€¼å¯¹ï¼ˆç®€å•å®ç°ï¼‰
     size_t pos = 0;
     while (pos < nbtText.size()) {
         size_t colonPos = nbtText.find(':', pos);
@@ -231,13 +231,13 @@ void BinaryReader::ReadNBTData(std::unordered_map<std::string, std::string>& nbt
     }
 }
 
-// ¶ÁÈ¡ÎïÆ·¶ÑÕ»
+// è¯»å–ç‰©å“å †æ ˆ
 void BinaryReader::ReadItemStack(ItemStack& item) {
 
-    // ¶ÁÈ¡ÍøÂçID
+    // è¯»å–ç½‘ç»œID
     item.NetworkID = ReadVarInt();
 
-    // PhoenixBuilder specific changes ÌØÊâ´¦Àí
+    // PhoenixBuilder specific changes ç‰¹æ®Šå¤„ç†
     if (item.NetworkID == 0 || item.NetworkID == -1) {
         item.Count = 0;
         item.MetadataValue = 0;
@@ -248,35 +248,35 @@ void BinaryReader::ReadItemStack(ItemStack& item) {
         return;
     }
 
-    // ¶ÁÈ¡»ù´¡ĞÅÏ¢
+    // è¯»å–åŸºç¡€ä¿¡æ¯
     item.Count = ReadUInt16();
     item.MetadataValue = ReadVarUInt();
 
-    // ¶ÁÈ¡ÊÇ·ñÓĞÍøÂçID
+    // è¯»å–æ˜¯å¦æœ‰ç½‘ç»œID
     bool hasNetID = false;
     ReadBool(hasNetID);
 
-    // Èç¹ûÓĞÍøÂçID£¬¶ÁÈ¡Ö®£¨ÕâÀïÔİÊ±Ìø¹ı£¬ÒòÎªItemStackÃ»ÓĞÕâ¸ö×Ö¶Î£©
+    // å¦‚æœæœ‰ç½‘ç»œIDï¼Œè¯»å–ä¹‹ï¼ˆè¿™é‡Œæš‚æ—¶è·³è¿‡ï¼Œå› ä¸ºItemStackæ²¡æœ‰è¿™ä¸ªå­—æ®µï¼‰
     if (hasNetID) {
         int32_t stackNetworkID = ReadVarInt();
-        // Õâ¸ö×Ö¶ÎÊôÓÚItemInstance£¬²»ÊÇItemStack
-        // ËùÒÔÕâÀïÖ»ÊÇÌø¹ıÊı¾İ
+        // è¿™ä¸ªå­—æ®µå±äºItemInstanceï¼Œä¸æ˜¯ItemStack
+        // æ‰€ä»¥è¿™é‡Œåªæ˜¯è·³è¿‡æ•°æ®
     }
 
-    // ¶ÁÈ¡·½¿éÔËĞĞÊ±ID
+    // è¯»å–æ–¹å—è¿è¡Œæ—¶ID
     item.BlockRuntimeID = ReadVarInt();
 
-    // ¶ÁÈ¡¶îÍâÊı¾İ
+    // è¯»å–é¢å¤–æ•°æ®
     int32_t extraDataSize = ReadVarInt();
     if (extraDataSize > 0) {
-        // ´´½¨Ò»¸öÁÙÊ±µÄBinaryReaderÀ´½âÎö¶îÍâÊı¾İ
+        // åˆ›å»ºä¸€ä¸ªä¸´æ—¶çš„BinaryReaderæ¥è§£æé¢å¤–æ•°æ®
         const uint8_t* extraData = reinterpret_cast<const uint8_t*>(Read(extraDataSize));
         BinaryReader extraReader((void*)extraData, extraDataSize);
 
-        // ¶ÁÈ¡NBT
+        // è¯»å–NBT
         int16_t length = extraReader.ReadInt16();
         if (length == -1) {
-            // ÓĞ°æ±¾ºÅ
+            // æœ‰ç‰ˆæœ¬å·
             uint8_t version = extraReader.ReadUInt8();
             if (version == 1) {
                 extraReader.ReadNBTData(item.NBTData);
@@ -286,32 +286,32 @@ void BinaryReader::ReadItemStack(ItemStack& item) {
             extraReader.ReadNBTData(item.NBTData);
         }
 
-        // ¶ÁÈ¡½»»¥ÊôĞÔ
+        // è¯»å–äº¤äº’å±æ€§
         extraReader.ReadStringVector(item.CanBePlacedOn);
         extraReader.ReadStringVector(item.CanBreak);
 
-        // Èç¹ûÊÇ¶ÜÅÆ£¬¶ÁÈ¡¸ñµ²Ê±¼ä´Á
-        if (item.NetworkID == 513) {  // ¼ÙÉè513ÊÇ¶ÜÅÆµÄID
+        // å¦‚æœæ˜¯ç›¾ç‰Œï¼Œè¯»å–æ ¼æŒ¡æ—¶é—´æˆ³
+        if (item.NetworkID == 513) {  // å‡è®¾513æ˜¯ç›¾ç‰Œçš„ID
             int64_t blockingTick = extraReader.ReadInt64();
-            // ÕâÀï¿ÉÒÔ´æ´¢µ½NBTDataÖĞ
+            // è¿™é‡Œå¯ä»¥å­˜å‚¨åˆ°NBTDataä¸­
             item.NBTData["BlockingTick"] = std::to_string(blockingTick);
         }
     }
 }
 
-// ¶ÁÈ¡ÎïÆ·ÊµÀı
+// è¯»å–ç‰©å“å®ä¾‹
 void BinaryReader::ReadItemInstance(ItemInstance& item) {
-    // ¶ÁÈ¡¶ÑÕ»ĞÅÏ¢
+    // è¯»å–å †æ ˆä¿¡æ¯
     ReadItemStack(item.Stack);
 
-    // Èç¹ûÎïÆ·ÊÇ¿ÕÆø£¬Ö±½Ó·µ»Ø
+    // å¦‚æœç‰©å“æ˜¯ç©ºæ°”ï¼Œç›´æ¥è¿”å›
     if (item.Stack.IsAir()) {
         item.HasNetworkID = false;
         item.StackNetworkID = 0;
         return;
     }
 
-    // ¶ÁÈ¡ÊÇ·ñÓĞÍøÂçID
+    // è¯»å–æ˜¯å¦æœ‰ç½‘ç»œID
     item.HasNetworkID = ReadUInt8() != 0;
 
     if (item.HasNetworkID) {
@@ -319,7 +319,7 @@ void BinaryReader::ReadItemInstance(ItemInstance& item) {
     }
 }
 
-// ¸¨Öúº¯ÊıÊµÏÖ
+// è¾…åŠ©å‡½æ•°å®ç°
 uint32_t BinaryReader::ReadVarInt32(int32_t& value) {
     uint32_t temp;
     value = static_cast<int32_t>(ReadVarInt_out(temp));

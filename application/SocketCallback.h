@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <functional>
 #include <unordered_map>
 #include <vector>
@@ -10,31 +10,31 @@
 extern class ConnectInstance;
 class SocketCallback {
 public:
-    // Á¬½Ó¶ªÊ§»Øµ÷º¯ÊıÀàĞÍ
+    // è¿æ¥ä¸¢å¤±å›è°ƒå‡½æ•°ç±»å‹
     using LostConnectCallback = std::function<void(const std::string&)>;
 
-    // Êı¾İ½ÓÊÕ»Øµ÷º¯ÊıÀàĞÍ
+    // æ•°æ®æ¥æ”¶å›è°ƒå‡½æ•°ç±»å‹
     using ReceiveCallback = std::function<void(ConnectInstance*, const std::vector<uint8_t>&)>;
 
     SocketCallback(ConnectInstance*);
     ~SocketCallback() = default;
 
-    // ÉèÖÃÁ¬½Ó¶ªÊ§»Øµ÷
+    // è®¾ç½®è¿æ¥ä¸¢å¤±å›è°ƒ
     void setLostConnectCallback(LostConnectCallback callback);
 
-    // ×¢²á½ÓÊÕ»Øµ÷£¨°´ÏûÏ¢ID£©
+    // æ³¨å†Œæ¥æ”¶å›è°ƒï¼ˆæŒ‰æ¶ˆæ¯IDï¼‰
     void registerReceiveCallback(uint32_t sid, ReceiveCallback callback);
 
-    // ÒÆ³ı½ÓÊÕ»Øµ÷
+    // ç§»é™¤æ¥æ”¶å›è°ƒ
     void removeReceiveCallback(uint32_t sid);
 
-    // Ö´ĞĞ»Øµ÷£¨´¦Àí½ÓÊÕµ½µÄÊı¾İ£©
+    // æ‰§è¡Œå›è°ƒï¼ˆå¤„ç†æ¥æ”¶åˆ°çš„æ•°æ®ï¼‰
     bool invokeCallback(uint32_t sid, const std::vector<uint8_t>& paramlist);
 
-    // Ö´ĞĞ»Øµ÷£¨×Ö½ÚÊı×é°æ±¾£©
+    // æ‰§è¡Œå›è°ƒï¼ˆå­—èŠ‚æ•°ç»„ç‰ˆæœ¬ï¼‰
     bool invokeCallback(uint32_t sid, const uint8_t* data, size_t length);
 
-    // »ñÈ¡ÒÑ×¢²áµÄÏûÏ¢IDÁĞ±í
+    // è·å–å·²æ³¨å†Œçš„æ¶ˆæ¯IDåˆ—è¡¨
     std::vector<uint32_t> getRegisteredIds() const;
 
 private:

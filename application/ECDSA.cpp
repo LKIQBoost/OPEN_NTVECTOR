@@ -1,11 +1,11 @@
-#include "ECDSA.h"
+ï»¿#include "ECDSA.h"
 std::string ECDSA::sign_es384(const std::string& data, EC_KEY* ec_key) {
     EVP_PKEY* pkey = EVP_PKEY_new();
     if (!pkey) {
         throw std::runtime_error("EVP_PKEY_new failed");
     }
 
-    // ½« EC_KEY ·â×°½ø EVP_PKEY
+    // å°† EC_KEY å°è£…è¿› EVP_PKEY
     if (EVP_PKEY_assign_EC_KEY(pkey, ec_key) != 1) {
         EVP_PKEY_free(pkey);
         throw std::runtime_error("EVP_PKEY_assign_EC_KEY failed");
@@ -17,21 +17,21 @@ std::string ECDSA::sign_es384(const std::string& data, EC_KEY* ec_key) {
         throw std::runtime_error("EVP_MD_CTX_new failed");
     }
 
-    // ³õÊ¼»¯Ç©ÃûÉÏÏÂÎÄ
+    // åˆå§‹åŒ–ç­¾åä¸Šä¸‹æ–‡
     if (EVP_DigestSignInit(md_ctx, nullptr, EVP_sha384(), nullptr, pkey) != 1) {
         EVP_MD_CTX_free(md_ctx);
         EVP_PKEY_free(pkey);
         throw std::runtime_error("EVP_DigestSignInit failed");
     }
 
-    // ¸üĞÂÊı¾İ
+    // æ›´æ–°æ•°æ®
     if (EVP_DigestSignUpdate(md_ctx, data.data(), data.size()) != 1) {
         EVP_MD_CTX_free(md_ctx);
         EVP_PKEY_free(pkey);
         throw std::runtime_error("EVP_DigestSignUpdate failed");
     }
 
-    // »ñÈ¡Ç©Ãû³¤¶È
+    // è·å–ç­¾åé•¿åº¦
     size_t sig_len;
     if (EVP_DigestSignFinal(md_ctx, nullptr, &sig_len) != 1) {
         EVP_MD_CTX_free(md_ctx);
@@ -39,7 +39,7 @@ std::string ECDSA::sign_es384(const std::string& data, EC_KEY* ec_key) {
         throw std::runtime_error("EVP_DigestSignFinal failed (1)");
     }
 
-    // Ö´ĞĞÇ©Ãû
+    // æ‰§è¡Œç­¾å
     std::vector<unsigned char> sig(sig_len);
     if (EVP_DigestSignFinal(md_ctx, sig.data(), &sig_len) != 1) {
         EVP_MD_CTX_free(md_ctx);
@@ -48,9 +48,9 @@ std::string ECDSA::sign_es384(const std::string& data, EC_KEY* ec_key) {
     }
 
     EVP_MD_CTX_free(md_ctx);
-    EVP_PKEY_free(pkey);  // ×¢Òâ£ºÕâÀï»áÊÍ·Å EC_KEY£¬Èç¹û²»ĞèÒªÌáÇ°ÊÍ·Å£¬¿ÉÒÔ¸ÄÓÃ EVP_PKEY_up_ref
+    EVP_PKEY_free(pkey);  // æ³¨æ„ï¼šè¿™é‡Œä¼šé‡Šæ”¾ EC_KEYï¼Œå¦‚æœä¸éœ€è¦æå‰é‡Šæ”¾ï¼Œå¯ä»¥æ”¹ç”¨ EVP_PKEY_up_ref
 
-    // ×ª»» DER ¸ñÊ½£¨ECDSA Ç©ÃûÊÇ R|S ½á¹¹£©
+    // è½¬æ¢ DER æ ¼å¼ï¼ˆECDSA ç­¾åæ˜¯ R|S ç»“æ„ï¼‰
     ECDSA_SIG* ec_sig = ECDSA_SIG_new();
     const unsigned char* p = sig.data();
     if (d2i_ECDSA_SIG(&ec_sig, &p, sig_len) == nullptr) {
@@ -60,14 +60,14 @@ std::string ECDSA::sign_es384(const std::string& data, EC_KEY* ec_key) {
     const BIGNUM* r, * s;
     ECDSA_SIG_get0(ec_sig, &r, &s);
 
-    std::vector<unsigned char> r_bn(48);  // P-384 ÇúÏß£¬R ºÍ S ¸÷ 48 ×Ö½Ú
+    std::vector<unsigned char> r_bn(48);  // P-384 æ›²çº¿ï¼ŒR å’Œ S å„ 48 å­—èŠ‚
     std::vector<unsigned char> s_bn(48);
     BN_bn2binpad(r, r_bn.data(), 48);
     BN_bn2binpad(s, s_bn.data(), 48);
 
     ECDSA_SIG_free(ec_sig);
 
-    // ºÏ²¢ R ºÍ S
+    // åˆå¹¶ R å’Œ S
     std::vector<unsigned char> raw_sig;
     raw_sig.insert(raw_sig.end(), r_bn.begin(), r_bn.end());
     raw_sig.insert(raw_sig.end(), s_bn.begin(), s_bn.end());
@@ -76,7 +76,7 @@ std::string ECDSA::sign_es384(const std::string& data, EC_KEY* ec_key) {
 }
 void ECDSA::EVP_PKEY_AS_EC_KEY(EVP_PKEY* EVPKey, EC_KEY* ECKey) {
     if (EVP_PKEY_id(EVPKey) == EVP_PKEY_EC) {
-        // »ñÈ¡ EC_KEY (²»Ôö¼ÓÒıÓÃ¼ÆÊı)
+        // è·å– EC_KEY (ä¸å¢åŠ å¼•ç”¨è®¡æ•°)
         ECKey = EVP_PKEY_get1_EC_KEY(EVPKey);
     }
 }

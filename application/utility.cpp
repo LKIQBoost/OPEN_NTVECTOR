@@ -3,44 +3,45 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "utility.h"  // °üº¬Í·ÎÄ¼þ
+#include "utility.h"  // ï¿½ï¿½ï¿½ï¿½Í·ï¿½Ä¼ï¿½
 #include "Logger.h"
 #include "EasyUtils.cpp"
 PyObject* decrypt_with_tail(PyObject* self, PyObject* args) {
     char* data;
-    int length;
-    if (!PyArg_ParseTuple(args, "s#", &data, &length))
+    Py_ssize_t length;
+    if (!PyArg_ParseTuple(args, "y#", &data, &length))
         return NULL;
-    std::string text = Easy::decrypt_with_tail(std::string(data, length));
-    return PyString_FromStringAndSize(text.data(), text.size());
+    std::string text = Easy::decrypt_with_tail(std::string(data, (size_t)length));
+    return PyBytes_FromStringAndSize(text.data(), (Py_ssize_t)text.size());
 }
 PyObject* encrypt_with_tail(PyObject* self, PyObject* args) {
     char* data;
-    int length;
-    if (!PyArg_ParseTuple(args, "s#", &data, &length))
+    Py_ssize_t length;
+    if (!PyArg_ParseTuple(args, "y#", &data, &length))
         return NULL;
-    std::string text = Easy::encrypt_with_tail(std::string(data, length));
-    return PyString_FromStringAndSize(text.data(), text.size());
+    std::string text = Easy::encrypt_with_tail(std::string(data, (size_t)length));
+    return PyBytes_FromStringAndSize(text.data(), (Py_ssize_t)text.size());
 }
 PyObject* get_encrypt_token(PyObject* self, PyObject* args) {
     char* token;
-    int length;
+    Py_ssize_t length;
     char* url;
     char* body;
-    if (!PyArg_ParseTuple(args, "s#ss", &token, &length, &body, &url))
+    if (!PyArg_ParseTuple(args, "y#ss", &token, &length, &body, &url))
         return NULL;
-    std::string text = Easy::ComputeDynamicToken(std::string(token, length), body, url);
-    return PyString_FromStringAndSize(text.data(), text.size());
+    std::string text = Easy::ComputeDynamicToken(std::string(token, (size_t)length), body, url);
+    return PyBytes_FromStringAndSize(text.data(), (Py_ssize_t)text.size());
 }
 
 static PyMethodDef EngineMethods[] = {
     {"decrypt_with_tail", decrypt_with_tail, METH_VARARGS, "decrypt data"},
     {"encrypt_with_tail", encrypt_with_tail, METH_VARARGS, "encrypt data"},
     {"get_encrypt_token", get_encrypt_token, METH_VARARGS, "get http dynamic token"},
-    {NULL, NULL, 0, NULL} // ½áÊø±ê¼Ç
+    {NULL, NULL, 0, NULL} // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 
-// Ä£¿é³õÊ¼»¯º¯Êý
-void initutility(void) {
-    (void)Py_InitModule("utility", EngineMethods);
+// Module init (Python 3)
+static struct PyModuleDef utility_module = { PyModuleDef_HEAD_INIT, "utility", NULL, -1, EngineMethods };
+PyMODINIT_FUNC PyInit_utility(void) {
+    return PyModule_Create(&utility_module);
 }

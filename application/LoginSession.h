@@ -1,16 +1,16 @@
-#pragma once
+ï»¿#pragma once
 #include <openssl/evp.h>
 #include <string>
 
-// Ò»´Î³É¹¦µÇÂ¼µÄ²úÎï - Öµ¶ÔÏó
+// ä¸€æ¬¡æˆåŠŸç™»å½•çš„äº§ç‰© - å€¼å¯¹è±¡
 //
-// °üº¬ MC µÚÒ»¸ö LoginPacket ĞèÒªµÄËùÓĞÊı¾İ:
-//   - chain:    ·şÎñÆ÷ÏÂ·¢µÄÖ¤ÊéÁ´(ÒÑ±»±¾µØ reissue)
-//   - skinJwt:  Ç©ÁËÃûµÄÆ¤·ôÊı¾İ JWT
-//   - ecKey:    ÓÃÓÚºóĞø ECDH ÎÕÊÖµÄ¿Í»§¶Ë EC ÃÜÔ¿
+// åŒ…å« MC ç¬¬ä¸€ä¸ª LoginPacket éœ€è¦çš„æ‰€æœ‰æ•°æ®:
+//   - chain:    æœåŠ¡å™¨ä¸‹å‘çš„è¯ä¹¦é“¾(å·²è¢«æœ¬åœ° reissue)
+//   - skinJwt:  ç­¾äº†åçš„çš®è‚¤æ•°æ® JWT
+//   - ecKey:    ç”¨äºåç»­ ECDH æ¡æ‰‹çš„å®¢æˆ·ç«¯ EC å¯†é’¥
 //
-// ÓµÓĞ EVP_PKEY* µÄËùÓĞÈ¨,Îö¹¹Ê±ÊÍ·Å
-// ²»¿É¿½±´(EC ÃÜÔ¿²»ÄÜÁ½¸öËùÓĞÕß),¿ÉÒÆ¶¯
+// æ‹¥æœ‰ EVP_PKEY* çš„æ‰€æœ‰æƒ,ææ„æ—¶é‡Šæ”¾
+// ä¸å¯æ‹·è´(EC å¯†é’¥ä¸èƒ½ä¸¤ä¸ªæ‰€æœ‰è€…),å¯ç§»åŠ¨
 class LoginSession {
 public:
     LoginSession() = default;
@@ -41,14 +41,14 @@ public:
         return *this;
     }
 
-    // === MC LoginPacket ÓÃµÄ×Ö¶Î ===
+    // === MC LoginPacket ç”¨çš„å­—æ®µ ===
     std::string chain;
     std::string skinJwt;
 
-    // === ECDH ÎÕÊÖÓÃ ===
+    // === ECDH æ¡æ‰‹ç”¨ ===
     EVP_PKEY* getECKey() const { return m_ecKey; }
 
-    // ¹¤³§·½·¨×¨ÓÃ,×ªÒÆ EVP_PKEY ËùÓĞÈ¨
+    // å·¥å‚æ–¹æ³•ä¸“ç”¨,è½¬ç§» EVP_PKEY æ‰€æœ‰æƒ
     void setECKey(EVP_PKEY* key) {
         if (m_ecKey) EVP_PKEY_free(m_ecKey);
         m_ecKey = key;

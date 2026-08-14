@@ -1,4 +1,4 @@
 #pragma once
 #include "Python.h"
 
-void initpkt(void);
+PyMODINIT_FUNC PyInit_pkt(void);

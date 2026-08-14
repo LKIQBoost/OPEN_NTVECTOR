@@ -1,7 +1,7 @@
-#pragma once
+ï»¿#pragma once
 #include <stdint.h>
 
-// »ù±¾ÀàĞÍ¶¨Òå
+// åŸºæœ¬ç±»å‹å®šä¹‰
 /*
 typedef uint8_t  _BYTE;
 typedef uint16_t _WORD;
@@ -15,46 +15,46 @@ typedef uint8_t  unsigned __int8;
 typedef uint16_t unsigned __int16;
 typedef uint32_t unsigned __int32;
 typedef uint64_t unsigned __int64;*/
-// Ñ­»·ÒÆÎ»ºê
+// å¾ªç¯ç§»ä½å®
 #define __ROL4__(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
 #define __ROR4__(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
 #define __ROL8__(x, n) (((x) << (n)) | ((x) >> (64 - (n))))
 #define __ROR8__(x, n) (((x) >> (n)) | ((x) << (64 - (n))))
 
-// ¶ÔÓÚ¹Ì¶¨Î»ÒÆÊıµÄÇé¿ö¿ÉÒÔ¶¨ÒåÌØ¶¨°æ±¾
+// å¯¹äºå›ºå®šä½ç§»æ•°çš„æƒ…å†µå¯ä»¥å®šä¹‰ç‰¹å®šç‰ˆæœ¬
 #define __ROL4_1__(x)  (((x) << 1) | ((x) >> 31))
 #define __ROR4_1__(x)  (((x) >> 1) | ((x) << 31))
-// 64Î»ÖµµÄ¸ßµÍÎ»·ÖÀë
+// 64ä½å€¼çš„é«˜ä½ä½åˆ†ç¦»
 #define LODWORD(x) ((uint32_t)((x) & 0xFFFFFFFF))
 #define HIDWORD(x) ((uint32_t)(((x) >> 32) & 0xFFFFFFFF))
 
-// 32Î»ÖµµÄ¸ßµÍÎ»·ÖÀë
+// 32ä½å€¼çš„é«˜ä½ä½åˆ†ç¦»
 #define LOWORD(x)  ((uint16_t)((x) & 0xFFFF))
 #define HIWORD(x)  ((uint16_t)(((x) >> 16) & 0xFFFF))
 
-// 16Î»ÖµµÄ¸ßµÍÎ»·ÖÀë
+// 16ä½å€¼çš„é«˜ä½ä½åˆ†ç¦»
 #define LOBYTE(x)  ((uint8_t)((x) & 0xFF))
 #define HIBYTE(x)  ((uint8_t)(((x) >> 8) & 0xFF))
-// ×éºÏºê
+// ç»„åˆå®
 #define __PAIR64__(hi, lo) (((uint64_t)(hi) << 32) | (uint32_t)(lo))
 #define MAKEWORD(lo, hi)   ((uint16_t)(((uint8_t)(lo)) | ((uint16_t)((uint8_t)(hi))) << 8))
 #define MAKEDWORD(lo, hi)  ((uint32_t)(((uint16_t)(lo)) | ((uint32_t)((uint16_t)(hi))) << 16))
-// µ÷ÓÃÔ¼¶¨ºê(¸ù¾İ±àÒëÆ÷²»Í¬)
+// è°ƒç”¨çº¦å®šå®(æ ¹æ®ç¼–è¯‘å™¨ä¸åŒ)
 #ifdef _MSC_VER
 #define __cdecl    __cdecl
 #define __stdcall  __stdcall
 #define __fastcall __fastcall
 #define __thiscall __thiscall
 #else
-    // GCC/ClangµÈ±àÒëÆ÷
+    // GCC/Clangç­‰ç¼–è¯‘å™¨
 #define __cdecl    __attribute__((cdecl))
 #define __stdcall  __attribute__((stdcall))
 #define __fastcall __attribute__((fastcall))
-#define __thiscall // Í¨³£GCC²»Ö§³Öthiscall
+#define __thiscall // é€šå¸¸GCCä¸æ”¯æŒthiscall
 #endif
-// °²È«×ª»»ºê
+// å®‰å…¨è½¬æ¢å®
 #define SAFE_CAST(type, expr) ((type)(expr))
 
-// ´ø·ûºÅÀ©Õ¹µÄ×ª»»
+// å¸¦ç¬¦å·æ‰©å±•çš„è½¬æ¢
 #define SIGN_EXTEND_32(x, bits) (((int32_t)((x) << (32 - (bits)))) >> (32 - (bits)))
 #define SIGN_EXTEND_64(x, bits) (((int64_t)((x) << (64 - (bits)))) >> (64 - (bits)))

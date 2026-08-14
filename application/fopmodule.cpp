@@ -5,9 +5,9 @@
 
 static PyObject* find_file(PyObject* self, PyObject* args) {
 	char* fullname;
-	int length;
+	Py_ssize_t length;
 	char* path;
-	int length_;
+	Py_ssize_t length_;
 	if (!PyArg_ParseTuple(args, "s#s#", &fullname, &length, &path, &length_))
 		return NULL;
 	std::string fm(fullname, length);
@@ -26,16 +26,16 @@ static PyObject* find_file(PyObject* self, PyObject* args) {
 	std::string full_path;
 
 	if (pt.data() && pt.data()[0] != '\0') {
-		// Èç¹ûÌá¹©ÁËÂ·¾¶£¬½«Â·¾¶ºÍÎÄ¼þÃû×éºÏ
+		// ï¿½ï¿½ï¿½ï¿½á¹©ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		full_path = pt;
 
-		// È·±£Â·¾¶ÒÔ·Ö¸ô·û½áÎ²
+		// È·ï¿½ï¿½Â·ï¿½ï¿½ï¿½Ô·Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½Î²
 		
 
 		full_path += fm;
 	}
 	else {
-		// Èç¹ûÃ»ÓÐÌá¹©Â·¾¶£¬Ö±½ÓÊ¹ÓÃÎÄ¼þÃû
+		// ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½á¹©Â·ï¿½ï¿½ï¿½ï¿½Ö±ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½
 		full_path = fm;
 	}
 	Logger::getInstance().log(LOG_INFO, "[FOP] find_file: " + pt + " filename: " + fm);
@@ -43,9 +43,9 @@ static PyObject* find_file(PyObject* self, PyObject* args) {
 }
 static PyObject* get_file(PyObject* self, PyObject* args) {
 	char* fullname;
-	int length;
+	Py_ssize_t length;
 	char* path;
-	int length_;
+	Py_ssize_t length_;
 	if (!PyArg_ParseTuple(args, "s#s#", &fullname, &length, &path, &length_))
 		return NULL;
 	std::string fm(fullname, length);
@@ -66,10 +66,10 @@ static PyObject* get_file(PyObject* self, PyObject* args) {
 	std::string full_path;
 
 	if (pt.data() && pt.data()[0] != '\0') {
-		// Èç¹ûÌá¹©ÁËÂ·¾¶£¬½«Â·¾¶ºÍÎÄ¼þÃû×éºÏ
+		// ï¿½ï¿½ï¿½ï¿½á¹©ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 		full_path = pt;
-		// È·±£Â·¾¶ÒÔ·Ö¸ô·û½áÎ²
+		// È·ï¿½ï¿½Â·ï¿½ï¿½ï¿½Ô·Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½Î²
 		//if (full_path.back() != '/' && full_path.back() != '\\') {
 		//	full_path += '/';
 		//}
@@ -77,7 +77,7 @@ static PyObject* get_file(PyObject* self, PyObject* args) {
 		full_path += fm;
 	}
 	else {
-		// Èç¹ûÃ»ÓÐÌá¹©Â·¾¶£¬Ö±½ÓÊ¹ÓÃÎÄ¼þÃû
+		// ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½á¹©Â·ï¿½ï¿½ï¿½ï¿½Ö±ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½
 		full_path = fm;
 	}
 	Logger::getInstance().log(LOG_INFO, "[FOP] find_file: " + pt + " filename: " + fm);
@@ -85,10 +85,14 @@ static PyObject* get_file(PyObject* self, PyObject* args) {
 	if (mcp.empty())
 		return Py_None;
 	else
-		return PyString_FromStringAndSize((char*)mcp.data(), mcp.size());
+		return PyBytes_FromStringAndSize((char*)mcp.data(), (Py_ssize_t)mcp.size());
 }
 static PyObject* fop_new_module(const char* name, PyCodeObject* code, PyObject* path) {
-	PyObject* module = PyImport_ExecCodeModuleExPath((char*)name, (PyObject*)code, NULL, path);
+	const char* pathname = NULL;
+	if (path && path != Py_None) {
+		pathname = PyUnicode_AsUTF8(path);
+	}
+	PyObject* module = PyImport_ExecCodeModuleEx((char*)name, (PyObject*)code, pathname);
 
 	if (!module) {
 		return NULL;
@@ -102,48 +106,48 @@ static PyObject* fop_new_module1(const char* name, PyCodeObject* code, PyObject*
     PyObject* dict = NULL;
     PyObject* result = NULL;
 
-    // 1. ÏÈ»ñÈ¡ sys.modules
+    // 1. ï¿½È»ï¿½È¡ sys.modules
     sys_modules = PyImport_GetModuleDict();
     if (!sys_modules) {
         Py_INCREF(Py_None);
         return Py_None;
     }
 
-    // 2. ¼ì²éÄ£¿éÊÇ·ñÒÑ´æÔÚ
+    // 2. ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ñ´ï¿½ï¿½ï¿½
     module = PyDict_GetItemString(sys_modules, name);
     if (module) {
-        // Ä£¿éÒÑ´æÔÚ£¬Ö±½Ó·µ»Ø
+        // Ä£ï¿½ï¿½ï¿½Ñ´ï¿½ï¿½Ú£ï¿½Ö±ï¿½Ó·ï¿½ï¿½ï¿½
         Py_INCREF(module);
         return module;
     }
 
-    // 3. ´´½¨ÐÂÄ£¿é£¨²»Í¨¹ý PyImport_AddModule£¬ÎÒÃÇ×Ô¼ºÌí¼Ó£©
+    // 3. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½é£¨ï¿½ï¿½Í¨ï¿½ï¿½ PyImport_AddModuleï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½Ó£ï¿½
     module = PyModule_New(name);
     if (!module) {
         Py_INCREF(Py_None);
         return Py_None;
     }
 
-    // 4. Ìí¼Óµ½ sys.modules£¨¹Ø¼ü£ºÔÚÖ´ÐÐ´úÂëÇ°Ìí¼Ó£©
+    // 4. ï¿½ï¿½ï¿½Óµï¿½ sys.modulesï¿½ï¿½ï¿½Ø¼ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½Ð´ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½Ó£ï¿½
     if (PyDict_SetItemString(sys_modules, name, module) < 0) {
         Py_DECREF(module);
         Py_INCREF(Py_None);
         return Py_None;
     }
 
-    // 5. »ñÈ¡Ä£¿é×Öµä
+    // 5. ï¿½ï¿½È¡Ä£ï¿½ï¿½ï¿½Öµï¿½
     dict = PyModule_GetDict(module);
 
-    // 6. ÉèÖÃ __builtins__
+    // 6. ï¿½ï¿½ï¿½ï¿½ __builtins__
     PyObject* builtins = PyEval_GetBuiltins();
     if (builtins) {
         PyDict_SetItemString(dict, "__builtins__", builtins);
     }
 
-    // 7. ÉèÖÃ°üÂ·¾¶
+    // 7. ï¿½ï¿½ï¿½Ã°ï¿½Â·ï¿½ï¿½
     if (path && path != Py_None) {
         if (PyDict_SetItemString(dict, "__path__", path) < 0) {
-            // ÇåÀí£º´Ó sys.modules ÖÐÒÆ³ýÄ£¿é
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ sys.modules ï¿½ï¿½ï¿½Æ³ï¿½Ä£ï¿½ï¿½
             if (sys_modules) {
                 PyDict_DelItemString(sys_modules, name);
             }
@@ -153,9 +157,10 @@ static PyObject* fop_new_module1(const char* name, PyCodeObject* code, PyObject*
         }
     }
 
-    // 8. ÉèÖÃ __file__
-    if (PyDict_SetItemString(dict, "__file__", code->co_filename) < 0) {
-        // ÇåÀí£º´Ó sys.modules ÖÐÒÆ³ýÄ£¿é
+    // 8. set __file__ (Py3: code->co_filename is opaque; read the attribute)
+    PyObject* filename_obj = PyObject_GetAttrString((PyObject*)code, "co_filename");
+    if (PyDict_SetItemString(dict, "__file__", filename_obj) < 0) {
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ sys.modules ï¿½ï¿½ï¿½Æ³ï¿½Ä£ï¿½ï¿½
         if (sys_modules) {
             PyDict_DelItemString(sys_modules, name);
         }
@@ -164,18 +169,18 @@ static PyObject* fop_new_module1(const char* name, PyCodeObject* code, PyObject*
         return Py_None;
     }
 
-    // 9. ÉèÖÃ __name__
-    PyObject* name_obj = PyString_FromString(name);
+    // 9. set __name__
+    PyObject* name_obj = PyUnicode_FromString(name);
     if (name_obj) {
         PyDict_SetItemString(dict, "__name__", name_obj);
         Py_DECREF(name_obj);
     }
 
-    // 10. Ö´ÐÐ´úÂë - Ä£·Â PyImport_ExecCodeModuleEx
-    // ×¢Òâ£ºÕâÀïÊ¹ÓÃ PyEval_EvalCode£¬µ«Ä£¿éÒÑ¾­ÔÚ sys.modules ÖÐ
-    result = PyEval_EvalCode((PyCodeObject*)code, dict, dict);
+    // 10. Ö´ï¿½Ð´ï¿½ï¿½ï¿½ - Ä£ï¿½ï¿½ PyImport_ExecCodeModuleEx
+    // ×¢ï¿½â£ºï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ PyEval_EvalCodeï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ sys.modules ï¿½ï¿½
+    result = PyEval_EvalCode((PyObject*)code, dict, dict);
     if (!result) {
-        // ÇåÀí£º´Ó sys.modules ÖÐÒÆ³ýÄ£¿é
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ sys.modules ï¿½ï¿½ï¿½Æ³ï¿½Ä£ï¿½ï¿½
         if (sys_modules) {
             PyDict_DelItemString(sys_modules, name);
         }
@@ -185,12 +190,12 @@ static PyObject* fop_new_module1(const char* name, PyCodeObject* code, PyObject*
     }
     Py_DECREF(result);
 
-    // 11. ÖØÐÂ»ñÈ¡Ä£¿é£¨¿ÉÄÜ±»Ìæ»»£©
+    // 11. ï¿½ï¿½ï¿½Â»ï¿½È¡Ä£ï¿½é£¨ï¿½ï¿½ï¿½Ü±ï¿½ï¿½æ»»ï¿½ï¿½
     module = PyDict_GetItemString(sys_modules, name);
     if (!module) {
         PyErr_Format(PyExc_ImportError,
             "Loaded module %s not found in sys.modules", name);
-        // ÇåÀí£º´Ó sys.modules ÖÐÒÆ³ýÄ£¿é
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ sys.modules ï¿½ï¿½ï¿½Æ³ï¿½Ä£ï¿½ï¿½
         if (sys_modules) {
             PyDict_DelItemString(sys_modules, name);
         }
@@ -261,17 +266,17 @@ static PyObject* reload_mcp(PyObject* self, PyObject* args) {
 
 	std::string mcp(fullname, length);
 
-	// 1. ¼ì²éÊÇ·ñÒÑ¾­¼ÓÔØ¹ýÕâ¸öMCP
+	// 1. ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½Ø¹ï¿½ï¿½ï¿½ï¿½MCP
 	auto it = PythonRuntime::mod_file_system_map.find(mcp.c_str());
 	if (it == PythonRuntime::mod_file_system_map.end()) {
 		Logger::getInstance().log(LOG_WARN, std::string() + "[MCP] MCP file not found in map: " + mcp);
 		Py_RETURN_FALSE;
 	}
 
-	// 2. ÒÆ³ý¾ÉµÄ MCPFileSystem
+	// 2. ï¿½Æ³ï¿½ï¿½Éµï¿½ MCPFileSystem
 	PythonRuntime::mod_file_system_map.erase(it);
 
-	// 3. ÖØÐÂ´´½¨ MCPFileSystem
+	// 3. ï¿½ï¿½ï¿½Â´ï¿½ï¿½ï¿½ MCPFileSystem
 	MCPFileSystem PublicMCP(mcp.c_str());
 	PythonRuntime::mod_file_system_map.insert({ mcp.c_str(), PublicMCP });
 
@@ -289,12 +294,11 @@ fop_methods[] = {
     //{"load_mcp",  NULL, METH_VARARGS},
     {NULL,        NULL}		     /* sentinel */
 };
-//PyMODINIT_FUNC
-static void
-initfop(void)
+// Module init (Python 3). Must stay static: fopmodule.h #includes fopmodule.cpp,
+// so this file is compiled both standalone and inside PythonRuntime.cpp's TU.
+static struct PyModuleDef fop_module = { PyModuleDef_HEAD_INIT, "fop", NULL, -1, fop_methods };
+static PyObject*
+PyInit_fop(void)
 {
-	(void)Py_InitModule("fop", fop_methods);
-	if (PyErr_Warn(PyExc_DeprecationWarning,
-		"NULL") < 0)
-	return;
+	return PyModule_Create(&fop_module);
 }

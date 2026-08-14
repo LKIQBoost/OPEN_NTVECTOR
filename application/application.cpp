@@ -1,6 +1,5 @@
 // application.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
-#define Py_NO_ENABLE_SHARED  // 彻底禁用动态链接
-#define PYTHON_STATIC        // 强制静态链接
+#define Py_ENABLE_SHARED     // link against python312.dll (dynamic embedding)
 //#define Linker_NtUniSdk
 
 //#define Linker_EnvSdk

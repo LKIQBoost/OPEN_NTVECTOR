@@ -3,4 +3,4 @@
 
 #include <Python.h>
 
-void initwebsocket(void);
+PyMODINIT_FUNC PyInit__websocket(void);

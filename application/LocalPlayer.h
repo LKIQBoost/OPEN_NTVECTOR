@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include "BinaryWriter.h"
 #include "PlayerAuthInput.h"
 class LocalPlayer
@@ -9,11 +9,11 @@ public:
         inputData = std::vector<PlayerAuthInputData>();
     }
     __int64 EntityRuntimeID;
-    Vec2 headRotation;//Pitch ºÍ Yaw ±íÊ¾Íæ¼Ò±¨¸æµÄĞı×ª½Ç¶È
+    Vec2 headRotation;//Pitch å’Œ Yaw è¡¨ç¤ºç©å®¶æŠ¥å‘Šçš„æ—‹è½¬è§’åº¦
     Vec3 position;
-    Vec2 MoveVector;//±íÊ¾Íæ¼Ò±¨¸æµÄÒÆ¶¯ÏòÁ¿£¬Í¨³£ÊÇÒ»¸ö¶şÎ¬ÏòÁ¿£¬±íÊ¾Íæ¼ÒÔÚË®Æ½ÃæÉÏµÄÒÆ¶¯·½ÏòºÍËÙ¶È£¨¶¯Á¿£©
-    float headYaw;//±íÊ¾Íæ¼Ò±¨¸æµÄÍ·²¿Ë®Æ½Ğı×ª½Ç¶È
-    std::vector<PlayerAuthInputData> inputData;//±íÊ¾Íæ¼ÒµÄÊäÈëÊı¾İ£¬Í¨³£ÊÇÒ»¸ö°üº¬¶à¸ö PlayerAuthInputData Ã¶¾ÙÖµµÄÁĞ±í£¬±íÊ¾Íæ¼Òµ±Ç°µÄÊäÈë×´Ì¬
-    bool readyPosDeltaDirty;//ÊÇ·ñË¥ÂäÉËº¦£¬falseÊÇÓĞÉËº¦
+    Vec2 MoveVector;//è¡¨ç¤ºç©å®¶æŠ¥å‘Šçš„ç§»åŠ¨å‘é‡ï¼Œé€šå¸¸æ˜¯ä¸€ä¸ªäºŒç»´å‘é‡ï¼Œè¡¨ç¤ºç©å®¶åœ¨æ°´å¹³é¢ä¸Šçš„ç§»åŠ¨æ–¹å‘å’Œé€Ÿåº¦ï¼ˆåŠ¨é‡ï¼‰
+    float headYaw;//è¡¨ç¤ºç©å®¶æŠ¥å‘Šçš„å¤´éƒ¨æ°´å¹³æ—‹è½¬è§’åº¦
+    std::vector<PlayerAuthInputData> inputData;//è¡¨ç¤ºç©å®¶çš„è¾“å…¥æ•°æ®ï¼Œé€šå¸¸æ˜¯ä¸€ä¸ªåŒ…å«å¤šä¸ª PlayerAuthInputData æšä¸¾å€¼çš„åˆ—è¡¨ï¼Œè¡¨ç¤ºç©å®¶å½“å‰çš„è¾“å…¥çŠ¶æ€
+    bool readyPosDeltaDirty;//æ˜¯å¦è¡°è½ä¼¤å®³ï¼Œfalseæ˜¯æœ‰ä¼¤å®³
 };
 

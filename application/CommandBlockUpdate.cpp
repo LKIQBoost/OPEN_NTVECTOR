@@ -1,6 +1,6 @@
-#include "CommandBlockUpdate.h"
+ï»¿#include "CommandBlockUpdate.h"
 
-// ¸¨Öúº¯Êı£º¶ÁÈ¡ varuint64 (ÎŞ·ûºÅ±ä³¤ 64 Î»ÕûÊı)
+// è¾…åŠ©å‡½æ•°ï¼šè¯»å– varuint64 (æ— ç¬¦å·å˜é•¿ 64 ä½æ•´æ•°)
 static uint64_t ReadVarUInt64(BinaryReader& br) {
     uint64_t value;
     size_t len = BinaryWriter::varint_to_uint(
@@ -11,20 +11,20 @@ static uint64_t ReadVarUInt64(BinaryReader& br) {
     return value;
 }
 
-// ¸¨Öúº¯Êı£º¶ÁÈ¡ BlockPos (UBlockPos - Ê¹ÓÃ varint ±àÂë)
+// è¾…åŠ©å‡½æ•°ï¼šè¯»å– BlockPos (UBlockPos - ä½¿ç”¨ varint ç¼–ç )
 static BlockPos ReadUBlockPos(BinaryReader& br) {
     BlockPos pos;
-    // UBlockPos Ê¹ÓÃÓĞ·ûºÅ varint ±àÂë
+    // UBlockPos ä½¿ç”¨æœ‰ç¬¦å· varint ç¼–ç 
     pos.x = br.ReadVarInt();
-    pos.y = static_cast<int32_t>(br.ReadVarUInt());  // y Í¨³£ÊÇÎŞ·ûºÅµÄ
+    pos.y = static_cast<int32_t>(br.ReadVarUInt());  // y é€šå¸¸æ˜¯æ— ç¬¦å·çš„
     pos.z = br.ReadVarInt();
     return pos;
 }
 
-// ¸¨Öúº¯Êı£ºĞ´Èë BlockPos (UBlockPos - Ê¹ÓÃ varint ±àÂë)
+// è¾…åŠ©å‡½æ•°ï¼šå†™å…¥ BlockPos (UBlockPos - ä½¿ç”¨ varint ç¼–ç )
 static void WriteUBlockPos(BinaryWriter& bw, const BlockPos& pos) {
     bw.WriteVarInt(pos.x);
-    bw.WriteVarUInt(static_cast<uint32_t>(pos.y));  // y Ê¹ÓÃÎŞ·ûºÅ
+    bw.WriteVarUInt(static_cast<uint32_t>(pos.y));  // y ä½¿ç”¨æ— ç¬¦å·
     bw.WriteVarInt(pos.z);
 }
 
@@ -36,45 +36,48 @@ unsigned char CommandBlockUpdate::ID()
 void CommandBlockUpdate::Deserializ(std::vector<unsigned char> pack)
 {
     BinaryReader br(pack.data(), pack.size());
-    // 1. ¶ÁÈ¡ Block ±êÖ¾
+    // 1. è¯»å– Block æ ‡å¿—
     br.ReadBool(Block);
 
     if (Block) {
-        // ÎïÀíÃüÁî·½¿é
-        // 2. ¶ÁÈ¡ Position (UBlockPos)
+        // ç‰©ç†å‘½ä»¤æ–¹å—
+        // 2. è¯»å– Position (UBlockPos)
         Position = ReadUBlockPos(br);
 
-        // 3. ¶ÁÈ¡ Mode (varuint32)
+        // 3. è¯»å– Mode (varuint32)
         br.ReadVarUInt32(Mode);
 
-        // 4. ¶ÁÈ¡ NeedsRedstone (bool)
+        // 4. è¯»å– NeedsRedstone (bool)
         br.ReadBool(NeedsRedstone);
 
-        // 5. ¶ÁÈ¡ Conditional (bool)
+        // 5. è¯»å– Conditional (bool)
         br.ReadBool(Conditional);
     }
     else {
-        // ¿ó³µÖĞµÄÃüÁî·½¿é
-        // 2. ¶ÁÈ¡ MinecartEntityRuntimeID (varuint64)
+        // çŸ¿è½¦ä¸­çš„å‘½ä»¤æ–¹å—
+        // 2. è¯»å– MinecartEntityRuntimeID (varuint64)
         MinecartEntityRuntimeID = ReadVarUInt64(br);
     }
 
-    // 6. ¶ÁÈ¡ Command (string)
+    // 6. è¯»å– Command (string)
     Command = br.ReadString();
 
-    // 7. ¶ÁÈ¡ LastOutput (string)
+    // 7. è¯»å– LastOutput (string)
     LastOutput = br.ReadString();
 
-    // 8. ¶ÁÈ¡ Name (string)
+    // 8. è¯»å– Name (string)
     Name = br.ReadString();
 
-    // 9. ¶ÁÈ¡ ShouldTrackOutput (bool)
+    // 8.5. è¯»å– FilteredName (string) - 1.21.120 åè®®å­—æ®µ
+    FilteredName = br.ReadString();
+
+    // 9. è¯»å– ShouldTrackOutput (bool)
     br.ReadBool(ShouldTrackOutput);
 
-    // 10. ¶ÁÈ¡ TickDelay (uint32, ÍøÒ×°æ)
+    // 10. è¯»å– TickDelay (uint32, ç½‘æ˜“ç‰ˆ)
     TickDelay = br.ReadUInt32();
 
-    // 11. ¶ÁÈ¡ ExecuteOnFirstTick (bool)
+    // 11. è¯»å– ExecuteOnFirstTick (bool)
     br.ReadBool(ExecuteOnFirstTick);
 }
 
@@ -82,48 +85,52 @@ std::vector<unsigned char> CommandBlockUpdate::Serializ()
 {
     BinaryWriter bw(256);
 
-    bw.WriteUInt8(ID());
-    // 1. Ğ´Èë Block ±êÖ¾
+    // å†™å…¥æ•°æ®åŒ…ID - å¿…é¡»ç”¨ VarUInt ç¼–ç ï¼Œä¸æ˜¯ UInt8
+    bw.WriteVarUInt(ID());
+    // 1. å†™å…¥ Block æ ‡å¿—
     bw.WriteBool(Block);
 
     if (Block) {
-        // ÎïÀíÃüÁî·½¿é
-        // 2. Ğ´Èë Position (UBlockPos)
+        // ç‰©ç†å‘½ä»¤æ–¹å—
+        // 2. å†™å…¥ Position (UBlockPos)
         WriteUBlockPos(bw, Position);
 
-        // 3. Ğ´Èë Mode (varuint32)
+        // 3. å†™å…¥ Mode (varuint32)
         bw.WriteVarUInt32(Mode);
 
-        // 4. Ğ´Èë NeedsRedstone (bool)
+        // 4. å†™å…¥ NeedsRedstone (bool)
         bw.WriteBool(NeedsRedstone);
 
-        // 5. Ğ´Èë Conditional (bool)
+        // 5. å†™å…¥ Conditional (bool)
         bw.WriteBool(Conditional);
     }
     else {
-        // ¿ó³µÖĞµÄÃüÁî·½¿é
-        // 2. Ğ´Èë MinecartEntityRuntimeID (varuint64)
+        // çŸ¿è½¦ä¸­çš„å‘½ä»¤æ–¹å—
+        // 2. å†™å…¥ MinecartEntityRuntimeID (varuint64)
         uint8_t varIntBuf[10];
         size_t len = BinaryWriter::uint_to_varint(MinecartEntityRuntimeID, varIntBuf);
         bw.Write(varIntBuf, len);
     }
 
-    // 6. Ğ´Èë Command (string)
+    // 6. å†™å…¥ Command (string)
     bw.WriteStringUTF(Command);
 
-    // 7. Ğ´Èë LastOutput (string)
+    // 7. å†™å…¥ LastOutput (string)
     bw.WriteStringUTF(LastOutput);
 
-    // 8. Ğ´Èë Name (string)
+    // 8. å†™å…¥ Name (string)
     bw.WriteStringUTF(Name);
 
-    // 9. Ğ´Èë ShouldTrackOutput (bool)
+    // 8.5. å†™å…¥ FilteredName (string) - 1.21.120 åè®®å¿…éœ€å­—æ®µï¼Œç¼ºå¤±ä¼šå¯¼è‡´æœåŠ¡ç«¯è§£æé”™ä½è¢«è¸¢
+    bw.WriteStringUTF(FilteredName);
+
+    // 9. å†™å…¥ ShouldTrackOutput (bool)
     bw.WriteBool(ShouldTrackOutput);
 
-    // 10. Ğ´Èë TickDelay (uint32, ÍøÒ×°æ)
+    // 10. å†™å…¥ TickDelay (uint32, ç½‘æ˜“ç‰ˆ)
     bw.WriteUInt32(TickDelay);
 
-    // 11. Ğ´Èë ExecuteOnFirstTick (bool)
+    // 11. å†™å…¥ ExecuteOnFirstTick (bool)
     bw.WriteBool(ExecuteOnFirstTick);
 
     return bw.vect();

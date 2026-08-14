@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 //#define ZLIB_WINAPI
 /*
 #include <zlib.h>
@@ -40,23 +40,23 @@ public:
             return std::vector<uint8_t>();
         }
 
-        // ÉèÖÃÊäÈëÊı¾İ
+        // è®¾ç½®è¾“å…¥æ•°æ®
         stream.avail_in = static_cast<uInt>(data.size());
         stream.next_in = reinterpret_cast<Bytef*>(data.data());
 
-        // Ô¤·ÖÅä½á¹û»º³åÇø£ºÑ¹ËõÊı¾İ×î´ó´óĞ¡ + 1×Ö½ÚÍ·²¿
+        // é¢„åˆ†é…ç»“æœç¼“å†²åŒºï¼šå‹ç¼©æ•°æ®æœ€å¤§å¤§å° + 1å­—èŠ‚å¤´éƒ¨
         std::vector<uint8_t> result;
         size_t maxCompressedSize = deflateBound(&stream, static_cast<uLong>(data.size()));
-        result.resize(maxCompressedSize + 1);  // +1 ÎªÍ·²¿00×Ö½ÚÔ¤Áô¿Õ¼ä
+        result.resize(maxCompressedSize + 1);  // +1 ä¸ºå¤´éƒ¨00å­—èŠ‚é¢„ç•™ç©ºé—´
 
-        // ÔÚµÚÒ»¸öÎ»ÖÃĞ´Èë00×Ö½Ú
+        // åœ¨ç¬¬ä¸€ä¸ªä½ç½®å†™å…¥00å­—èŠ‚
         result[0] = 0x00;
 
-        // ÉèÖÃÊä³ö£º´ÓµÚ¶ş¸ö×Ö½Ú¿ªÊ¼
+        // è®¾ç½®è¾“å‡ºï¼šä»ç¬¬äºŒä¸ªå­—èŠ‚å¼€å§‹
         stream.avail_out = static_cast<uInt>(maxCompressedSize);
         stream.next_out = reinterpret_cast<Bytef*>(result.data() + 1);
 
-        // Ö´ĞĞÑ¹Ëõ
+        // æ‰§è¡Œå‹ç¼©
         ret = deflate(&stream, Z_FINISH);
         deflateEnd(&stream);
 
@@ -65,7 +65,7 @@ public:
             return std::vector<uint8_t>();
         }
 
-        // µ÷Õû´óĞ¡Îª£º1×Ö½ÚÍ·²¿ + Êµ¼ÊÑ¹ËõÊı¾İ´óĞ¡
+        // è°ƒæ•´å¤§å°ä¸ºï¼š1å­—èŠ‚å¤´éƒ¨ + å®é™…å‹ç¼©æ•°æ®å¤§å°
         result.resize(stream.total_out + 1);
 
         return result;
@@ -76,20 +76,20 @@ public:
             return std::vector<uint8_t>();
         }
 
-        // ¸ù¾İÍ·²¿×Ö½Ú½øĞĞ²»Í¬´¦Àí
+        // æ ¹æ®å¤´éƒ¨å­—èŠ‚è¿›è¡Œä¸åŒå¤„ç†
         uint8_t header = data[0];
 
         if (header == 0xFF) {
-            // Í·²¿ÊÇFF£ºÖ±½Ó·µ»ØÈ¥µôFFµÄÊı¾İ
+            // å¤´éƒ¨æ˜¯FFï¼šç›´æ¥è¿”å›å»æ‰FFçš„æ•°æ®
             if (data.size() <= 1) {
-                return std::vector<uint8_t>(); // Ö»ÓĞFF×Ö½Ú£¬·µ»Ø¿Õ
+                return std::vector<uint8_t>(); // åªæœ‰FFå­—èŠ‚ï¼Œè¿”å›ç©º
             }
             return std::vector<uint8_t>(data.begin() + 1, data.end());
         }
         else if (header == 0x00) {
-            // Í·²¿ÊÇ00£º½øĞĞDEFLATE½âÑ¹
+            // å¤´éƒ¨æ˜¯00ï¼šè¿›è¡ŒDEFLATEè§£å‹
             if (data.size() <= 1) {
-                return std::vector<uint8_t>(); // Ö»ÓĞ00×Ö½Ú£¬·µ»Ø¿Õ
+                return std::vector<uint8_t>(); // åªæœ‰00å­—èŠ‚ï¼Œè¿”å›ç©º
             }
 
             z_stream stream;
@@ -99,19 +99,19 @@ public:
             stream.avail_in = 0;
             stream.next_in = Z_NULL;
 
-            // Ê¹ÓÃÔ­Ê¼ DEFLATE ¸ñÊ½£¨ÎŞ zlib Í·Î²£©
+            // ä½¿ç”¨åŸå§‹ DEFLATE æ ¼å¼ï¼ˆæ—  zlib å¤´å°¾ï¼‰
             int ret = inflateInit2(&stream, -15);
             if (ret != Z_OK) {
                 Logger::getInstance().log(LOG_NETWORK, "inflateInit2 failed");
             }
 
-            // ÉèÖÃÊäÈëÊı¾İ£¨Ìø¹ıÍ·²¿µÄ00×Ö½Ú£©
+            // è®¾ç½®è¾“å…¥æ•°æ®ï¼ˆè·³è¿‡å¤´éƒ¨çš„00å­—èŠ‚ï¼‰
             stream.avail_in = static_cast<uInt>(data.size() - 1);
             stream.next_in = reinterpret_cast<Bytef*>(data.data() + 1);
 
-            // ×¼±¸Êä³ö»º³åÇø
+            // å‡†å¤‡è¾“å‡ºç¼“å†²åŒº
             std::vector<uint8_t> decompressed;
-            decompressed.resize((data.size() - 1) * 4); // ³õÊ¼¹À¼Æ´óĞ¡
+            decompressed.resize((data.size() - 1) * 4); // åˆå§‹ä¼°è®¡å¤§å°
 
             stream.avail_out = static_cast<uInt>(decompressed.size());
             stream.next_out = reinterpret_cast<Bytef*>(decompressed.data());
@@ -120,7 +120,7 @@ public:
 
             do {
                 if (stream.avail_out == 0) {
-                    // À©´óÊä³ö»º³åÇø
+                    // æ‰©å¤§è¾“å‡ºç¼“å†²åŒº
                     size_t old_size = decompressed.size();
                     decompressed.resize(old_size * 2);
                     stream.next_out = reinterpret_cast<Bytef*>(decompressed.data() + stream.total_out);
@@ -136,10 +136,10 @@ public:
 
             } while (ret != Z_STREAM_END);
 
-            // ÇåÀí×ÊÔ´
+            // æ¸…ç†èµ„æº
             inflateEnd(&stream);
 
-            // µ÷Õû´óĞ¡ÎªÊµ¼Ê½âÑ¹Êı¾İ
+            // è°ƒæ•´å¤§å°ä¸ºå®é™…è§£å‹æ•°æ®
             decompressed.resize(stream.total_out);
 
             return decompressed;
@@ -154,7 +154,7 @@ public:
         inflateInit(&stream);
 
         std::vector<uint8_t> output;
-        size_t buffer_size = 1024;  // ³õÊ¼»º³åÇø´óĞ¡
+        size_t buffer_size = 1024;  // åˆå§‹ç¼“å†²åŒºå¤§å°
         output.resize(buffer_size);
 
         stream.next_in = data.data();
@@ -167,7 +167,7 @@ public:
             ret = inflate(&stream, Z_NO_FLUSH);
 
             if (ret == Z_OK && stream.avail_out == 0) {
-                // »º³åÇøÒÑÂú£¬ĞèÒªÀ©Èİ
+                // ç¼“å†²åŒºå·²æ»¡ï¼Œéœ€è¦æ‰©å®¹
                 size_t old_size = output.size();
                 buffer_size *= 2;
                 output.resize(buffer_size);
@@ -181,7 +181,7 @@ public:
             return std::vector<uint8_t>();
         }
 
-        // µ÷Õûµ½Êµ¼Ê´óĞ¡
+        // è°ƒæ•´åˆ°å®é™…å¤§å°
         inflateEnd(&stream);
         return output;
     }

@@ -1,4 +1,4 @@
-#include "ZlibCompress.h"
+ï»¿#include "ZlibCompress.h"
 //#define ZLIB_WINAPI
 /*
 std::vector<uint8_t> ZlibCompress::Compress(std::vector<uint8_t> data)
@@ -22,7 +22,7 @@ std::vector<uint8_t> ZlibCompress::Decompress(std::vector<uint8_t> data)
     inflateInit(&stream);
 
     std::vector<uint8_t> output;
-    size_t buffer_size = 1024;  // ³õÊ¼»º³åÇø´óĞ¡
+    size_t buffer_size = 1024;  // åˆå§‹ç¼“å†²åŒºå¤§å°
     output.resize(buffer_size);
 
     stream.next_in = data.data();
@@ -35,7 +35,7 @@ std::vector<uint8_t> ZlibCompress::Decompress(std::vector<uint8_t> data)
         ret = inflate(&stream, Z_NO_FLUSH);
 
         if (ret == Z_OK && stream.avail_out == 0) {
-            // »º³åÇøÒÑÂú£¬ĞèÒªÀ©Èİ
+            // ç¼“å†²åŒºå·²æ»¡ï¼Œéœ€è¦æ‰©å®¹
             size_t old_size = output.size();
             buffer_size *= 2;
             output.resize(buffer_size);
@@ -49,7 +49,7 @@ std::vector<uint8_t> ZlibCompress::Decompress(std::vector<uint8_t> data)
         return std::vector<uint8_t>();
     }
 
-    // µ÷Õûµ½Êµ¼Ê´óĞ¡
+    // è°ƒæ•´åˆ°å®é™…å¤§å°
     inflateEnd(&stream);
     return output;
 }

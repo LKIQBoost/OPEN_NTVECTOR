@@ -1,6 +1,11 @@
-#include "CallbackManager.h"
+﻿#include "CallbackManager.h"
 #include "ClientInstance.h"
+#include "SubChunkClient.h"
 #include "PlayStatus.h"
+#include "ContainerOpen.h"
+#include "InventoryContent.h"
+#include "BlockActorData.h"
+#include "BlockDataStore.h"
 
 extern unsigned int MinecraftBedrockProtocolVersion;
 void CallbackManager::onNetworkSetting(ConnectInstance* m_session, std::vector<uint8_t> packet) {
@@ -93,7 +98,7 @@ void CallbackManager::onPlayStatus(ConnectInstance* m_session, std::vector<uint8
     // 7=FailedServerFullSubClient
     if (ps.Status != 0 && ps.Status != 3) {
         LOG(LOG_ERROR, "[Callback] PlayStatus indicates failure (", ps.Status, "), server will disconnect");
-        // 依然触发事件，让Python层可以感知
+        // 渚濈劧瑙﹀彂浜嬩欢锛岃Python灞傚彲浠ユ劅鐭?
         PythonEventEngine engine;
         engine.trigger("on_play_status", ps.Status);
         return;
@@ -224,7 +229,7 @@ void CallbackManager::onPyRpc(ConnectInstance* m_session, std::vector<uint8_t> p
     PyRpc rpc;
     rpc.Deserializ(packet);
     LOG(LOG_SCRIPTING, "[Callback] Triggering Python 'on_rpc' event, data size: ", rpc.rpcdata.size());
-    engine.trigger("on_rpc", rpc.rpcdata);
+    engine.triggerBytes("on_rpc", rpc.rpcdata);
 }
 
 void CallbackManager::onDisconnect(ConnectInstance* m_session, std::vector<uint8_t> packet)
@@ -315,9 +320,27 @@ void CallbackManager::onIDMoveActorAbsolute(ConnectInstance*, std::vector<uint8_
 {
     //std::cout << "onIDMoveActorAbsolute" << '\n';
 }
-void CallbackManager::onIDCorrectPlayerMovePrediction(ConnectInstance*, std::vector<uint8_t>)
+void CallbackManager::onIDCorrectPlayerMovePrediction(ConnectInstance* ctx, std::vector<uint8_t> data)
 {
-    //std::cout << "onIDCorrectPlayerMovePrediction" << '\n';
+    // MCBE 1.21.120 CorrectPlayerMovePrediction:
+    // prediction_type(u8) position(vec3f) delta(vec3f) rotation(vec2f)
+    // angular_velocity(option: 0x00 none / 0x01 + lf32) on_ground(bool) tick(varint64)
+    BinaryReader br(data.data(), (int)data.size());
+    unsigned char predictionType = br.ReadUInt8();   // 0=player, 1=vehicle
+    Vec3 pos = br.ReadVec3();
+    br.ReadVec3();                                    // delta, ignored
+    br.ReadVec2();                                    // rotation, ignored
+    if (br.ReadUInt8() != 0) {                        // optional angular velocity
+        br.ReadFloat();                               // ignored
+    }
+    bool onGround;
+    br.ReadBool(onGround);                            // ignored
+    br.ReadVarInt64();                                // tick, ignored
+
+    if (predictionType == 0) {
+        ctx->getClientInstance()->getLocalPlayer()->position = pos;
+    }
+    LOG(LOG_ENTITY, "[Callback] onIDCorrectPlayerMovePrediction - corrected position: ", pos.x, ", ", pos.y, ", ", pos.z);
 }
 void CallbackManager::onIDTickSync(ConnectInstance*, std::vector<uint8_t>)
 {
@@ -345,6 +368,29 @@ void CallbackManager::onIDRespawn(ConnectInstance* ctx, std::vector<uint8_t> s)
     PythonEventEngine engine;
     engine.trigger("on_respawn", rs.State, rs.EntityRuntimeID);
 }
+void CallbackManager::onContainerOpen(ConnectInstance* m_session, std::vector<uint8_t> packet) {
+    ContainerOpen pkt;
+    pkt.Deserializ(packet);
+    BlockDataStore::StoreContainerOpen(pkt.ToInfo());
+    LOG(LOG_INFO, "[Callback] onContainerOpen - window: ", (int)pkt.WindowID, " type: ", (int)pkt.WindowType, " pos: ", pkt.Position.x, ",", pkt.Position.y, ",", pkt.Position.z);
+}
+
+void CallbackManager::onInventoryContent(ConnectInstance* m_session, std::vector<uint8_t> packet) {
+    InventoryContent pkt;
+    pkt.Deserializ(packet);
+    BlockDataStore::StoreContainerContent(pkt.WindowID, pkt.Slots);
+    LOG(LOG_INFO, "[Callback] onInventoryContent - window: ", pkt.WindowID, " slots: ", pkt.Slots.size());
+}
+
+void CallbackManager::onBlockActorData(ConnectInstance* m_session, std::vector<uint8_t> packet) {
+    BlockActorData pkt;
+    pkt.Deserializ(packet);
+    BlockDataStore::StoreBlockActor(pkt.Position, pkt.RawNBT, pkt.NBTFields);
+}
+void CallbackManager::onSubChunk(ConnectInstance* m_session, std::vector<uint8_t> packet)
+{
+    SubChunkClient::OnPacket(packet);
+}
 void CallbackManager::runLoopAuthInput(ClientInstance* ctx)
 {
     PlayerAuthInput a;
@@ -354,7 +400,7 @@ void CallbackManager::runLoopAuthInput(ClientInstance* ctx)
     a.MoveVector.y = 0;
     a.headYaw = ctx->getLocalPlayer()->headYaw;
     a.inputData = ctx->getLocalPlayer()->inputData;
-    // �ڶ�����������ɺ�һ����ɾ��Ŀ��Ԫ�أ���������Ч��
+    // 锟节讹拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷珊锟揭伙拷锟斤拷锟缴撅拷锟侥匡拷锟皆拷兀锟斤拷锟斤拷锟斤拷锟斤拷锟叫э拷锟?
     ctx->getLocalPlayer()->inputData.erase(
         std::remove(ctx->getLocalPlayer()->inputData.begin(), ctx->getLocalPlayer()->inputData.end(), (PlayerAuthInputData)37),
         ctx->getLocalPlayer()->inputData.end()
@@ -365,6 +411,7 @@ void CallbackManager::runLoopAuthInput(ClientInstance* ctx)
     a.InputMode = MOUSE;
     a.playMode = 0;
     a.playMode = 0;
+    a.interactionModel = 0;   // 必须显式赋值：未初始化(Release 下随机)会写入垃圾 varint，导致 auth input 后续字段解析错位、整包被服务器丢弃
     a.interactPitch = 0;
     a.interactYaw = 0;
     a.Tick = ctx->getTick();

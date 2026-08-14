@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <functional>
 #include <thread>
 #include <memory>
@@ -12,16 +12,16 @@
 class ClientInstance
 {
 public:
-    ClientInstance() = default;   // ÓÃÀàÄÚ³õÊ¼»¯ + LocalPlayer Ä¬ÈÏ¹¹Ôì,²»ĞèÒª memset
+    ClientInstance() = default;   // ç”¨ç±»å†…åˆå§‹åŒ– + LocalPlayer é»˜è®¤æ„é€ ,ä¸éœ€è¦ memset
     ~ClientInstance() {
-        m_is_disconnect = true;   // Í¨Öª BaseTick ÍË³ö
+        m_is_disconnect = true;   // é€šçŸ¥ BaseTick é€€å‡º
         if (m_baseTick.joinable()) {
-            m_baseTick.join();    // µÈÏß³ÌÍËÍê
+            m_baseTick.join();    // ç­‰çº¿ç¨‹é€€å®Œ
         }
-        // m_connection / m_localPlayer / m_session_info ÓÉ unique_ptr ×Ô¶¯ÊÍ·Å
+        // m_connection / m_localPlayer / m_session_info ç”± unique_ptr è‡ªåŠ¨é‡Šæ”¾
     }
-    // === RakNet Â·¾¶ ===
-    // session: ÒÑÍê³ÉµÇÂ¼µÄ²úÎï,ËùÓĞÈ¨ÒÆ½»½øÀ´
+    // === RakNet è·¯å¾„ ===
+    // session: å·²å®Œæˆç™»å½•çš„äº§ç‰©,æ‰€æœ‰æƒç§»äº¤è¿›æ¥
     void startUp(LoginSession session, std::string server_ip, int server_port) {
         if (Params::logger)
             std::cout << session.chain << std::endl;
@@ -38,7 +38,7 @@ public:
             m_session_info.chain,
             m_session_info.skinJwt,
             server_ip, server_port,
-            m_session_info.getECKey(),   // ½èÓÃ,LoginSession ÈÔÊÇËùÓĞÕß
+            m_session_info.getECKey(),   // å€Ÿç”¨,LoginSession ä»æ˜¯æ‰€æœ‰è€…
             this);
 
         SocketInitialize();
@@ -49,7 +49,7 @@ public:
         m_connection->Connect();
     }
 
-    // === NetherNet Â·¾¶(ÔİÊ±±£Áô¾ÉÂß¼­,»ØÍ·ÔÙÇ¨) ===
+    // === NetherNet è·¯å¾„(æš‚æ—¶ä¿ç•™æ—§é€»è¾‘,å›å¤´å†è¿) ===
     void startUp_NetherNet(LoginSession session,
         std::string host_nethernet_id,
         std::string from_nethernet_id,
@@ -145,14 +145,18 @@ private:
         m_connection->RegisterReceiveCallBack(IDDisconnect, CallbackManager::onDisconnect);
         m_connection->RegisterReceiveCallBack(IDStartGame, CallbackManager::onStartGame);
         m_connection->RegisterReceiveCallBack(IDPyRpc, CallbackManager::onPyRpc);
+        m_connection->RegisterReceiveCallBack(IDContainerOpen, CallbackManager::onContainerOpen);
+        m_connection->RegisterReceiveCallBack(IDInventoryContent, CallbackManager::onInventoryContent);
+        m_connection->RegisterReceiveCallBack(IDBlockActorData, CallbackManager::onBlockActorData);
+        m_connection->RegisterReceiveCallBack(IDSubChunk, CallbackManager::onSubChunk);
         //m_connection->RegisterReceiveCallBack(IDText, CallbackManager::onText);
         //m_connection->RegisterReceiveCallBack(IDAddPlayer, CallbackManager::onAddPlayer);
         //m_connection->RegisterReceiveCallBack(IDPlayerList, CallbackManager::onPlayerList);
         //m_connection->RegisterReceiveCallBack(IDDeathInfo, CallbackManager::onDeathInfo);
         //m_connection->RegisterReceiveCallBack(IDCommandOutput, CallbackManager::onIDCommandOutput);
-        //m_connection->RegisterReceiveCallBack(IDMovePlayer, CallbackManager::onIDMovePlayer);
+        m_connection->RegisterReceiveCallBack(IDMovePlayer, CallbackManager::onIDMovePlayer);
         //m_connection->RegisterReceiveCallBack(IDMoveActorAbsolute, CallbackManager::onIDMoveActorAbsolute);
-        //m_connection->RegisterReceiveCallBack(IDCorrectPlayerMovePrediction, CallbackManager::onIDCorrectPlayerMovePrediction);
+        m_connection->RegisterReceiveCallBack(IDCorrectPlayerMovePrediction, CallbackManager::onIDCorrectPlayerMovePrediction);
         //m_connection->RegisterReceiveCallBack(IDTickSync, CallbackManager::onIDTickSync);
         //m_connection->RegisterReceiveCallBack(IDUpdatePlayerGameType, CallbackManager::onIDUpdatePlayerGameType);
         //m_connection->RegisterReceiveCallBack(IDSetHealth, CallbackManager::onIDSetHealth);
@@ -160,8 +164,8 @@ private:
         LOG(LOG_INFO, "[ClientInstance] SocketInitialize - All packet callbacks registered");
     }
 
-    // ¡ï ÉùÃ÷Ë³ĞòÖØÒª - LoginSession ×îÏÈÉùÃ÷ ¡ú ×îºóÎö¹¹(»î×î¾Ã)
-    //                    m_connection ÔÚËüÖ®ºó ¡ú ÔçÒ»²½Îö¹¹(Ëü½èÓÃ m_session_info µÄ ecKey)
+    // â˜… å£°æ˜é¡ºåºé‡è¦ - LoginSession æœ€å…ˆå£°æ˜ â†’ æœ€åææ„(æ´»æœ€ä¹…)
+    //                    m_connection åœ¨å®ƒä¹‹å â†’ æ—©ä¸€æ­¥ææ„(å®ƒå€Ÿç”¨ m_session_info çš„ ecKey)
     LoginSession                     m_session_info;
     std::unique_ptr<ConnectInstance> m_connection;
     std::unique_ptr<LocalPlayer>     m_localPlayer = std::make_unique<LocalPlayer>();

@@ -6,9 +6,9 @@
 extern "C" {
 #endif
 
-	// PythonÄ£¿é³õÊ¼»¯º¯Êý
+	// PythonÄ£ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	//PyMODINIT_FUNC initengine(void);
-	void initmod_log(void);
+	PyMODINIT_FUNC PyInit_mod_log(void);
 
 #ifdef __cplusplus
 }

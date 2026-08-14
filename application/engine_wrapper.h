@@ -8,6 +8,7 @@
 #include "CommandOutput.h"
 #include "PlayerList.h"
 #include "Respawn.h"
+#include "Py3Compat.h"
 
 extern "C" {
     void trigger_event(const char* event_name, PyObject* args_array);
@@ -104,6 +105,22 @@ public:
         trigger_event(event_name.c_str(), args);
     }
 
+    // Trigger an event whose payload is raw binary (rpc data, packet bytes).
+    // In Py3 the std::string overload would decode it as UTF-8 into str, so we
+    // deliver it as bytes explicitly. trigger_event REQUIRES a list/tuple
+    // argument (it silently drops non-list args), so wrap the bytes in a list.
+    void triggerBytes(const std::string& event_name, const std::string& binary) {
+        PyGILState_STATE gstate = PyGILState_Ensure();
+        PyObject* b = PyBytes_FromStringAndSize(binary.data(), (Py_ssize_t)binary.size());
+        if (b) {
+            PyObject* args = PyList_New(1);
+            PyList_SetItem(args, 0, b);   // steals the reference to b
+            trigger_event(event_name.c_str(), args);
+            Py_DECREF(args);
+        }
+        PyGILState_Release(gstate);
+    }
+
 private:
     // �ݹ���ֹ����
     void addArgumentsToList(PyObject* list, int index) {
@@ -120,11 +137,11 @@ private:
 
     // ����ת������
     PyObject* convertToPythonObject(int value) {
-        return PyInt_FromLong(value);
+        return PyLong_FromLong(value);
     }
 
     PyObject* convertToPythonObject(long value) {
-        return PyInt_FromLong(value);
+        return PyLong_FromLong(value);
     }
 
     PyObject* convertToPythonObject(uint64_t value) {
@@ -150,7 +167,7 @@ private:
         {
             // 2.1 ��C++ std::string ת Python2.7 str����
             // PyString_FromString ��Python2.7ר��API��ר��ת const char* -> Python str
-            PyObject* py_str = PyString_FromString(it->c_str());
+            PyObject* py_str = PyTextFromUtf8(it->c_str());
             if (py_str == NULL) {
                 // �ַ���ת��ʧ�ܣ��ͷ��Ѵ�����Python���󣬷�ֹ�ڴ�й©
                 Py_DECREF(py_list);
@@ -179,15 +196,15 @@ private:
     }
 
     PyObject* convertToPythonObject(const char* value) {
-        return PyString_FromString(value);
+        return PyTextFromUtf8(value);
     }
 
     PyObject* convertToPythonObject(const std::string& value) {
-        return PyString_FromStringAndSize(value.c_str(), value.size());
+        return PyTextFromUtf8(value.c_str(), (Py_ssize_t)value.size());
     }
 
     PyObject* convertToPythonObject(const std::vector<uint8_t>& value) {
-        return PyString_FromString(std::string(value.begin(), value.end()).c_str());
+        return PyBytes_FromStringAndSize((const char*)value.data(), (Py_ssize_t)value.size());
     }
 
     PyObject* convertToPythonObject(bool value) {
@@ -212,7 +229,7 @@ private:
             uuid[6], uuid[7],
             uuid[8], uuid[9],
             uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]);
-        return PyString_FromString(hex_str);
+        return PyTextFromUtf8(hex_str);
     }
 
     // 将 CommandOrigin 转换为 Python 字典
@@ -224,7 +241,7 @@ private:
         }
 
         // Origin 类型
-        PyObject* py_origin = PyInt_FromLong(origin.Origin);
+        PyObject* py_origin = PyLong_FromLong(origin.Origin);
         PyDict_SetItemString(dict, "origin", py_origin);
         Py_DECREF(py_origin);
 
@@ -234,7 +251,7 @@ private:
         Py_DECREF(py_uuid);
 
         // RequestID
-        PyObject* py_request_id = PyString_FromString(origin.RequestID.c_str());
+        PyObject* py_request_id = PyTextFromUtf8(origin.RequestID.c_str());
         PyDict_SetItemString(dict, "request_id", py_request_id);
         Py_DECREF(py_request_id);
 
@@ -260,14 +277,14 @@ private:
         Py_DECREF(py_success);
 
         // Message
-        PyObject* py_message = PyString_FromString(msg.Message.c_str());
+        PyObject* py_message = PyTextFromUtf8(msg.Message.c_str());
         PyDict_SetItemString(dict, "message", py_message);
         Py_DECREF(py_message);
 
         // Parameters (字符串列表)
         PyObject* py_params = PyList_New(msg.Parameters.size());
         for (size_t i = 0; i < msg.Parameters.size(); i++) {
-            PyObject* py_param = PyString_FromString(msg.Parameters[i].c_str());
+            PyObject* py_param = PyTextFromUtf8(msg.Parameters[i].c_str());
             PyList_SetItem(py_params, i, py_param); // SetItem steals reference
         }
         PyDict_SetItemString(dict, "parameters", py_params);
@@ -306,12 +323,12 @@ private:
         Py_DECREF(py_origin);
 
         // OutputType
-        PyObject* py_output_type = PyInt_FromLong(output.OutputType);
+        PyObject* py_output_type = PyLong_FromLong(output.OutputType);
         PyDict_SetItemString(dict, "output_type", py_output_type);
         Py_DECREF(py_output_type);
 
         // SuccessCount
-        PyObject* py_success_count = PyInt_FromLong(output.SuccessCount);
+        PyObject* py_success_count = PyLong_FromLong(output.SuccessCount);
         PyDict_SetItemString(dict, "success_count", py_success_count);
         Py_DECREF(py_success_count);
 
@@ -321,7 +338,7 @@ private:
         Py_DECREF(py_messages);
 
         // DataSet (仅当 OutputType == 4 时有值)
-        PyObject* py_dataset = PyString_FromString(output.DataSet.c_str());
+        PyObject* py_dataset = PyTextFromUtf8(output.DataSet.c_str());
         PyDict_SetItemString(dict, "data_set", py_dataset);
         Py_DECREF(py_dataset);
 
@@ -339,50 +356,50 @@ private:
         }
 
         // SkinID
-        PyObject* py_skin_id = PyString_FromString(skin.SkinID.c_str());
+        PyObject* py_skin_id = PyTextFromUtf8(skin.SkinID.c_str());
         PyDict_SetItemString(dict, "skin_id", py_skin_id);
         Py_DECREF(py_skin_id);
 
         // PlayFabID
-        PyObject* py_playfab_id = PyString_FromString(skin.PlayFabID.c_str());
+        PyObject* py_playfab_id = PyTextFromUtf8(skin.PlayFabID.c_str());
         PyDict_SetItemString(dict, "playfab_id", py_playfab_id);
         Py_DECREF(py_playfab_id);
 
         // 皮肤图像尺寸
-        PyObject* py_skin_width = PyInt_FromLong(skin.SkinImageWidth);
+        PyObject* py_skin_width = PyLong_FromLong(skin.SkinImageWidth);
         PyDict_SetItemString(dict, "skin_image_width", py_skin_width);
         Py_DECREF(py_skin_width);
 
-        PyObject* py_skin_height = PyInt_FromLong(skin.SkinImageHeight);
+        PyObject* py_skin_height = PyLong_FromLong(skin.SkinImageHeight);
         PyDict_SetItemString(dict, "skin_image_height", py_skin_height);
         Py_DECREF(py_skin_height);
 
         // 披风图像尺寸
-        PyObject* py_cape_width = PyInt_FromLong(skin.CapeImageWidth);
+        PyObject* py_cape_width = PyLong_FromLong(skin.CapeImageWidth);
         PyDict_SetItemString(dict, "cape_image_width", py_cape_width);
         Py_DECREF(py_cape_width);
 
-        PyObject* py_cape_height = PyInt_FromLong(skin.CapeImageHeight);
+        PyObject* py_cape_height = PyLong_FromLong(skin.CapeImageHeight);
         PyDict_SetItemString(dict, "cape_image_height", py_cape_height);
         Py_DECREF(py_cape_height);
 
         // CapeID
-        PyObject* py_cape_id = PyString_FromString(skin.CapeID.c_str());
+        PyObject* py_cape_id = PyTextFromUtf8(skin.CapeID.c_str());
         PyDict_SetItemString(dict, "cape_id", py_cape_id);
         Py_DECREF(py_cape_id);
 
         // FullID
-        PyObject* py_full_id = PyString_FromString(skin.FullID.c_str());
+        PyObject* py_full_id = PyTextFromUtf8(skin.FullID.c_str());
         PyDict_SetItemString(dict, "full_id", py_full_id);
         Py_DECREF(py_full_id);
 
         // ArmSize
-        PyObject* py_arm_size = PyString_FromString(skin.ArmSize.c_str());
+        PyObject* py_arm_size = PyTextFromUtf8(skin.ArmSize.c_str());
         PyDict_SetItemString(dict, "arm_size", py_arm_size);
         Py_DECREF(py_arm_size);
 
         // SkinColour
-        PyObject* py_skin_colour = PyString_FromString(skin.SkinColour.c_str());
+        PyObject* py_skin_colour = PyTextFromUtf8(skin.SkinColour.c_str());
         PyDict_SetItemString(dict, "skin_colour", py_skin_colour);
         Py_DECREF(py_skin_colour);
 
@@ -400,19 +417,19 @@ private:
         Py_DECREF(py_trusted);
 
         // 动画数量 (网易版直接存储数量)
-        PyObject* py_anim_count = PyInt_FromLong(skin.AnimationCount);
+        PyObject* py_anim_count = PyLong_FromLong(skin.AnimationCount);
         PyDict_SetItemString(dict, "animation_count", py_anim_count);
         Py_DECREF(py_anim_count);
 
         // SkinResourcePatch
-        PyObject* py_resource_patch = PyString_FromString(skin.SkinResourcePatch.c_str());
+        PyObject* py_resource_patch = PyTextFromUtf8(skin.SkinResourcePatch.c_str());
         PyDict_SetItemString(dict, "skin_resource_patch", py_resource_patch);
         Py_DECREF(py_resource_patch);
 
         // Persona 部件列表 (网易版是字符串列表)
         PyObject* py_pieces = PyList_New(skin.PersonaPieces.size());
         for (size_t i = 0; i < skin.PersonaPieces.size(); i++) {
-            PyObject* py_piece = PyString_FromString(skin.PersonaPieces[i].c_str());
+            PyObject* py_piece = PyTextFromUtf8(skin.PersonaPieces[i].c_str());
             PyList_SetItem(py_pieces, i, py_piece);
         }
         PyDict_SetItemString(dict, "persona_pieces", py_pieces);
@@ -421,7 +438,7 @@ private:
         // Persona 颜色列表
         PyObject* py_tints = PyList_New(skin.PieceTintColours.size());
         for (size_t i = 0; i < skin.PieceTintColours.size(); i++) {
-            PyObject* py_tint = PyString_FromString(skin.PieceTintColours[i].c_str());
+            PyObject* py_tint = PyTextFromUtf8(skin.PieceTintColours[i].c_str());
             PyList_SetItem(py_tints, i, py_tint);
         }
         PyDict_SetItemString(dict, "piece_tint_colours", py_tints);
@@ -450,28 +467,28 @@ private:
 
         // EntityUniqueID*Py
 
-        PyObject* py_entity_id_ = PyString_FromString(std::to_string(~entry.EntityUniqueID >> 1).c_str());
+        PyObject* py_entity_id_ = PyTextFromUtf8(std::to_string(~entry.EntityUniqueID >> 1).c_str());
         //PyObject* py_entity_id_ = PyLong_FromLongLong(~entry.EntityUniqueID >> 1);
         PyDict_SetItemString(dict, "entity_unique_id_netease", py_entity_id_);
         Py_DECREF(py_entity_id_);
 
         // Username
-        PyObject* py_username = PyString_FromString(entry.Username.c_str());
+        PyObject* py_username = PyTextFromUtf8(entry.Username.c_str());
         PyDict_SetItemString(dict, "username", py_username);
         Py_DECREF(py_username);
 
         // XUID
-        PyObject* py_xuid = PyString_FromString(entry.XUID.c_str());
+        PyObject* py_xuid = PyTextFromUtf8(entry.XUID.c_str());
         PyDict_SetItemString(dict, "xuid", py_xuid);
         Py_DECREF(py_xuid);
 
         // PlatformChatID
-        PyObject* py_platform_chat_id = PyString_FromString(entry.PlatformChatID.c_str());
+        PyObject* py_platform_chat_id = PyTextFromUtf8(entry.PlatformChatID.c_str());
         PyDict_SetItemString(dict, "platform_chat_id", py_platform_chat_id);
         Py_DECREF(py_platform_chat_id);
 
         // BuildPlatform
-        PyObject* py_build_platform = PyInt_FromLong(entry.BuildPlatform);
+        PyObject* py_build_platform = PyLong_FromLong(entry.BuildPlatform);
         PyDict_SetItemString(dict, "build_platform", py_build_platform);
         Py_DECREF(py_build_platform);
 
@@ -496,7 +513,7 @@ private:
         Py_DECREF(py_sub_client);
 
         // Unknown (网易特有)
-        PyObject* py_unknown = PyInt_FromLong(entry.Unknown);
+        PyObject* py_unknown = PyLong_FromLong(entry.Unknown);
         PyDict_SetItemString(dict, "unknown", py_unknown);
         Py_DECREF(py_unknown);
 
@@ -528,13 +545,13 @@ private:
         }
 
         // ActionType
-        PyObject* py_action_type = PyInt_FromLong(playerList.ActionType);
+        PyObject* py_action_type = PyLong_FromLong(playerList.ActionType);
         PyDict_SetItemString(dict, "action_type", py_action_type);
         Py_DECREF(py_action_type);
 
         // ActionType 字符串表示
         const char* action_str = (playerList.ActionType == PlayerListActionAdd) ? "add" : "remove";
-        PyObject* py_action_str = PyString_FromString(action_str);
+        PyObject* py_action_str = PyTextFromUtf8(action_str);
         PyDict_SetItemString(dict, "action", py_action_str);
         Py_DECREF(py_action_str);
 
@@ -544,7 +561,7 @@ private:
         Py_DECREF(py_entries);
 
         // 条目数量
-        PyObject* py_count = PyInt_FromLong(static_cast<long>(playerList.Entries.size()));
+        PyObject* py_count = PyLong_FromLong(static_cast<long>(playerList.Entries.size()));
         PyDict_SetItemString(dict, "count", py_count);
         Py_DECREF(py_count);
 
@@ -590,12 +607,12 @@ private:
         Py_DECREF(py_position);
 
         // State
-        PyObject* py_state = PyInt_FromLong(respawn.State);
+        PyObject* py_state = PyLong_FromLong(respawn.State);
         PyDict_SetItemString(dict, "state", py_state);
         Py_DECREF(py_state);
 
         // State 字符串表示
-        PyObject* py_state_str = PyString_FromString(respawn.GetStateString());
+        PyObject* py_state_str = PyTextFromUtf8(respawn.GetStateString());
         PyDict_SetItemString(dict, "state_string", py_state_str);
         Py_DECREF(py_state_str);
 

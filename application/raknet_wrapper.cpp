@@ -215,9 +215,9 @@ extern "C" {
         const char* host;
         unsigned short port;
         const char* password = NULL;
-        int passwordLen = 0;
+        Py_ssize_t passwordLen = 0;
 
-        if (!PyArg_ParseTuple(args, "sH|s#", &host, &port, &password, &passwordLen))
+        if (!PyArg_ParseTuple(args, "sH|y#", &host, &port, &password, &passwordLen))
             return NULL;
 
         if (!self->peer) {
@@ -246,12 +246,12 @@ extern "C" {
     // Send - �������ݣ��Զ�����0xfeͷ
     static PyObject* raknet_send(PyRakNet* self, PyObject* args) {
         const char* data;
-        int length;
+        Py_ssize_t length;
         int priority = 0;      // MEDIUM_PRIORITY
         int reliability = 2;   // UNRELIABLE
         char orderingChannel = 0;
 
-        if (!PyArg_ParseTuple(args, "s#|iib", &data, &length, &priority, &reliability, &orderingChannel))
+        if (!PyArg_ParseTuple(args, "y#|iib", &data, &length, &priority, &reliability, &orderingChannel))
             return NULL;
 
         if (!self->peer) {
@@ -287,7 +287,7 @@ extern "C" {
         PyMem_Free(send_buffer);
         Logger::getInstance().log(LOG_RAKNET, std::string() + "[RakNet] Sent " + std::to_string(length) +
             " bytes, instance_id: " + std::to_string(self->instance_id));
-        return PyInt_FromLong(result);
+        return PyLong_FromLong(result);
     }
 
     // Receive - ����ͬ���ӿڣ���ֻ����״̬
@@ -305,7 +305,7 @@ extern "C" {
         result[0] = 0;  // ״̬0�������ݣ�����ʹ�ûص���
         memset(result + 1, 0, requestedLength);
 
-        PyObject* ret = PyString_FromStringAndSize(result, requestedLength + 1);
+        PyObject* ret = PyBytes_FromStringAndSize(result, requestedLength + 1);
         PyMem_Free(result);
 
         return ret;
@@ -351,7 +351,7 @@ extern "C" {
 
     // ��ȡʵ��ID
     static PyObject* raknet_get_instance_id(PyRakNet* self, PyObject* args) {
-        return PyInt_FromLong(self->instance_id);
+        return PyLong_FromLong(self->instance_id);
     }
 
     // ��������
@@ -366,48 +366,8 @@ extern "C" {
         {NULL, NULL, 0, NULL}
     };
 
-    // ���Ͷ���
-    PyTypeObject PyRakNet_Type = {
-        PyObject_HEAD_INIT(NULL)
-        0,                         // ob_size
-        "_raknet.RakNet",          // tp_name
-        sizeof(PyRakNet),          // tp_basicsize
-        0,                         // tp_itemsize
-        (destructor)0,            // tp_dealloc
-        0,                         // tp_print
-        0,                         // tp_getattr
-        0,                         // tp_setattr
-        0,                         // tp_compare
-        0,                         // tp_repr
-        0,                         // tp_as_number
-        0,                         // tp_as_sequence
-        0,                         // tp_as_mapping
-        0,                         // tp_hash
-        0,                         // tp_call
-        0,                         // tp_str
-        0,                         // tp_getattro
-        0,                         // tp_setattro
-        0,                         // tp_as_buffer
-        Py_TPFLAGS_DEFAULT,        // tp_flags
-        "RakNet wrapper object",   // tp_doc
-        0,                         // tp_traverse
-        0,                         // tp_clear
-        0,                         // tp_richcompare
-        0,                         // tp_weaklistoffset
-        0,                         // tp_iter
-        0,                         // tp_iternext
-        PyRakNet_methods,          // tp_methods
-        0,                         // tp_members
-        0,                         // tp_getset
-        0,                         // tp_base
-        0,                         // tp_dict
-        0,                         // tp_descr_get
-        0,                         // tp_descr_set
-        0,                         // tp_dictoffset
-        0,                         // tp_init
-        0,                         // tp_alloc
-        0,                         // tp_new
-    };
+    // PyTypeObject (Python 3) - fields assigned in PyInit__raknet
+    PyTypeObject PyRakNet_Type = { PyVarObject_HEAD_INIT(NULL, 0) };
 
     // ģ�鷽��
     static PyMethodDef RakNetMethods[] = {
@@ -416,24 +376,28 @@ extern "C" {
         {NULL, NULL, 0, NULL}
     };
 
-    // ģ���ʼ������
-    void init_raknet(void) {
-        // ��ʼ������
+    // Module init (Python 3)
+    static struct PyModuleDef _raknet_module = { PyModuleDef_HEAD_INIT, "_raknet", NULL, -1, RakNetMethods };
+    PyMODINIT_FUNC PyInit__raknet(void) {
+        PyRakNet_Type.tp_name = "_raknet.RakNet";
+        PyRakNet_Type.tp_basicsize = sizeof(PyRakNet);
+        PyRakNet_Type.tp_flags = Py_TPFLAGS_DEFAULT;
+        PyRakNet_Type.tp_doc = "RakNet wrapper object";
+        PyRakNet_Type.tp_methods = PyRakNet_methods;
         PyRakNet_Type.tp_new = PyType_GenericNew;
         PyRakNet_Type.tp_dealloc = (destructor)raknet_delete;
         if (PyType_Ready(&PyRakNet_Type) < 0)
-            return;
+            return NULL;
 
-        // ����ģ��
-        PyObject* module = Py_InitModule("_raknet", RakNetMethods);
+        PyObject* module = PyModule_Create(&_raknet_module);
         if (!module)
-            return;
+            return NULL;
 
-        // �������͵�ģ��
         Py_INCREF(&PyRakNet_Type);
         PyModule_AddObject(module, "RakNet", (PyObject*)&PyRakNet_Type);
 
         Logger::getInstance().log(LOG_RAKNET, "[RakNet] Module initialized");
+        return module;
     }
 
 #ifdef __cplusplus

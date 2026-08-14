@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include "httplib.h"
 #include <string>
 #include <map>
@@ -19,7 +19,7 @@ public:
         const std::string& data,
         const std::map<std::string, std::string>& headers)
     {
-        // ½âÎö url: https://host:port/path
+        // è§£æ url: https://host:port/path
         std::string scheme, host, path;
         int port = 0;
 

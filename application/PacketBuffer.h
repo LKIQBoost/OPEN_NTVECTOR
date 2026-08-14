@@ -1,4 +1,4 @@
-struct BufferSlice {
+ï»¿struct BufferSlice {
     uint8_t* data;
     size_t size;
 
@@ -13,7 +13,7 @@ struct BufferSlice {
 
 class PacketBuffer {
 public:
-    // °²È«³£Á¿£º»º³åÇø×î´óÔÊĞíÀ©Èİµ½ 256MB
+    // å®‰å…¨å¸¸é‡ï¼šç¼“å†²åŒºæœ€å¤§å…è®¸æ‰©å®¹åˆ° 256MB
     static constexpr size_t MAX_SAFE_BUFFER_SIZE = 256ULL * 1024 * 1024;
 
 private:
@@ -25,7 +25,7 @@ private:
     bool isSending = false;
     bool shutdownFlag = false;
 
-    // ÔÚ°²È«³£Á¿·¶Î§ÄÚ¶¯Ì¬À©Èİ
+    // åœ¨å®‰å…¨å¸¸é‡èŒƒå›´å†…åŠ¨æ€æ‰©å®¹
     void ensureCapacity(size_t required) {
         size_t currentCap = buffer.capacity();
         if (required <= currentCap) return;
@@ -50,20 +50,20 @@ public:
         writePos = 0;
     }
 
-    // ======== Ğ´Èë ========
+    // ======== å†™å…¥ ========
 
-    // ×·¼ÓÊı¾İ£¬×Ô¶¯Ìí¼Ó varint ³¤¶ÈÍ·²¿
+    // è¿½åŠ æ•°æ®ï¼Œè‡ªåŠ¨æ·»åŠ  varint é•¿åº¦å¤´éƒ¨
     //
-    // Á÷³Ì£º
-    //   1. µ¥°ü > 256MB ¡ú return false
-    //   2. ÕıÔÚ·¢ËÍ »ò ÒÑÓÃ+ĞÂ°ü > 256MB ¡ú ×èÈûµÈ finishSending Çå¿Õ
-    //   3. ÎïÀíÈİÁ¿²»¹» ¡ú ¶¯Ì¬À©Èİ
-    //   4. Ğ´Èë varint + data
+    // æµç¨‹ï¼š
+    //   1. å•åŒ… > 256MB â†’ return false
+    //   2. æ­£åœ¨å‘é€ æˆ– å·²ç”¨+æ–°åŒ… > 256MB â†’ é˜»å¡ç­‰ finishSending æ¸…ç©º
+    //   3. ç‰©ç†å®¹é‡ä¸å¤Ÿ â†’ åŠ¨æ€æ‰©å®¹
+    //   4. å†™å…¥ varint + data
     bool appendData(const uint8_t* data, size_t dataSize) {
         size_t varintLen = BinaryWriter::calculateVarintSizeFast(dataSize);
         size_t packetTotal = varintLen + dataSize;
 
-        // µ¥°ü³¬¹ı 256MB£¬²»¿ÉÄÜ×°ÏÂ
+        // å•åŒ…è¶…è¿‡ 256MBï¼Œä¸å¯èƒ½è£…ä¸‹
         if (packetTotal > MAX_SAFE_BUFFER_SIZE) {
             return false;
         }
@@ -72,9 +72,9 @@ public:
 
         cv.wait(lock, [&] {
             if (shutdownFlag) return true;
-            // ÕıÔÚ·¢ËÍ£º±ØĞëµÈ£¬ÒòÎª·¢ËÍ·½³ÖÓĞÂãÖ¸Õë£¬À©Èİ»áµ¼ÖÂĞü¿Õ
+            // æ­£åœ¨å‘é€ï¼šå¿…é¡»ç­‰ï¼Œå› ä¸ºå‘é€æ–¹æŒæœ‰è£¸æŒ‡é’ˆï¼Œæ‰©å®¹ä¼šå¯¼è‡´æ‚¬ç©º
             if (isSending) return false;
-            // ÒÑÓÃ + ĞÂ°ü³¬¹ı 256MB£ºµÈ·¢ËÍ·½È¡×ßÊı¾İºóÇå¿Õ
+            // å·²ç”¨ + æ–°åŒ…è¶…è¿‡ 256MBï¼šç­‰å‘é€æ–¹å–èµ°æ•°æ®åæ¸…ç©º
             return (writePos + packetTotal) <= MAX_SAFE_BUFFER_SIZE;
             });
 
@@ -82,17 +82,17 @@ public:
 
         size_t required = writePos + packetTotal;
 
-        // ÎïÀíÈİÁ¿²»¹»£¬¶¯Ì¬À©Èİ£¨²»³¬¹ı 256MB£©
+        // ç‰©ç†å®¹é‡ä¸å¤Ÿï¼ŒåŠ¨æ€æ‰©å®¹ï¼ˆä¸è¶…è¿‡ 256MBï¼‰
         if (required > buffer.capacity()) {
             ensureCapacity(required);
         }
 
-        // Ğ´Èë varint ³¤¶ÈÍ·²¿
+        // å†™å…¥ varint é•¿åº¦å¤´éƒ¨
         uint8_t* ptr = buffer.data() + writePos;
         size_t written = BinaryWriter::uint_to_varint(dataSize, ptr);
         writePos += written;
 
-        // Ğ´ÈëÊı¾İÌå
+        // å†™å…¥æ•°æ®ä½“
         if (dataSize > 0) {
             std::memcpy(buffer.data() + writePos, data, dataSize);
             writePos += dataSize;
@@ -109,7 +109,7 @@ public:
         return appendData(data.data(), data.size());
     }
 
-    // ´ø³¬Ê±µÄĞ´Èë
+    // å¸¦è¶…æ—¶çš„å†™å…¥
     template<typename Rep, typename Period>
     bool appendDataWithTimeout(const uint8_t* data, size_t dataSize,
         const std::chrono::duration<Rep, Period>& timeout) {
@@ -153,11 +153,11 @@ public:
     BufferSlice swapAndGetBuffer() {
         return getBuffer();
     }
-    // ======== ¶ÁÈ¡/·¢ËÍ ========
+    // ======== è¯»å–/å‘é€ ========
 
-    // »ñÈ¡µ±Ç°»º³åÇøÊı¾İÓÃÓÚ·¢ËÍ
-    // µ÷ÓÃºó»º³åÇø½øÈë·¢ËÍ×´Ì¬£¬appendData »á×èÈû
-    // ·¢ËÍÍê³Éºó±ØĞëµ÷ÓÃ finishSending()
+    // è·å–å½“å‰ç¼“å†²åŒºæ•°æ®ç”¨äºå‘é€
+    // è°ƒç”¨åç¼“å†²åŒºè¿›å…¥å‘é€çŠ¶æ€ï¼ŒappendData ä¼šé˜»å¡
+    // å‘é€å®Œæˆåå¿…é¡»è°ƒç”¨ finishSending()
     BufferSlice getBuffer() {
         std::unique_lock<std::mutex> lock(mtx);
 
@@ -171,7 +171,7 @@ public:
         return BufferSlice(buffer.data(), writePos);
     }
 
-    // ·¢ËÍÍê³É£¬Çå¿Õ»º³åÇø£¬»½ĞÑ×èÈûµÄĞ´ÈëÏß³Ì
+    // å‘é€å®Œæˆï¼Œæ¸…ç©ºç¼“å†²åŒºï¼Œå”¤é†’é˜»å¡çš„å†™å…¥çº¿ç¨‹
     void finishSending() {
         {
             std::lock_guard<std::mutex> lock(mtx);
@@ -181,7 +181,7 @@ public:
         cv.notify_all();
     }
 
-    // ======== ¿ØÖÆ ========
+    // ======== æ§åˆ¶ ========
 
     void shutdown() {
         {
@@ -195,7 +195,7 @@ public:
         return shutdownFlag;
     }
 
-    // ======== ²éÑ¯ ========
+    // ======== æŸ¥è¯¢ ========
 
     size_t currentSize() const {
         return writePos;
@@ -213,7 +213,7 @@ public:
         return static_cast<double>(writePos) / static_cast<double>(MAX_SAFE_BUFFER_SIZE);
     }
 
-    // ======== Î¬»¤ ========
+    // ======== ç»´æŠ¤ ========
 
     void clear() {
         {
@@ -232,10 +232,10 @@ public:
     }
 
     struct BufferStats {
-        size_t size;          // ÒÑÓÃ×Ö½ÚÊı
-        size_t capacity;      // µ±Ç°ÎïÀíÈİÁ¿
-        bool sending;         // ÊÇ·ñÕıÔÚ·¢ËÍ
-        bool shutdown;        // ÊÇ·ñÒÑ¹Ø±Õ
+        size_t size;          // å·²ç”¨å­—èŠ‚æ•°
+        size_t capacity;      // å½“å‰ç‰©ç†å®¹é‡
+        bool sending;         // æ˜¯å¦æ­£åœ¨å‘é€
+        bool shutdown;        // æ˜¯å¦å·²å…³é—­
     };
 
     BufferStats getStats() const {

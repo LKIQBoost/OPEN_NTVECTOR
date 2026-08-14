@@ -2,7 +2,7 @@
 #include "PythonUtils.h"
 
 PyCodeObject* PythonUtils::ReadMarshalCodeObject(char* code, int length)
-{// Ìø¹ý.pycÎÄ¼þÍ·
+{// ï¿½ï¿½ï¿½ï¿½.pycï¿½Ä¼ï¿½Í·
     if (length < 8) {
         PyErr_SetString(PyExc_ValueError, "Invalid .pyc file: too short");
         return NULL;
@@ -11,18 +11,18 @@ PyCodeObject* PythonUtils::ReadMarshalCodeObject(char* code, int length)
     const char* marshaled_data = code;
     Py_ssize_t marshaled_length = length;
 
-    // Ê¹ÓÃFILE*»òÕß×Ö·û´®½Ó¿Ú
-    // ÕâÀïÎÒÃÇÊ¹ÓÃ×Ö·û´®½Ó¿Ú£¬ÐèÒªÄ£ÄâÒ»¸öÎÄ¼þ¶ÔÏó
+    // Ê¹ï¿½ï¿½FILE*ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½Ó¿Ú£ï¿½ï¿½ï¿½ÒªÄ£ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½
 
-    PyObject* string_obj = PyString_FromStringAndSize(marshaled_data, marshaled_length);
+    PyObject* string_obj = PyBytes_FromStringAndSize(marshaled_data, marshaled_length);
     if (!string_obj) {
         return NULL;
     }
 
-    // Ê¹ÓÃPyMarshal_ReadObjectFromString£¨Èç¹û¿ÉÓÃ£©
-    // »òÕßÔÚPython 2.7ÖÐ¿ÉÄÜÐèÒªÊ¹ÓÃÆäËû·½·¨
+    // Ê¹ï¿½ï¿½PyMarshal_ReadObjectFromStringï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Python 2.7ï¿½Ð¿ï¿½ï¿½ï¿½ï¿½ï¿½ÒªÊ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-    // »ØÍËµ½Python·½·¨
+    // ï¿½ï¿½ï¿½Ëµï¿½Pythonï¿½ï¿½ï¿½ï¿½
     PyObject* marshal_module = PyImport_ImportModule("marshal");
     if (!marshal_module) {
         Py_DECREF(string_obj);

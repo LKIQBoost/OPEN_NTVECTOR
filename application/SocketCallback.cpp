@@ -1,4 +1,4 @@
-#include "SocketCallback.h"
+﻿#include "SocketCallback.h"
 #include <sstream>
 #include <iomanip>
 
@@ -24,7 +24,7 @@ bool SocketCallback::invokeCallback(uint32_t sid, const std::vector<uint8_t>& pa
     if (it == receiveCallbacks_.end()) {
         return false;
     }
-    // ִ�лص�
+    // 执行回调
     try {
         it->second(m_ctx, paramlist);
         return true;

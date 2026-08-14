@@ -6,8 +6,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-	// PythonÄ£¿é³õÊ¼»¯º¯Êý
-	void init_raknet(void);
+	// PythonÄ£ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	PyMODINIT_FUNC PyInit__raknet(void);
 
 #ifdef __cplusplus
 }

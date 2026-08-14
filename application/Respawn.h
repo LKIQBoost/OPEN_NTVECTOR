@@ -1,14 +1,14 @@
-#pragma once
+ï»¿#pragma once
 #include "PacketBase.h"
 
-// Respawn ×´Ì¬³£Á¿
-constexpr uint8_t RespawnStateSearchingForSpawn = 0;   // ÕıÔÚËÑË÷ÖØÉúµã
-constexpr uint8_t RespawnStateReadyToSpawn = 1;        // ·şÎñ¶Ë×¼±¸ºÃÖØÉú
-constexpr uint8_t RespawnStateClientReadyToSpawn = 2;  // ¿Í»§¶Ë×¼±¸ºÃÖØÉú
+// Respawn çŠ¶æ€å¸¸é‡
+constexpr uint8_t RespawnStateSearchingForSpawn = 0;   // æ­£åœ¨æœç´¢é‡ç”Ÿç‚¹
+constexpr uint8_t RespawnStateReadyToSpawn = 1;        // æœåŠ¡ç«¯å‡†å¤‡å¥½é‡ç”Ÿ
+constexpr uint8_t RespawnStateClientReadyToSpawn = 2;  // å®¢æˆ·ç«¯å‡†å¤‡å¥½é‡ç”Ÿ
 
-// Respawn Êı¾İ°ü
-// ·şÎñ¶Ë·¢ËÍ´Ë°üÈÃÍæ¼ÒÔÚ¿Í»§¶ËÖØÉú
-// ¿Í»§¶ËÒ²»á·¢ËÍ´Ë°ü×÷ÎªÏìÓ¦Íê³ÉÖØÉúÁ÷³Ì
+// Respawn æ•°æ®åŒ…
+// æœåŠ¡ç«¯å‘é€æ­¤åŒ…è®©ç©å®¶åœ¨å®¢æˆ·ç«¯é‡ç”Ÿ
+// å®¢æˆ·ç«¯ä¹Ÿä¼šå‘é€æ­¤åŒ…ä½œä¸ºå“åº”å®Œæˆé‡ç”Ÿæµç¨‹
 class Respawn : public PacketBase
 {
 public:
@@ -16,16 +16,16 @@ public:
     void Deserializ(std::vector<unsigned char> pack) override;
     std::vector<unsigned char> Serializ() override;
 
-    // Êı¾İ°ü×Ö¶Î
-    Vec3 Position;              // ÖØÉúÎ»ÖÃ (¿ÉÄÜÔÚ²»Í¬Î¬¶È)
-    uint8_t State = 0;          // ÖØÉú×´Ì¬ (¼ûÉÏ·½³£Á¿)
-    uint64_t EntityRuntimeID = 0;  // ÊµÌåÔËĞĞÊ± ID
+    // æ•°æ®åŒ…å­—æ®µ
+    Vec3 Position;              // é‡ç”Ÿä½ç½® (å¯èƒ½åœ¨ä¸åŒç»´åº¦)
+    uint8_t State = 0;          // é‡ç”ŸçŠ¶æ€ (è§ä¸Šæ–¹å¸¸é‡)
+    uint64_t EntityRuntimeID = 0;  // å®ä½“è¿è¡Œæ—¶ ID
 
-    // ±ã½İ·½·¨
+    // ä¾¿æ·æ–¹æ³•
     bool IsSearchingForSpawn() const { return State == RespawnStateSearchingForSpawn; }
     bool IsReadyToSpawn() const { return State == RespawnStateReadyToSpawn; }
     bool IsClientReadyToSpawn() const { return State == RespawnStateClientReadyToSpawn; }
 
-    // »ñÈ¡×´Ì¬×Ö·û´®
+    // è·å–çŠ¶æ€å­—ç¬¦ä¸²
     const char* GetStateString() const;
 };
