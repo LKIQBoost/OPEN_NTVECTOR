@@ -41,3 +41,4 @@ add_subdirectory(application/include/SLikeNet-master EXCLUDE_FROM_ALL)
 # 主项目
 # ============================================================
 add_subdirectory(application)
+add_subdirectory(tools EXCLUDE_FROM_ALL)
