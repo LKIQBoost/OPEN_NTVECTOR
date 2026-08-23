@@ -1,5 +1,6 @@
 ﻿#include "SubChunkClient.h"
 #include "ClientInstance.h"
+#include <json/json.h>
 #include <chrono>
 
 extern ClientInstance* g_client_instance;
@@ -43,7 +44,8 @@ bool SubChunkClient::Lookup(uint32_t hash, std::string& name, std::string& state
 
 // 解析子区块载荷: v9 + layer_count + y_index + 每层块存储 -> palette 哈希列表
 bool SubChunkClient::ParseSubchunk(const std::vector<uint8_t>& payload,
-                                   std::vector<uint32_t>& palette) {
+                                   std::vector<uint32_t>& palette,
+                                   size_t& storages_end) {
     if (payload.empty()) return false;
     Reader r(payload);
     if (!r.avail(3)) return false;
@@ -75,7 +77,108 @@ bool SubChunkClient::ParseSubchunk(const std::vector<uint8_t>& payload,
             palette.push_back((uint32_t)(zigzagv(rid) & 0xFFFFFFFF));
         }
     }
+    storages_end = r.off;
     return true;
+}
+
+// ---- 网络 NBT 解析(方块实体): varint 长度 + zigzag int ----
+static Json::Value ReadNbtCompound(SubChunkClient::Reader& r);
+
+static bool ReadNbtValue(SubChunkClient::Reader& r, uint8_t tag, Json::Value& out) {
+    if (!r.avail(1)) return false;
+    switch (tag) {
+        case 1: {  // byte
+            out = (int)(int8_t)r.u8(); return true;
+        }
+        case 2: {  // short
+            if (!r.avail(2)) return false;
+            int16_t v; std::memcpy(&v, r.p + r.off, 2); r.skip(2); out = (int)v; return true;
+        }
+        case 3:  // int (zigzag varint)
+        case 4: {  // long (zigzag varint)
+            out = (Json::Int64)SubChunkClient::zigzagv(r.varint()); return true;
+        }
+        case 5: {  // float
+            if (!r.avail(4)) return false;
+            float f; std::memcpy(&f, r.p + r.off, 4); r.skip(4); out = (double)f; return true;
+        }
+        case 6: {  // double
+            if (!r.avail(8)) return false;
+            double d; std::memcpy(&d, r.p + r.off, 8); r.skip(8); out = d; return true;
+        }
+        case 7: {  // byte array
+            uint64_t n = r.varint(); if (!r.avail((size_t)n)) return false;
+            Json::Value arr(Json::arrayValue);
+            for (uint64_t i = 0; i < n; i++) arr.append((int)(int8_t)r.u8());
+            out = arr; return true;
+        }
+        case 8: {  // string
+            uint64_t n = r.varint(); if (!r.avail((size_t)n)) return false;
+            out = std::string((const char*)r.p + r.off, (size_t)n); r.skip((size_t)n); return true;
+        }
+        case 9: {  // list
+            if (!r.avail(1)) return false;
+            uint8_t elem = r.u8(); uint64_t n = r.varint();
+            Json::Value arr(Json::arrayValue);
+            for (uint64_t i = 0; i < n; i++) {
+                Json::Value v;
+                if (!ReadNbtValue(r, elem, v)) return false;
+                arr.append(v);
+            }
+            out = arr; return true;
+        }
+        case 10: {  // compound
+            out = ReadNbtCompound(r); return true;
+        }
+        case 11:  // int array
+        case 12: {  // long array
+            uint64_t n = r.varint();
+            Json::Value arr(Json::arrayValue);
+            for (uint64_t i = 0; i < n; i++) arr.append((Json::Int64)SubChunkClient::zigzagv(r.varint()));
+            out = arr; return true;
+        }
+        default:
+            return false;
+    }
+}
+
+static Json::Value ReadNbtCompound(SubChunkClient::Reader& r) {
+    Json::Value obj(Json::objectValue);
+    while (r.avail(1)) {
+        uint8_t tag = r.u8();
+        if (tag == 0) break;  // TAG_End
+        uint64_t nlen = r.varint();
+        if (!r.avail((size_t)nlen)) break;
+        std::string name((const char*)r.p + r.off, (size_t)nlen); r.skip((size_t)nlen);
+        Json::Value v;
+        if (!ReadNbtValue(r, tag, v)) break;
+        obj[name] = v;
+    }
+    return obj;
+}
+
+// 解析子区块载荷末尾的方块实体(网络 NBT 复合标签,直到载荷结束)
+void SubChunkClient::ParseBlockEntities(const std::vector<uint8_t>& payload, size_t start_off,
+                                        std::vector<BlockEntity>& entities,
+                                        int /*sx*/, int /*sy*/, int /*sz*/) {
+    Reader r(payload);
+    r.off = start_off;
+    Json::FastWriter fw;
+    while (r.avail(1)) {
+        if (r.u8() != 0x0a) break;  // 期望 root compound
+        uint64_t nlen = r.varint();
+        if (!r.avail((size_t)nlen)) break;
+        r.skip((size_t)nlen);  // root name(通常为空)
+        Json::Value obj = ReadNbtCompound(r);
+        if (!obj.isObject() || obj.empty()) break;
+        BlockEntity e;
+        e.x = obj.get("x", Json::Value(-99999)).asInt();
+        e.y = obj.get("y", Json::Value(-99999)).asInt();
+        e.z = obj.get("z", Json::Value(-99999)).asInt();
+        e.nbt_json = fw.write(obj);
+        if (!e.nbt_json.empty() && e.nbt_json.back() == '\n') e.nbt_json.pop_back();
+        entities.push_back(e);
+    }
 }
 
 void SubChunkClient::OnPacket(const std::vector<uint8_t>& payload) {
@@ -86,9 +189,61 @@ void SubChunkClient::OnPacket(const std::vector<uint8_t>& payload) {
     s_cv.notify_all();
 }
 
+// 发送 NetworkChunkPublisherUpdate(121): coordinates(x zigzag32, y varint, z zigzag32) + radius(varint) + saved_chunks(lu32 count=0)
+void SubChunkClient::PublishChunks(int x, int y, int z, int radius) {
+    if (!g_client_instance || !g_client_instance->getInstance()) return;
+    std::vector<uint8_t> pkt;
+    write_varint(pkt, 121);
+    write_zigzag32(pkt, x);
+    write_varint(pkt, (uint64_t)(uint32_t)y);
+    write_zigzag32(pkt, z);
+    write_varint(pkt, (uint64_t)(uint32_t)radius);
+    write_u32le(pkt, 0);  // saved_chunks 空
+    g_client_instance->getInstance()->WritePacket(pkt);
+}
+
+// 处理 LevelChunk(58): 解析 blob 哈希,发送 ClientCacheBlobStatus(135) 请求缺失 blob
+void SubChunkClient::HandleLevelChunk(const std::vector<uint8_t>& data) {
+    Reader r(data);
+    if (!r.avail(4)) return;
+    zigzagv(r.varint());  // x
+    zigzagv(r.varint());  // z
+    zigzagv(r.varint());  // dimension
+    uint64_t scc = r.varint();  // sub_chunk_count
+    // highest_subchunk_count (仅当 scc 解释为 -2 时)
+    if (scc == 0xFFFFFFFFFFFFFFFEULL) { if (!r.avail(2)) return; r.skip(2); }
+    if (!r.avail(1)) return;
+    uint8_t cache_enabled = r.u8();
+    if (!cache_enabled) return;  // 无缓存模式,无需 blob 握手
+    uint64_t n = r.varint();     // blob 哈希数量
+    if (n > 100000) return;
+    std::vector<uint64_t> hashes;
+    for (uint64_t i = 0; i < n; i++) {
+        if (!r.avail(8)) return;
+        uint64_t h; std::memcpy(&h, r.p + r.off, 8); r.skip(8);
+        hashes.push_back(h);
+    }
+    // 发送 ClientCacheBlobStatus(135): misses=全部哈希, haves=0
+    std::vector<uint8_t> pkt;
+    write_varint(pkt, 135);
+    write_varint(pkt, hashes.size());   // misses 数量
+    write_varint(pkt, 0);               // haves 数量
+    for (uint64_t h : hashes) {         // misses × lu64
+        for (int b = 0; b < 8; b++) pkt.push_back((uint8_t)(h >> (b * 8)));
+    }
+    if (g_client_instance && g_client_instance->getInstance())
+        g_client_instance->getInstance()->WritePacket(pkt);
+}
+
+// 处理 ClientCacheMissResponse(136): 接收 blob 数据。握手完成,服务器随后下发 BlockActorData
+void SubChunkClient::HandleBlobMissResponse(const std::vector<uint8_t>& data) {
+    // 无需解析 blob 内容;仅确认收到(可留空或统计)
+}
+
 bool SubChunkClient::RequestBlocks(int ox, int oy, int oz,
                                    const std::vector<std::array<int8_t, 3>>& offsets,
                                    std::vector<BlockData>& out,
+                                   std::vector<BlockEntity>& entities,
                                    int timeout_ms) {
     if (offsets.empty() || !g_client_instance || !g_client_instance->getInstance()) return false;
 
@@ -131,6 +286,7 @@ bool SubChunkClient::RequestBlocks(int ox, int oy, int oz,
     if (count > offsets.size() * 2 + 16) return false;
 
     out.clear();
+    entities.clear();
     for (uint32_t i = 0; i < count; i++) {
         if (!r.avail(4)) break;
         int8_t dx = r.i8();
@@ -161,7 +317,8 @@ bool SubChunkClient::RequestBlocks(int ox, int oy, int oz,
         if (rhm == 1) { if (!r.avail(256)) break; r.skip(256); }
 
         std::vector<uint32_t> palette;
-        if (!ParseSubchunk(payload, palette) || palette.empty()) continue;
+        size_t storages_end = 0;
+        if (!ParseSubchunk(payload, palette, storages_end) || palette.empty()) continue;
 
         // 块索引: paletteType 的 bits 需要从 payload 再解析一次
         Reader pr(payload);
@@ -175,6 +332,7 @@ bool SubChunkClient::RequestBlocks(int ox, int oy, int oz,
             // 全部同一方块
             if (palette.empty()) continue;
             AddBlocks(out, ox + dx, oy + dy, oz + dz, palette[0], palette);
+            ParseBlockEntities(payload, storages_end, entities, ox + dx, oy + dy, oz + dz);
             continue;
         }
         int per_word = 32 / bits;
@@ -195,6 +353,7 @@ bool SubChunkClient::RequestBlocks(int ox, int oy, int oz,
             int ly = linear & 0xF;
             AddBlock(out, (ox + dx) * 16 + lx, (oy + dy) * 16 + ly, (oz + dz) * 16 + lz, h);
         }
+        ParseBlockEntities(payload, storages_end, entities, ox + dx, oy + dy, oz + dz);
     }
     return true;
 }

@@ -42,23 +42,34 @@ def nbt_int(name, v):
     return bytes([0x03]) + u16(len(name)) + name.encode() + struct.pack('<i', v)
 
 
+def state_value(raw):
+    """minecraft-data states 元数据格式 {key: {type, value}} -> (type, value)"""
+    if isinstance(raw, dict) and 'value' in raw:
+        return raw.get('type'), raw.get('value')
+    return None, raw
+
+
 def block_nbt(name_with_ns, states):
     inner = b''
-    for k, v in (states or {}).items():
-        if isinstance(v, str):
+    for k, raw in (states or {}).items():
+        stype, v = state_value(raw)
+        if stype == 'string' or (stype is None and isinstance(v, str)):
             inner += nbt_str(k, v)
-        elif isinstance(v, bool):
-            inner += nbt_byte(k, v)
-        elif isinstance(v, int):
+        elif stype == 'byte' or stype == 'bool' or (stype is None and isinstance(v, bool)):
+            inner += nbt_byte(k, 1 if v else 0)   # byte/bool -> TAG_Byte(1字节)
+        elif stype == 'int' or (stype is None and isinstance(v, int)):
             inner += nbt_int(k, v)
+        else:
+            inner += nbt_str(k, str(v))
     body = nbt_str('name', name_with_ns) + nbt_comp('states', inner)
     return bytes([0x0a]) + u16(0) + body + b'\x00'
 
 
 def states_to_json(states):
-    # 输出紧凑 JSON,保持原值类型
+    # states 为原始 {key: {type, value}} 或 {key: 值},输出紧凑 JSON(提取 value)
     parts = []
-    for k, v in (states or {}).items():
+    for k, raw in (states or {}).items():
+        v = raw.get('value') if isinstance(raw, dict) and 'value' in raw else raw
         if isinstance(v, str):
             parts.append('"%s":"%s"' % (k, v))
         elif isinstance(v, bool):
@@ -87,9 +98,7 @@ def main():
     all_entries = []
     for e in bs:
         nm = e['name']
-        raw = e.get('states') or {}
-        states = {k: v['value'] if isinstance(v, dict) and 'value' in v else v
-                  for k, v in raw.items()}
+        states = e.get('states') or {}   # 保留原始 {key: {type, value}} 元数据
         full = 'minecraft:' + nm
         h = fnv1a32(block_nbt(full, states))
         sj = states_to_json(states)

@@ -18,7 +18,8 @@ PyObject* getpatchversion(PyObject* self, PyObject* args) {
     return PyTextFromGbk(Params::PatchVersion);
 }
 PyObject* getplayername(PyObject* self, PyObject* args) {
-    return PyTextFromGbk(Params::DisplayName);
+    // DisplayName 已由 gbkToUtf8 / 配置文件(JSON)统一为 UTF-8,不能按 GBK 解码
+    return PyTextFromUtf8(Params::DisplayName.data(), (Py_ssize_t)Params::DisplayName.size());
 }
 
 static PyMethodDef EngineMethods[] = {

@@ -1262,17 +1262,20 @@ static PyObject* get_subchunk_blocks(PyObject* self, PyObject* args) {
     }
 
     std::vector<SubChunkClient::BlockData> blocks;
+    std::vector<SubChunkClient::BlockEntity> entities;
     bool req_ok;
     Py_BEGIN_ALLOW_THREADS   // 释放 GIL:等待响应时让接收线程能处理 174 包 + Python 回调
-    req_ok = SubChunkClient::RequestBlocks(ox, oy, oz, offsets, blocks);
+    req_ok = SubChunkClient::RequestBlocks(ox, oy, oz, offsets, blocks, entities);
     Py_END_ALLOW_THREADS
     if (!req_ok) {
         PyErr_SetString(PyExc_RuntimeError, "SubChunk request failed or timed out");
         return NULL;
     }
 
-    PyObject* result = PyList_New((Py_ssize_t)blocks.size());
     Json::Reader jreader;
+    PyObject* result = PyDict_New();
+    // blocks 列表
+    PyObject* blist = PyList_New((Py_ssize_t)blocks.size());
     for (size_t i = 0; i < blocks.size(); i++) {
         const auto& b = blocks[i];
         PyObject* d = PyDict_New();
@@ -1286,9 +1289,64 @@ static PyObject* get_subchunk_blocks(PyObject* self, PyObject* args) {
         } else {
             PyDict_SetItemString(d, "states", PyDict_New());
         }
-        PyList_SetItem(result, (Py_ssize_t)i, d);
+        PyList_SetItem(blist, (Py_ssize_t)i, d);
     }
+    PyDict_SetItemString(result, "blocks", blist);
+    Py_DECREF(blist);
+    // block_entities 列表
+    PyObject* elist = PyList_New((Py_ssize_t)entities.size());
+    for (size_t i = 0; i < entities.size(); i++) {
+        const auto& e = entities[i];
+        PyObject* d = PyDict_New();
+        PyDict_SetItemString(d, "x", PyLong_FromLong(e.x));
+        PyDict_SetItemString(d, "y", PyLong_FromLong(e.y));
+        PyDict_SetItemString(d, "z", PyLong_FromLong(e.z));
+        Json::Value nbt;
+        if (jreader.parse(e.nbt_json, nbt)) {
+            PyDict_SetItemString(d, "nbt", JsonValueToPy(nbt));
+        } else {
+            PyDict_SetItemString(d, "nbt", PyDict_New());
+        }
+        PyList_SetItem(elist, (Py_ssize_t)i, d);
+    }
+    PyDict_SetItemString(result, "block_entities", elist);
+    Py_DECREF(elist);
     return result;
+}
+
+static PyObject* get_block_actor(PyObject* self, PyObject* args) {
+    int x, y, z;
+    if (!PyArg_ParseTuple(args, "iii", &x, &y, &z)) {
+        return NULL;
+    }
+    std::vector<uint8_t> rawNbt;
+    std::map<std::string, std::string> fields;
+    if (!BlockDataStore::GetBlockActor(BlockPos{ x, y, z }, rawNbt, fields)) {
+        Py_RETURN_NONE;   // 未缓存(服务器未下发 BlockActorData)
+    }
+    PyObject* result = PyDict_New();
+    std::string hex;
+    static const char* kHex = "0123456789abcdef";
+    for (uint8_t b : rawNbt) {
+        hex += kHex[b >> 4]; hex += kHex[b & 0xF];
+    }
+    PyDict_SetItemString(result, "raw_nbt", PyUnicode_FromString(hex.c_str()));
+    PyObject* fdict = PyDict_New();
+    for (const auto& kv : fields) {
+        PyDict_SetItemString(fdict, kv.first.c_str(), PyUnicode_FromString(kv.second.c_str()));
+    }
+    PyDict_SetItemString(result, "fields", fdict);
+    Py_DECREF(fdict);
+    return result;
+}
+
+static PyObject* publish_chunks(PyObject* self, PyObject* args) {
+    int x, y, z, radius;
+    if (!PyArg_ParseTuple(args, "iiii", &x, &y, &z, &radius)) {
+        return NULL;
+    }
+    SubChunkClient::PublishChunks(x, y, z, radius);
+    Py_RETURN_NONE;
 }
 
 static PyObject* disabled_auth_input(PyObject* self, PyObject* args) {
@@ -1404,7 +1462,9 @@ static PyMethodDef EngineMethods[] = {
     {"get_pot_y", get_pot_y, METH_NOARGS, ""},
     {"get_pot_z", get_pot_z, METH_NOARGS, ""},
     {"move", move, METH_VARARGS, ""},
-    {"get_subchunk_blocks", get_subchunk_blocks, METH_VARARGS, "Request subchunks, return [{x,y,z,name,states}]"},
+    {"get_subchunk_blocks", get_subchunk_blocks, METH_VARARGS, "Request subchunks, return {blocks, block_entities}"},
+    {"get_block_actor", get_block_actor, METH_VARARGS, "Get cached BlockActorData (fields+raw_nbt) at (x,y,z), or None"},
+    {"publish_chunks", publish_chunks, METH_VARARGS, "Send NetworkChunkPublisherUpdate(x,y,z,radius) to stream chunks"},
     {"get_entity_runtime_id", get_entity_runtime_id, METH_NOARGS, ""},
     {"get_auth_input", get_auth_input, METH_NOARGS, ""},
     {"disabled_auth_input", disabled_auth_input, METH_NOARGS, ""},

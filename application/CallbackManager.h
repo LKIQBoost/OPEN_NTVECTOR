@@ -40,5 +40,7 @@ public:
     static void onInventoryContent(ConnectInstance*, std::vector<uint8_t>);
     static void onBlockActorData(ConnectInstance*, std::vector<uint8_t>);
     static void onSubChunk(ConnectInstance*, std::vector<uint8_t>);
+    static void onLevelChunk(ConnectInstance*, std::vector<uint8_t>);
+    static void onBlobMissResponse(ConnectInstance*, std::vector<uint8_t>);
     static void runLoopAuthInput(ClientInstance*);
 };

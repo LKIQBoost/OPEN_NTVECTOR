@@ -149,6 +149,8 @@ private:
         m_connection->RegisterReceiveCallBack(IDInventoryContent, CallbackManager::onInventoryContent);
         m_connection->RegisterReceiveCallBack(IDBlockActorData, CallbackManager::onBlockActorData);
         m_connection->RegisterReceiveCallBack(IDSubChunk, CallbackManager::onSubChunk);
+        m_connection->RegisterReceiveCallBack(IDLevelChunk, CallbackManager::onLevelChunk);
+        m_connection->RegisterReceiveCallBack(IDClientCacheMissResponse, CallbackManager::onBlobMissResponse);
         //m_connection->RegisterReceiveCallBack(IDText, CallbackManager::onText);
         //m_connection->RegisterReceiveCallBack(IDAddPlayer, CallbackManager::onAddPlayer);
         //m_connection->RegisterReceiveCallBack(IDPlayerList, CallbackManager::onPlayerList);

@@ -391,6 +391,14 @@ void CallbackManager::onSubChunk(ConnectInstance* m_session, std::vector<uint8_t
 {
     SubChunkClient::OnPacket(packet);
 }
+void CallbackManager::onLevelChunk(ConnectInstance* m_session, std::vector<uint8_t> packet)
+{
+    SubChunkClient::HandleLevelChunk(packet);
+}
+void CallbackManager::onBlobMissResponse(ConnectInstance* m_session, std::vector<uint8_t> packet)
+{
+    SubChunkClient::HandleBlobMissResponse(packet);
+}
 void CallbackManager::runLoopAuthInput(ClientInstance* ctx)
 {
     PlayerAuthInput a;
