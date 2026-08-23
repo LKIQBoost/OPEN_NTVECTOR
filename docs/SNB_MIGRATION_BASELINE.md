@@ -45,4 +45,4 @@ and independently reviewable.
 - [x] Structured protocol events
 - [x] Async requests and timeout handling
 - [x] Player, world, entity, and inventory state
-- [ ] Type declarations, documentation, and final regression
+- [x] Type declarations, documentation, and final regression
