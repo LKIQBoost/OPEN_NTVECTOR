@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-# Python 3.12+ development package used for embedding.
+# Prefer a locally installed Python development package instead of a user-specific path.
 find_package(Python3 3.12 COMPONENTS Development REQUIRED)
 
 # 收集所有源文件
@@ -9,12 +9,35 @@ file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cc"
 )
-file(GLOB APP_HEADERS CONFIGURE_DEPENDS
+file(GLOB_RECURSE APP_HEADERS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
 )
 
+# The migration keeps the original flat files for compatibility with external
+# includes, while the structured directories provide the compiled implementation.
+# Exclude only flat source files whose basename is now supplied by Core/, Network/,
+# Packets/, Crypto/, Python/, or platform/.
+set(_STRUCTURED_DIRS Core Crypto Network Packets Python PythonAPI NBT platform)
+set(_STRUCTURED_NAMES)
+foreach(_dir IN LISTS _STRUCTURED_DIRS)
+    file(GLOB _structured_files "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}/*.cpp"
+         "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}/*.c"
+         "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}/*.cc")
+    foreach(_structured_file IN LISTS _structured_files)
+        get_filename_component(_structured_name "${_structured_file}" NAME)
+        list(APPEND _STRUCTURED_NAMES "${_structured_name}")
+    endforeach()
+endforeach()
+list(REMOVE_DUPLICATES _STRUCTURED_NAMES)
+foreach(_structured_name IN LISTS _STRUCTURED_NAMES)
+    list(FILTER APP_SOURCES EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/${_structured_name}$")
+endforeach()
+
 # 排除 include/ 子目录中的源文件（那些是第三方库，单独构建）
 list(FILTER APP_SOURCES EXCLUDE REGEX ".*/include/.*")
+list(FILTER APP_HEADERS EXCLUDE REGEX ".*/include/.*")
+list(FILTER APP_SOURCES EXCLUDE REGEX ".*/platform/platform/.*")
+list(FILTER APP_HEADERS EXCLUDE REGEX ".*/platform/platform/.*")
 
 # 非 Windows 排除资源文件
 if(NOT WIN32)
@@ -57,9 +80,9 @@ if(WIN32)
     if(ENABLE_NTUNISDK)
         target_compile_definitions(Program PRIVATE Linker_NtUniSdk)
         target_sources(Program PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/NtUniSdkBase.cpp"
-            "${CMAKE_CURRENT_SOURCE_DIR}/MPayDelegate.cpp"
-            "${CMAKE_CURRENT_SOURCE_DIR}/MPayWrapper.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/Core/NtUniSdkBase.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/Core/MPayDelegate.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/Core/MPayWrapper.cpp"
         )
     endif()
 endif()
@@ -68,8 +91,15 @@ endif()
 # OpenSSL / jsoncpp / Python / libwebsockets / libdatachannel
 # 的头文件由各自的 CMake target 通过 INTERFACE_INCLUDE_DIRECTORIES 自动提供
 target_include_directories(Program PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core
+    ${CMAKE_CURRENT_SOURCE_DIR}/Crypto
+    ${CMAKE_CURRENT_SOURCE_DIR}/Network
+    ${CMAKE_CURRENT_SOURCE_DIR}/Packets
+    ${CMAKE_CURRENT_SOURCE_DIR}/Python
+    ${CMAKE_CURRENT_SOURCE_DIR}/PythonAPI
+    ${CMAKE_CURRENT_SOURCE_DIR}/NBT
     ${CMAKE_CURRENT_SOURCE_DIR}/platform
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include/SLikeNet-master/Source
     ${CMAKE_CURRENT_SOURCE_DIR}/include/SLikeNet-master/Source/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/zlib-1.3.1

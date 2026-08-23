@@ -40,9 +40,9 @@ and independently reviewable.
 
 - [x] Baseline and comparison
 - [x] Build and test foundation (Ninja + MinGW baseline links `Program.exe`)
-- [ ] NBT and native Python API
-- [ ] Packet objects and generic codec
-- [ ] Structured protocol events
-- [ ] Async requests and timeout handling
-- [ ] Player, world, entity, and inventory state
+- [x] NBT and native Python API
+- [x] Packet objects and generic codec
+- [x] Structured protocol events
+- [x] Async requests and timeout handling
+- [x] Player, world, entity, and inventory state
 - [ ] Type declarations, documentation, and final regression
