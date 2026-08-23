@@ -1,7 +1,3 @@
 #pragma once
-#include "ConnectInstance.h"
-class Manager
-{
-public:
-	void BaseTick(ConnectInstance *) {}
-};
+#include "Core/Manager.h"
+

@@ -1,3 +1,3 @@
 #pragma once
+#include "Python/ctypes.h"
 
-extern "C" void init_ctypes(void);

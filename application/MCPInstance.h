@@ -1,5 +1,3 @@
 #pragma once
-class MCPInstance {
-public:
-	static 
-};
+#include "Core/MCPInstance.h"
+

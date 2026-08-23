@@ -13,10 +13,8 @@ file(GLOB_RECURSE APP_HEADERS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
 )
 
-# The migration keeps the original flat files for compatibility with external
-# includes, while the structured directories provide the compiled implementation.
-# Exclude only flat source files whose basename is now supplied by Core/, Network/,
-# Packets/, Crypto/, Python/, or platform/.
+# Legacy flat header paths are compatibility shims; compiled implementations live
+# only in the structured directories below.
 set(_STRUCTURED_DIRS Core Crypto Network Packets Python PythonAPI NBT platform)
 set(_STRUCTURED_NAMES)
 foreach(_dir IN LISTS _STRUCTURED_DIRS)
@@ -36,8 +34,6 @@ endforeach()
 # 排除 include/ 子目录中的源文件（那些是第三方库，单独构建）
 list(FILTER APP_SOURCES EXCLUDE REGEX ".*/include/.*")
 list(FILTER APP_HEADERS EXCLUDE REGEX ".*/include/.*")
-list(FILTER APP_SOURCES EXCLUDE REGEX ".*/platform/platform/.*")
-list(FILTER APP_HEADERS EXCLUDE REGEX ".*/platform/platform/.*")
 
 # 非 Windows 排除资源文件
 if(NOT WIN32)

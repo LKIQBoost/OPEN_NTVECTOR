@@ -1,4 +1,3 @@
 #pragma once
-class SkinParams{
+#include "Core/SkinParams.h"
 
-};

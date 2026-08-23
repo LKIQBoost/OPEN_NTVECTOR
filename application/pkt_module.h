@@ -1,4 +1,3 @@
 #pragma once
-#include "Python.h"
+#include "Packets/pkt_module.h"
 
-PyMODINIT_FUNC PyInit_pkt(void);

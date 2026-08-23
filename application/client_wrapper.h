@@ -1,4 +1,3 @@
 #pragma once
-#include "ClientInstance.h"
+#include "Python/client_wrapper.h"
 
-void initclient(void);

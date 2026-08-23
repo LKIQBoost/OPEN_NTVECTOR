@@ -1,8 +1,3 @@
 #pragma once
+#include "Python/PythonUtils.h"
 
-#include <Python.h>
-class PythonUtils
-{
-public:
-	static PyCodeObject* ReadMarshalCodeObject(char* code,int length);
-};

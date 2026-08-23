@@ -1,4 +1,3 @@
 #pragma once
-#include <pybind11/pybind11.h>
-#include <pybind11/embed.h>
-#include "Logger.h"
+#include "Network/web_rtc_python_wrapper.h"
+
