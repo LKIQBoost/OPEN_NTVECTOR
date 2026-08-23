@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.10)
+project(api-test-network C)
+include(CTest)
+
+MACRO(require_lws_config req_mac)
+	if (NOT DEFINED ${req_mac})
+		message(FATAL_ERROR "Make sure you include LWSConfig.cmake")
+	endif()
+ENDMACRO()
+
+require_lws_config(LWS_WITH_NETWORK)
+
+if (LWS_WITH_NETWORK)
+	add_executable(${PROJECT_NAME} main.c)
+	if (websockets_shared)
+		target_link_libraries(${PROJECT_NAME} websockets_shared ${LIBWEBSOCKETS_DEP_LIBS})
+		add_dependencies(${PROJECT_NAME} websockets_shared)
+	else()
+		target_link_libraries(${PROJECT_NAME} websockets ${LIBWEBSOCKETS_DEP_LIBS})
+	endif()
+	add_test(NAME api-test-network COMMAND ${PROJECT_NAME})
+endif()

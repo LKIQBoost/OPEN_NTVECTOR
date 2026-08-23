@@ -1,0 +1,18 @@
+set(PLUGIN_NAME protocol_lws_dht_dnssec_monitor)
+set(requirements 1)
+require_lws_config(LWS_WITH_AUTHORITATIVE_DNS 1 requirements)
+require_lws_config(LWS_WITH_JOSE 1 requirements)
+require_lws_config(LWS_WITH_SYS_ASYNC_DNS_DNSSEC 1 requirements)
+require_lws_config(LWS_WITH_SPAWN 1 requirements)
+require_lws_config(LWS_WITH_DIR 1 requirements)
+
+if (requirements)
+	create_plugin(${PLUGIN_NAME} "lws-dht-dnssec-monitor" "protocol_lws_dht_dnssec_monitor.c;monitor-pki.c;monitor-acme.c;monitor-api.c;monitor-dnssec.c;monitor-whois.c;monitor-utils.c;monitor-proxy.c" "" "")
+	if (NOT LWS_WITH_PLUGINS_BUILTIN)
+		target_compile_definitions(${PLUGIN_NAME} PRIVATE LWS_BUILDING_SHARED)
+	endif()
+
+	if (NOT WIN32 AND LWS_WITH_PLUGINS AND NOT LWS_WITH_PLUGINS_BUILTIN)
+		install(DIRECTORY assets/ DESTINATION share/libwebsockets-test-server/lws-dht-dnssec-monitor/assets COMPONENT plugins)
+	endif()
+endif()

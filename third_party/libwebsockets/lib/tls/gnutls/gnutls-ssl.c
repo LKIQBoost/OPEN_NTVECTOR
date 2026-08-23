@@ -1,0 +1,332 @@
+/*
+ * libwebsockets - small server side websockets and web server implementation
+ *
+ * Copyright (C) 2010 - 2026 Andy Green <andy@warmcat.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
+#include "private-lib-core.h"
+#include "private-lib-tls.h"
+
+#if defined(LWS_ROLE_QUIC)
+extern void
+gnutls_quic_bio_free(struct lws *wsi);
+#endif
+
+#if defined(LWS_WITH_TCP_TLS)
+int
+lws_ssl_capable_read(struct lws *wsi, unsigned char *buf, size_t len)
+{
+	int n;
+
+	if (!wsi->tls.ssl)
+		return lws_ssl_capable_read_no_ssl(wsi, buf, len);
+
+	n = (int)gnutls_record_recv((gnutls_session_t)wsi->tls.ssl, buf, len);
+	if (n > 0) {
+		struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
+
+		if (gnutls_record_check_pending((gnutls_session_t)wsi->tls.ssl)) {
+			if (lws_dll2_is_detached(&wsi->tls.dll_pending_tls))
+				lws_dll2_add_head(&wsi->tls.dll_pending_tls,
+						  &pt->tls.dll_pending_tls_owner);
+		} else
+			__lws_ssl_remove_wsi_from_buffered_list(wsi);
+
+		if (wsi->a.context->tls_ops->fake_POLLIN_for_buffered)
+			wsi->a.context->tls_ops->fake_POLLIN_for_buffered(pt);
+
+		return n;
+	}
+
+	if (!n) {
+		__lws_ssl_remove_wsi_from_buffered_list(wsi);
+		return LWS_SSL_CAPABLE_ERROR;
+	}
+
+	if (n == GNUTLS_E_AGAIN || n == GNUTLS_E_INTERRUPTED) {
+		if (gnutls_record_get_direction((gnutls_session_t)wsi->tls.ssl) == 0)
+			return LWS_SSL_CAPABLE_MORE_SERVICE_READ;
+
+		wsi->tls_read_wanted_write = 1;
+		lws_callback_on_writable(wsi);
+		__lws_change_pollfd(wsi, LWS_POLLIN, 0);
+		return LWS_SSL_CAPABLE_MORE_SERVICE_WRITE;
+	}
+
+	lwsl_info("gnutls_record_recv error %d\n", n);
+
+	return LWS_SSL_CAPABLE_ERROR;
+}
+
+int
+lws_ssl_capable_write(struct lws *wsi, unsigned char *buf, size_t len)
+{
+	int n;
+
+	if (!wsi->tls.ssl)
+		return lws_ssl_capable_write_no_ssl(wsi, buf, len);
+
+	n = (int)gnutls_record_send((gnutls_session_t)wsi->tls.ssl, buf, len);
+	if (n >= 0)
+		return n;
+
+	if (n == GNUTLS_E_AGAIN || n == GNUTLS_E_INTERRUPTED) {
+		if (gnutls_record_get_direction((gnutls_session_t)wsi->tls.ssl) == 1)
+			return LWS_SSL_CAPABLE_MORE_SERVICE_WRITE;
+
+		return LWS_SSL_CAPABLE_MORE_SERVICE_READ;
+	}
+
+	return LWS_SSL_CAPABLE_ERROR;
+}
+
+int
+lws_ssl_pending(struct lws *wsi)
+{
+	if (!wsi->tls.ssl)
+		return 0;
+
+	return (int)gnutls_record_check_pending((gnutls_session_t)wsi->tls.ssl);
+}
+#endif
+
+int
+lws_ssl_close(struct lws *wsi)
+{
+#if defined(LWS_ROLE_QUIC)
+	gnutls_quic_bio_free(wsi);
+#endif
+
+	if (wsi->tls.ssl) {
+#if defined(LWS_WITH_TLS_SESSIONS)
+		lws_tls_session_new_gnutls(wsi);
+#endif
+		gnutls_deinit((gnutls_session_t)wsi->tls.ssl);
+		wsi->tls.ssl = NULL;
+	}
+
+	__lws_ssl_remove_wsi_from_buffered_list(wsi);
+
+	lws_tls_restrict_return(wsi);
+
+	if (wsi->tls.ctx_ref) {
+		lws_tls_ctx_ref_unref(wsi->tls.ctx_ref);
+		wsi->tls.ctx_ref = NULL;
+	}
+
+	return 0;
+}
+
+#if defined(LWS_WITH_SERVER) && defined(LWS_WITH_TCP_TLS)
+enum lws_ssl_capable_status
+lws_tls_server_accept(struct lws *wsi)
+{
+	int n;
+
+#if defined(LWS_WITH_LATENCY)
+	lws_usec_t _g_ssl_acc_start = lws_now_usecs();
+#endif
+
+	if (!wsi->tls.ssl)
+		return LWS_SSL_CAPABLE_ERROR;
+
+	wsi->skip_fallback = 1;
+
+	n = gnutls_handshake((gnutls_session_t)wsi->tls.ssl);
+	lwsl_debug("%s: gnutls_handshake returned %d\n", __func__, n);
+
+#if defined(LWS_WITH_LATENCY)
+	{
+		unsigned int ms = (unsigned int)((lws_now_usecs() - _g_ssl_acc_start) / 1000);
+		if (ms > 2 && !wsi->tls.ssl_accept_in_bg)
+			lws_latency_note(&wsi->a.context->pt[(int)wsi->tsi], _g_ssl_acc_start, 2000, "ssl_accept:%dms", ms);
+	}
+#endif
+
+	if (n == GNUTLS_E_SUCCESS)
+		return LWS_SSL_CAPABLE_DONE;
+
+	if (n == GNUTLS_E_AGAIN || n == GNUTLS_E_INTERRUPTED) {
+		if (gnutls_record_get_direction((gnutls_session_t)wsi->tls.ssl) == 0) {
+			if (!wsi->tls.ssl_accept_in_bg && lws_change_pollfd(wsi, LWS_POLLOUT, LWS_POLLIN))
+				lwsl_notice("%s: lws_change_pollfd failed\n", __func__);
+
+			return LWS_SSL_CAPABLE_MORE_SERVICE_READ;
+		} else {
+			if (!wsi->tls.ssl_accept_in_bg && lws_change_pollfd(wsi, LWS_POLLIN, LWS_POLLOUT))
+				lwsl_notice("%s: lws_change_pollfd failed\n", __func__);
+
+			return LWS_SSL_CAPABLE_MORE_SERVICE_WRITE;
+		}
+	}
+
+	lwsl_info("gnutls_handshake (server) failed: %s (%d)\n", gnutls_strerror(n), n);
+
+	return LWS_SSL_CAPABLE_ERROR;
+}
+#endif
+
+#if defined(LWS_WITH_TCP_TLS)
+enum lws_ssl_capable_status
+lws_tls_client_connect(struct lws *wsi, char *errbuf, size_t len)
+{
+	int n;
+
+	if (!wsi->tls.ssl)
+		return LWS_SSL_CAPABLE_ERROR;
+
+	n = gnutls_handshake((gnutls_session_t)wsi->tls.ssl);
+	if (n == GNUTLS_E_SUCCESS) {
+#if defined(LWS_WITH_CLIENT)
+		wsi->tls_session_reused = gnutls_session_is_resumed((gnutls_session_t)wsi->tls.ssl) ? 1 : 0;
+#endif
+#if defined(LWS_WITH_TLS_SESSIONS)
+		lws_tls_session_new_gnutls(wsi);
+#endif
+		return LWS_SSL_CAPABLE_DONE;
+	}
+
+	if (n == GNUTLS_E_AGAIN || n == GNUTLS_E_INTERRUPTED) {
+		if (gnutls_record_get_direction((gnutls_session_t)wsi->tls.ssl) == 0) {
+			if (lws_change_pollfd(wsi, LWS_POLLOUT, LWS_POLLIN))
+				lwsl_notice("%s: lws_change_pollfd failed\n", __func__);
+
+			return LWS_SSL_CAPABLE_MORE_SERVICE_READ;
+		} else {
+			if (lws_change_pollfd(wsi, LWS_POLLIN, LWS_POLLOUT))
+				lwsl_notice("%s: lws_change_pollfd failed\n", __func__);
+
+			return LWS_SSL_CAPABLE_MORE_SERVICE_WRITE;
+		}
+	}
+
+	lwsl_info("gnutls_handshake (client) failed: %s (%d)\n", gnutls_strerror(n), n);
+
+	if (errbuf)
+		snprintf(errbuf, len, "GnuTLS handshake failed: %s", gnutls_strerror(n));
+
+	return LWS_SSL_CAPABLE_ERROR;
+}
+#endif
+
+int
+lws_ssl_get_error(struct lws *wsi, int n)
+{
+	if (n == GNUTLS_E_AGAIN || n == GNUTLS_E_INTERRUPTED) {
+		if (!wsi->tls.ssl)
+			return 2; /* SSL_ERROR_WANT_READ */
+
+		if (gnutls_record_get_direction((gnutls_session_t)wsi->tls.ssl) == 0)
+			return 2; /* SSL_ERROR_WANT_READ */
+
+		return 3; /* SSL_ERROR_WANT_WRITE */
+	}
+
+	return n;
+}
+
+enum lws_ssl_capable_status
+__lws_tls_shutdown(struct lws *wsi)
+{
+	int n;
+
+	if (!wsi->tls.ssl)
+		return LWS_SSL_CAPABLE_DONE;
+
+	n = gnutls_bye((gnutls_session_t)wsi->tls.ssl, GNUTLS_SHUT_WR);
+	if (n == GNUTLS_E_SUCCESS)
+		return LWS_SSL_CAPABLE_DONE;
+
+	if (n == GNUTLS_E_AGAIN || n == GNUTLS_E_INTERRUPTED) {
+		if (gnutls_record_get_direction((gnutls_session_t)wsi->tls.ssl) == 1)
+			return LWS_SSL_CAPABLE_MORE_SERVICE_WRITE;
+
+		return LWS_SSL_CAPABLE_MORE_SERVICE_READ;
+	}
+
+	return LWS_SSL_CAPABLE_ERROR;
+}
+
+#if defined(LWS_WITH_SERVER)
+enum lws_ssl_capable_status
+lws_tls_server_abort_connection(struct lws *wsi)
+{
+	if (wsi->tls.ssl) {
+		__lws_tls_shutdown(wsi);
+		gnutls_deinit((gnutls_session_t)wsi->tls.ssl);
+		wsi->tls.ssl = NULL;
+	}
+
+	return LWS_SSL_CAPABLE_DONE;
+}
+#endif
+
+int
+lws_tls_client_confirm_peer_cert(struct lws *wsi, char *ebuf, size_t ebuf_len)
+{
+	unsigned int status = 0;
+	gnutls_session_t session = (gnutls_session_t)wsi->tls.ssl;
+
+	if (gnutls_certificate_verify_peers2(session, &status) < 0) {
+		snprintf(ebuf, ebuf_len, "gnutls_certificate_verify_peers2 failed");
+		return -1;
+	}
+
+	if (status != 0) {
+		unsigned int allowed = 0;
+
+		if (wsi->tls.use_ssl & LCCSCF_ALLOW_INSECURE)
+			allowed = status;
+
+		if (wsi->tls.use_ssl & LCCSCF_ALLOW_SELFSIGNED)
+			allowed |= GNUTLS_CERT_INVALID | GNUTLS_CERT_SIGNER_NOT_FOUND | GNUTLS_CERT_SIGNER_NOT_CA;
+
+		if (wsi->tls.use_ssl & LCCSCF_ALLOW_EXPIRED)
+			allowed |= GNUTLS_CERT_EXPIRED | GNUTLS_CERT_NOT_ACTIVATED;
+
+		if ((status & ~allowed) == 0) {
+			lwsl_info("%s: allowing anyway\n", __func__);
+			return 0;
+		}
+
+		gnutls_datum_t ds;
+		gnutls_certificate_verification_status_print(status, gnutls_certificate_type_get(session), &ds, 0);
+		if (ds.data) {
+			snprintf(ebuf, ebuf_len, "Peer cert verify failed: %s", ds.data);
+			gnutls_free(ds.data);
+		} else {
+			snprintf(ebuf, ebuf_len, "Peer cert verify failed with status %d", status); lwsl_err("GnuTLS verify failed: status=%u, allowed=%u\n", status, allowed);
+		}
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+tops_fake_POLLIN_for_buffered_gnutls(struct lws_context_per_thread *pt)
+{
+	return lws_tls_fake_POLLIN_for_buffered(pt);
+}
+
+const struct lws_tls_ops tls_ops_gnutls = {
+	.fake_POLLIN_for_buffered = tops_fake_POLLIN_for_buffered_gnutls,
+};

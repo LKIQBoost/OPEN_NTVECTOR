@@ -1,0 +1,649 @@
+/*
+ * libwebsockets - small server side websockets and web server implementation
+ *
+ * Copyright (C) 2010 - 2026 Andy Green <andy@warmcat.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
+#include "private-lib-core.h"
+#include "private-lib-system-auth-dns.h"
+
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
+#if defined(LWS_WITH_AUTHORITATIVE_DNS)
+
+static int
+strexp_cb(void *priv, const char *name, char *out, size_t *pos,
+	  size_t olen, size_t *exp_ofs)
+{
+	struct lws_auth_dns_sign_info *info = (struct lws_auth_dns_sign_info *)priv;
+	int n;
+	size_t l;
+	const char *val = NULL;
+
+	if (info->subst_cb) {
+		lwsl_notice("%s: attempting substitution for macro name: '%s'\n", __func__, name);
+		val = info->subst_cb(info, name);
+	}
+
+	if (!val) {
+		for (n = 0; n < info->num_substs; n++) {
+			if (!strcmp(name, info->subst_names[n])) {
+				val = info->subst_values[n];
+				break;
+			}
+		}
+	}
+
+	if (!val) {
+		lwsl_warn("%s: unknown substitution variable: %s\n", __func__, name);
+		return LSTRX_FATAL_NAME_UNKNOWN;
+	}
+
+	if (val[0] == '\0') {
+		info->skip_line = 1;
+		return LSTRX_DONE;
+	}
+
+	l = strlen(val);
+
+	if (*exp_ofs >= l)
+		return LSTRX_DONE;
+
+	if (*pos >= olen)
+		return LSTRX_FILLED_OUT;
+
+	l -= *exp_ofs;
+	if (l > olen - *pos)
+		l = olen - *pos;
+
+	memcpy(out + *pos, val + *exp_ofs, l);
+	*pos += l;
+	*exp_ofs += l;
+
+	if (*exp_ofs == strlen(val))
+		return LSTRX_DONE;
+
+	return LSTRX_FILLED_OUT;
+}
+
+int
+lws_auth_dns_parse_zone_buf(const char *buf, size_t len, struct auth_dns_zone *zone, const char *ipv4, const char *ipv6)
+{
+	const char *p = buf, *end = buf + len;
+	char last_name[256] = "";
+	int in_parens = 0;
+	int in_comment = 0;
+
+	char line_accum[16384];
+	size_t lptr = 0;
+	int loop_cycles = 0;
+
+	lwsl_notice("%s: Parsing zone buffer of length %zu\n", __func__, len);
+
+	while (p <= end) {
+		if (++loop_cycles > 5000000) {
+			lwsl_err("auth-dns: parsing exceeded maximum length\n");
+			break;
+		}
+
+		if (p < end && *p == '(' && !in_comment)
+			in_parens = 1;
+		else if (p < end && *p == ')' && !in_comment)
+			in_parens = 0;
+		else if (p < end && *p == ';')
+			in_comment = 1;
+
+		/* if newline and we're not inside parenthesis, we have a logical line */
+		if (p < end && *p == '\n')
+			in_comment = 0;
+
+		if (p == end || (*p == '\n' && !in_parens)) {
+			in_comment = 0;
+			line_accum[lptr] = '\0';
+
+			if (lptr > 0) {
+				lws_tokenize_t ts;
+				lws_tokenize_elem e;
+				lws_tokenize_init(&ts, line_accum, LWS_TOKENIZE_F_DOT_NONTERM | LWS_TOKENIZE_F_NO_FLOATS | LWS_TOKENIZE_F_MINUS_NONTERM | LWS_TOKENIZE_F_SLASH_NONTERM | LWS_TOKENIZE_F_COLON_NONTERM | LWS_TOKENIZE_F_EQUALS_NONTERM | LWS_TOKENIZE_F_PLUS_NONTERM);
+				ts.len = lptr;
+
+				char toks[32][256];
+				const char *tok_ptr[32];
+				int num_toks = 0, name_inherited = 0, n;
+
+				if (line_accum[0] == ' ' || line_accum[0] == '\t')
+					name_inherited = 1;
+
+				int max_tokens = 0;
+				do {
+					e = lws_tokenize(&ts);
+					if (e == LWS_TOKZE_ENDED)
+						break;
+					max_tokens++;
+					if (max_tokens > 256)
+						break;
+
+					if (e == LWS_TOKZE_TOKEN || e == LWS_TOKZE_QUOTED_STRING || e == LWS_TOKZE_INTEGER) {
+						if (num_toks < 32) {
+							n = (int)ts.token_len;
+							if (n > (int)sizeof(toks[0]) - 1)
+								n = sizeof(toks[0]) - 1;
+							memcpy(toks[num_toks], ts.token, (size_t)n);
+							toks[num_toks][n] = '\0';
+							tok_ptr[num_toks] = ts.start;
+							num_toks++;
+						}
+					}
+
+				} while (e > 0);
+
+				if (!strncmp(line_accum, "$ORIGIN", 7)) {
+					const char *v = line_accum + 7;
+					while (*v == ' ' || *v == '\t') v++;
+					lws_strncpy(zone->origin, v, sizeof(zone->origin));
+					char *sp = (char *)strchr(zone->origin, ' ');
+					if (!sp) sp = (char *)strchr(zone->origin, '\t');
+					if (sp) *sp = '\0';
+				} else if (!strncmp(line_accum, "$TTL", 4)) {
+					const char *v = line_accum + 4;
+					while (*v == ' ' || *v == '\t') v++;
+					lws_strncpy(zone->default_ttl, v, sizeof(zone->default_ttl));
+					char *sp = (char *)strchr(zone->default_ttl, ' ');
+					if (!sp) sp = (char *)strchr(zone->default_ttl, '\t');
+					if (sp) *sp = '\0';
+				} else if (num_toks > 0) {
+					{
+						/* RR parsing */
+						int type_idx = 0;
+						struct auth_dns_rrset *rrset = NULL;
+						struct auth_dns_rr *rr;
+						char cur_name[256];
+						uint32_t ttl = 0;
+						uint16_t class_ = 1;
+						uint16_t type = 0;
+
+						/* Fix: check if the line started with @ as a delimiter since lws_tokenize skips it */
+						int started_with_at = 0;
+						for (int i = 0; line_accum[i]; i++) {
+							if (line_accum[i] == ' ' || line_accum[i] == '\t') continue;
+							if (line_accum[i] == '@') started_with_at = 1;
+							break;
+						}
+
+						if (name_inherited) {
+							lws_strncpy(cur_name, last_name, sizeof(cur_name));
+						} else if (started_with_at) {
+							lws_strncpy(cur_name, "@", sizeof(cur_name));
+							lws_strncpy(last_name, "@", sizeof(last_name));
+							/* we didn't consume it as a token, so type_idx is 0 */
+						} else {
+							lws_strncpy(cur_name, toks[0], sizeof(cur_name));
+							lws_strncpy(last_name, toks[0], sizeof(last_name));
+							type_idx++;
+						}
+
+						/* canonicalize name: lowercase and append origin if relative */
+						if (!strcmp(cur_name, "@") && zone->origin[0]) {
+							lws_strncpy(cur_name, zone->origin, sizeof(cur_name));
+						} else if (cur_name[0] && cur_name[strlen(cur_name) - 1] != '.' && zone->origin[0]) {
+							char t[256];
+							lws_snprintf(t, sizeof(t), "%s.%s", cur_name, zone->origin);
+							lws_strncpy(cur_name, t, sizeof(cur_name));
+						}
+						for (char *c = cur_name; *c; c++)
+							*c = (char)tolower((unsigned char)*c);
+
+						if (type_idx < num_toks) {
+							/* check for TTL (numeric) */
+							const char *cp = toks[type_idx];
+							while (*cp && *cp >= '0' && *cp <= '9') cp++;
+							if (!*cp && toks[type_idx][0]) {
+								ttl = (uint32_t)atoi(toks[type_idx]);
+								type_idx++;
+							} else {
+								if (zone->default_ttl[0])
+									ttl = (uint32_t)atoi(zone->default_ttl);
+							}
+						}
+
+						if (type_idx < num_toks && !strcasecmp(toks[type_idx], "IN")) {
+							class_ = 1;
+							type_idx++;
+						}
+
+						if (type_idx < num_toks) {
+							// lwsl_notice("  Attempting type match at type_idx=%d: '%s'\n", type_idx, toks[type_idx]);
+							/* simplistic type assignment */
+							if (!strcasecmp(toks[type_idx], "A")) type = 1;
+							else if (!strcasecmp(toks[type_idx], "NS")) type = 2;
+							else if (!strcasecmp(toks[type_idx], "SOA")) type = 6;
+							else if (!strcasecmp(toks[type_idx], "CNAME")) type = 5;
+							else if (!strcasecmp(toks[type_idx], "MX")) type = 15;
+							else if (!strcasecmp(toks[type_idx], "TXT")) type = 16;
+							else if (!strcasecmp(toks[type_idx], "AAAA")) type = 28;
+							else if (!strcasecmp(toks[type_idx], "RRSIG")) type = 46;
+							else if (!strcasecmp(toks[type_idx], "DNSKEY")) type = 48;
+							else if (!strcasecmp(toks[type_idx], "NSEC3")) type = 50;
+							else if (!strcasecmp(toks[type_idx], "NSEC3PARAM")) type = 51;
+							else if (!strcasecmp(toks[type_idx], "TLSA")) type = 52;
+							else if (!strcasecmp(toks[type_idx], "CAA")) type = 257;
+							else if (!strcasecmp(toks[type_idx], "HTTPS")) type = 65;
+							else if (!strncasecmp(toks[type_idx], "TYPE", 4) &&
+								 toks[type_idx][4] >= '0' && toks[type_idx][4] <= '9')
+								type = (uint16_t)atoi(toks[type_idx] + 4);
+							else type = 0; /* unknown */
+							type_idx++;
+						}
+
+						// lwsl_notice("%s: Record: name=%s, type=%u, class=%u, tokens=%d, final_type_idx=%d\n", __func__, cur_name, type, class_, num_toks, type_idx);
+
+						/* find existing rrset */
+						lws_start_foreach_dll(struct lws_dll2 *, d, lws_dll2_get_head(&zone->rrset_list)) {
+							struct auth_dns_rrset *rs = lws_container_of(d, struct auth_dns_rrset, list);
+							if (rs->type == type && rs->class_ == class_ && !strcmp(rs->name, cur_name)) {
+								rrset = rs;
+								break;
+							}
+						} lws_end_foreach_dll(d);
+
+						if (!rrset) {
+							rrset = lws_zalloc(sizeof(*rrset), "auth_dns_rrset");
+							if (!rrset)
+								return 1;
+							rrset->name = lws_strdup(cur_name);
+							rrset->type = type;
+							rrset->class_ = class_;
+							rrset->ttl = ttl;
+							lws_dll2_add_tail(&rrset->list, &zone->rrset_list);
+						}
+
+						rr = lws_zalloc(sizeof(*rr), "auth_dns_rr");
+						if (!rr)
+							return 1;
+
+						/* The remainder of the line is rdata. */
+						{
+							const char *rd = tok_ptr[type_idx - 1];
+							if (rd) {
+								while (*rd == ' ' || *rd == '\t') rd++;
+
+								/* Strip surrounding quotes if present (TXT records) */
+								size_t rdlen = strlen(rd);
+								if (rdlen >= 2 && rd[0] == '"' && rd[rdlen - 1] == '"') {
+									char *qrd = lws_strdup(rd);
+									if (qrd) {
+										rdlen = strlen(qrd);
+										qrd[rdlen - 1] = '\0';
+										rr->rdata = lws_strdup(qrd + 1);
+										rr->rdata_len = rdlen - 2;
+										lws_free(qrd);
+									}
+								} else {
+									rr->rdata = lws_strdup(rd);
+									if (rr->rdata)
+										rr->rdata_len = rdlen;
+								}
+							}
+						}
+
+						lws_dll2_add_tail(&rr->list, &rrset->rr_list);
+						if (lws_auth_dns_rdata_to_wire(zone, rr, rrset->type, ipv4, ipv6))
+							lwsl_err("Failed to wire-encode rdata for %s\n", rrset->name);
+
+						lwsl_info("Parsed RR: name=%s type=%d ttl=%u rdata=%s\n", rrset->name, rrset->type, rrset->ttl, rr->rdata ? rr->rdata : "");
+					}
+				}
+			}
+
+			lptr = 0;
+		} else {
+			if (!in_comment && *p != '(' && *p != ')' && *p != '\n' && *p != '\r' && lptr < sizeof(line_accum) - 1)
+				line_accum[lptr++] = *p;
+		}
+		p++;
+	}
+	return 0;
+}
+
+void
+lws_auth_dns_free_zone(struct auth_dns_zone *z)
+{
+	lws_start_foreach_dll_safe(struct lws_dll2 *, d, d1, lws_dll2_get_head(&z->rrset_list)) {
+		struct auth_dns_rrset *rs = lws_container_of(d, struct auth_dns_rrset, list);
+
+		lws_start_foreach_dll_safe(struct lws_dll2 *, d2, d3, lws_dll2_get_head(&rs->rr_list)) {
+			struct auth_dns_rr *rr = lws_container_of(d2, struct auth_dns_rr, list);
+			lws_dll2_remove(&rr->list);
+			if (rr->rdata)
+				lws_free(rr->rdata);
+			if (rr->wire_rdata)
+				lws_free(rr->wire_rdata);
+			lws_free(rr);
+		} lws_end_foreach_dll_safe(d2, d3);
+
+		lws_dll2_remove(&rs->list);
+		if (rs->name)
+			lws_free(rs->name);
+		lws_free(rs);
+	} lws_end_foreach_dll_safe(d, d1);
+}
+
+int
+lws_auth_dns_sign_zone(struct lws_auth_dns_sign_info *info)
+{
+	char obuf[8192]; /* simple large enough buffer for test */
+	int fd, n, ofd = -1, res_wr, temp_len = 0, temp_max = 0;
+	size_t uout = 0;
+	struct stat st;
+	char *buf, *expbuf;
+	ssize_t ns;
+	struct lws_jwk jwk;
+	struct lws_jose jose;
+	struct lws_jws jws;
+	struct stat ost;
+	char *outbuf = NULL;
+
+	lwsl_info("%s: starting zone signing from %s\n", __func__, info->input_filepath);
+
+	fd = open(info->input_filepath, LWS_O_RDONLY);
+	if (fd < 0) {
+		lwsl_err("%s: unable to open %s\n", __func__, info->input_filepath);
+		return 1;
+	}
+
+	if (fstat(fd, &st) < 0 || st.st_size <= 0 || st.st_size > 1024 * 1024) {
+		close(fd);
+		return 1;
+	}
+
+	buf = lws_malloc((size_t)st.st_size + 1, "auth_dns_in");
+	if (!buf) {
+		close(fd);
+		return 1;
+	}
+
+	ns = read(fd, buf, (unsigned int)st.st_size);
+	close(fd);
+
+	if (ns != st.st_size) {
+		lws_free(buf);
+		return 1;
+	}
+
+	buf[st.st_size] = '\0';
+
+	expbuf = lws_malloc((size_t)st.st_size * 2, "auth_dns_exp");
+	if (!expbuf) {
+		lws_free(buf);
+		return 1;
+	}
+
+	char *lb = buf;
+	uout = 0;
+	while (lb < buf + st.st_size) {
+		char *le = (char *)strchr(lb, '\n');
+		if (!le)
+			le = buf + st.st_size;
+		else
+			le++; /* Include newline */
+
+		info->curr_line = lb;
+		info->curr_line_len = (size_t)(le - lb);
+		info->skip_line = 0;
+
+		/* Expand current line */
+		char line_exp[4096];
+		lws_strexp_t exp_line;
+		size_t uin_line = 0, uout_line = 0;
+
+		lws_strexp_init(&exp_line, info, strexp_cb, line_exp, sizeof(line_exp));
+		if (lws_strexp_expand(&exp_line, lb, info->curr_line_len, &uin_line, &uout_line) != LSTRX_DONE && !info->skip_line) {
+			lwsl_err("%s: lws_strexp_expand failed or filled out buffer on line\n", __func__);
+			goto bail;
+		}
+
+		if (!info->skip_line && uout_line > 0) {
+			if (uout + uout_line >= (size_t)st.st_size * 2) {
+				lwsl_err("%s: expbuf overflow\n", __func__);
+				goto bail;
+			}
+			memcpy(expbuf + uout, line_exp, uout_line);
+			uout += uout_line;
+		}
+
+		lb = le;
+	}
+
+	expbuf[uout] = '\0';
+
+	struct auth_dns_zone zone;
+	memset(&zone, 0, sizeof(zone));
+
+	if (lws_auth_dns_parse_zone_buf(expbuf, uout, &zone, info->ipv4, info->ipv6)) {
+		lwsl_err("Failed to parse zone\n");
+		goto bail;
+	}
+
+	lws_auth_dns_inject_mock_keys(info, &zone);
+	lws_auth_dns_sort_zone(info, &zone);
+	lws_auth_dns_sign_rrsets(info, &zone);
+
+	/* Write canonical sorted and combined zone into output_filepath (or fallback to user output string dump) */
+	fd = open(info->output_filepath ? info->output_filepath : "signed.zone", LWS_O_WRONLY | LWS_O_CREAT | LWS_O_TRUNC, 0644);
+	if (fd < 0) {
+		lwsl_err("Failed to open output file for signing results\n");
+		goto bail;
+	}
+
+	/* Write generic setup string at top */
+	n = lws_snprintf(obuf, sizeof(obuf), "$ORIGIN %s\n$TTL %u\n\n", zone.origin, atoi(zone.default_ttl) ? atoi(zone.default_ttl) : 3600);
+	if (n > (int)sizeof(obuf) - 1)
+		n = (int)sizeof(obuf) - 1;
+	(void)write(fd, obuf, (unsigned int)n);
+
+	lws_start_foreach_dll(struct lws_dll2 *, d, lws_dll2_get_head(&zone.rrset_list)) {
+		struct auth_dns_rrset *rs = lws_container_of(d, struct auth_dns_rrset, list);
+
+		const char *ts = "UNKNOWN";
+		switch (rs->type) {
+			case 1: ts = "A"; break;
+			case 2: ts = "NS"; break;
+			case 5: ts = "CNAME"; break;
+			case 6: ts = "SOA"; break;
+			case 15: ts = "MX"; break;
+			case 16: ts = "TXT"; break;
+			case 28: ts = "AAAA"; break;
+			case 46: ts = "RRSIG"; break;
+			case 48: ts = "DNSKEY"; break;
+			case 50: ts = "NSEC3"; break;
+			case 51: ts = "NSEC3PARAM"; break;
+			case 52: ts = "TLSA"; break;
+			case 257: ts = "CAA"; break;
+			case 65: ts = "HTTPS"; break;
+		}
+
+		lws_start_foreach_dll(struct lws_dll2 *, d2, lws_dll2_get_head(&rs->rr_list)) {
+			struct auth_dns_rr *rr = lws_container_of(d2, struct auth_dns_rr, list);
+
+			n = lws_snprintf(obuf, sizeof(obuf), "%-30s\t%u\tIN\t%s\t%s\n",
+				rs->name, rs->ttl, ts, rr->rdata ? rr->rdata : "");
+			if (n > (int)sizeof(obuf) - 1)
+				n = (int)sizeof(obuf) - 1;
+			(void)write(fd, obuf, (unsigned int)n);
+		} lws_end_foreach_dll(d2);
+	} lws_end_foreach_dll(d);
+
+
+	close(fd);
+	lwsl_info("lws_auth_dns_sign_zone succeeded! Wrote to %s\n", info->output_filepath ? info->output_filepath : "signed.zone");
+
+	if (!info->jws_filepath || !info->ksk_jwk_filepath) {
+		lwsl_err("Missing jws_filepath or ksk_jwk_filepath\n");
+		goto bail_jws;
+	}
+
+	lwsl_info("Starting JWS generation for %s (using KSK)\n", info->jws_filepath);
+
+	if (lws_jwk_load(&jwk, info->ksk_jwk_filepath, NULL, NULL)) {
+		lwsl_err("Failed loading KSK jwk\n");
+		goto bail_jws;
+	}
+
+	ofd = open(info->output_filepath ? info->output_filepath : "signed.zone", LWS_O_RDONLY);
+	if (ofd < 0 || fstat(ofd, &ost) || ost.st_size <= 0 || ost.st_size >= 1048576) {
+		lwsl_err("Failed file open/stat ofd=%d st_size=%ld\n", ofd, (long)ost.st_size);
+		goto bail_jwk;
+	}
+
+	outbuf = lws_malloc((size_t)ost.st_size, "auth_dns_out_jws");
+	if (!outbuf || read(ofd, outbuf, (unsigned int)ost.st_size) != ost.st_size) {
+		lwsl_err("Failed read or malloc\n");
+		goto bail_ofd;
+	}
+
+	char *compact = NULL;
+	char *temp = NULL;
+
+	compact = lws_malloc((size_t)ost.st_size * 2 + 1024, "jws_compact");
+	if (!compact) {
+		lwsl_err("Failed alloc compact\n");
+		goto bail_ofd;
+	}
+
+	temp_max = temp_len = (int)(ost.st_size * 2 + 4096);
+	temp = lws_malloc((size_t)temp_len, "jws_temp");
+	if (!temp) {
+		lwsl_err("Failed alloc temp\n");
+		goto bail_ofd;
+	}
+
+	lws_jws_init(&jws, &jwk, info->cx);
+	lws_jose_init(&jose);
+
+	if (lws_jws_alloc_element(&jws.map, LJWS_JOSE, (temp + temp_max - temp_len), &temp_len, 2048, 0)) {
+		lwsl_err("Failed JWS alloc JOSE\n");
+		goto bail_jose;
+	}
+
+	const char *alg = "ES256";
+	if (jwk.kty == LWS_GENCRYPTO_KTY_EC) {
+		if (jwk.e[LWS_GENCRYPTO_EC_KEYEL_X].len == 48) alg = "ES384";
+		else if (jwk.e[LWS_GENCRYPTO_EC_KEYEL_X].len == 66) alg = "ES512";
+	} else if (jwk.kty == LWS_GENCRYPTO_KTY_RSA) {
+		if (jwk.e[LWS_GENCRYPTO_RSA_KEYEL_N].len <= 256) alg = "RS256";
+		else if (jwk.e[LWS_GENCRYPTO_RSA_KEYEL_N].len <= 384) alg = "RS384";
+		else alg = "RS512";
+	}
+
+	{
+		char jwk_pub[1024];
+		int jwk_pub_len = sizeof(jwk_pub);
+
+		if (lws_jwk_export(&jwk, LWSJWKF_EXPORT_NOCRLF /* pure public components without newlines */, jwk_pub, &jwk_pub_len) < 0) {
+			lwsl_err("Failed to export public JWK for JWS header\n");
+			goto bail_jose;
+		}
+
+		/* Write both alg and the fully exported JSON Web Key into the JOSE header */
+		int n = lws_snprintf((char *)jws.map.buf[LJWS_JOSE], 2048, "{\"alg\":\"%s\",\"jwk\":%s}", alg, jwk_pub);
+		if (n >= 2048) {
+			lwsl_err("JWS JOSE header exceeded maximum length\n");
+			goto bail_jose;
+		}
+		jws.map.len[LJWS_JOSE] = (uint32_t)n;
+	}
+
+	jws.map.buf[LJWS_PYLD] = (const char *)outbuf;
+	jws.map.len[LJWS_PYLD] = (uint32_t)ost.st_size;
+
+	if (lws_jws_encode_b64_element(&jws.map_b64, LJWS_PYLD, (temp + temp_max - temp_len), &temp_len, jws.map.buf[LJWS_PYLD], jws.map.len[LJWS_PYLD]) ||
+		lws_jws_encode_b64_element(&jws.map_b64, LJWS_JOSE, (temp + temp_max - temp_len), &temp_len, jws.map.buf[LJWS_JOSE], jws.map.len[LJWS_JOSE])) {
+		lwsl_err("Failed JWS b64 encode\n");
+		goto bail_jose;
+	}
+
+	lwsl_notice("JWS Header String: '%s'\n", (const char *)jws.map.buf[LJWS_JOSE]);
+
+	if (lws_jws_parse_jose(&jose, (const char *)jws.map.buf[LJWS_JOSE], (int)jws.map.len[LJWS_JOSE], (temp + temp_max - temp_len), &temp_len) < 0) {
+		lwsl_err("Failed JWS parse JOSE\n");
+		goto bail_jose;
+	}
+
+	if (lws_jws_alloc_element(&jws.map_b64, LJWS_SIG, (temp + temp_max - temp_len), &temp_len, 512, 0)) {
+		lwsl_err("Failed JWS alloc SIG\n");
+		goto bail_jose;
+	}
+
+	n = lws_jws_sign_from_b64(&jose, &jws, (char *)jws.map_b64.buf[LJWS_SIG], jws.map_b64.len[LJWS_SIG]);
+	if (n < 0) {
+		lwsl_err("Failed JWS sign from b64: %d\n", n);
+		goto bail_jose;
+	}
+
+	jws.map_b64.len[LJWS_SIG] = (uint32_t)n;
+	res_wr = lws_jws_write_compact(&jws, compact, (size_t)ost.st_size * 2 + 1024);
+	if (res_wr) {
+		lwsl_err("Failed JWS compact write\n");
+		goto bail_jose;
+	}
+
+	{
+		int jfd = open(info->jws_filepath, LWS_O_WRONLY | LWS_O_CREAT | LWS_O_TRUNC, 0644);
+		if (jfd >= 0) {
+			size_t clen = strlen(compact);
+			(void)write(jfd, compact, (unsigned int)clen);
+			close(jfd);
+			lwsl_info("Wrote outer signature JWS to %s\n", info->jws_filepath);
+		} else {
+			lwsl_err("Failed opening JWS output file\n");
+		}
+	}
+
+	lws_free(compact);
+	lws_free(temp);
+
+bail_jose:
+	lws_jose_destroy(&jose);
+bail_ofd:
+	if (outbuf)
+		lws_free(outbuf);
+	if (ofd >= 0)
+		close(ofd);
+bail_jwk:
+	lws_jwk_destroy(&jwk);
+bail_jws:
+	lws_free(expbuf);
+	lws_free(buf);
+
+	return 0;
+
+bail:
+	if (expbuf)
+		lws_free(expbuf);
+	if (buf)
+		lws_free(buf);
+
+	return 1;
+}
+
+#endif

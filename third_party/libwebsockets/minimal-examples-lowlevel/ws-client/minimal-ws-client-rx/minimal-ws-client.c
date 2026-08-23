@@ -1,0 +1,183 @@
+/*
+ * lws-minimal-ws-client
+ *
+ * Written in 2010-2019 by Andy Green <andy@warmcat.com>
+ *
+ * This file is made available under the Creative Commons CC0 1.0
+ * Universal Public Domain Dedication.
+ *
+ * This demonstrates the a minimal ws client using lws.
+ *
+ * It connects to https://libwebsockets.org/ and makes a
+ * wss connection to the dumb-increment protocol there.  While
+ * connected, it prints the numbers it is being sent by
+ * dumb-increment protocol.
+ */
+
+#include <libwebsockets.h>
+
+enum {
+	LWS_SW_D,
+	LWS_SW_T,
+	LWS_SW_SERVER,
+	LWS_SW_PORT,
+	LWS_SW_L,
+	LWS_SW_HELP,
+};
+
+static const struct lws_switches switches[] = {
+	[LWS_SW_D]	= { "-d",              "Debug logs (e.g. -d 15)" },
+	[LWS_SW_T]	= { "-t",              "Test flag" },
+	[LWS_SW_SERVER]	= { "--server",        "Server address to connect to" },
+	[LWS_SW_PORT]	= { "-p",              "Port to connect to" },
+	[LWS_SW_L]	= { "-l",              "localhost / selfsigned" },
+	[LWS_SW_HELP]	= { "--help",		"Show this help information" },
+};
+
+#include <string.h>
+#include <signal.h>
+
+static int interrupted, rx_seen, test;
+static struct lws *client_wsi;
+
+static int
+callback_dumb_increment(struct lws *wsi, enum lws_callback_reasons reason,
+	      void *user, void *in, size_t len)
+{
+	switch (reason) {
+
+	/* because we are protocols[0] ... */
+	case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+		lwsl_err("CLIENT_CONNECTION_ERROR: %s\n",
+			 in ? (char *)in : "(null)");
+		client_wsi = NULL;
+		break;
+
+	case LWS_CALLBACK_CLIENT_ESTABLISHED:
+		lwsl_user("%s: established\n", __func__);
+		break;
+
+	case LWS_CALLBACK_CLIENT_RECEIVE:
+		lwsl_user("RX: %s\n", (const char *)in);
+		rx_seen++;
+		if (test && rx_seen == 10)
+			interrupted = 1;
+		break;
+
+	case LWS_CALLBACK_CLIENT_CLOSED:
+		client_wsi = NULL;
+		break;
+
+	default:
+		break;
+	}
+
+	return lws_callback_http_dummy(wsi, reason, user, in, len);
+}
+
+static const struct lws_protocols protocols[] = {
+	{
+		"dumb-increment-protocol",
+		callback_dumb_increment,
+		0, 0, 0, NULL, 0
+	},
+	LWS_PROTOCOL_LIST_TERM
+};
+
+static void
+sigint_handler(int sig)
+{
+	interrupted = 1;
+}
+
+int main(int argc, const char **argv)
+{
+	struct lws_context_creation_info info;
+	struct lws_client_connect_info i;
+	struct lws_context *context;
+	const char *p;
+	int n = 0;
+	(void)switches;
+
+	if ((argc == 1) || lws_cmdline_option(argc, argv, switches[LWS_SW_HELP].sw)) {
+		lws_switches_print_help(argv[0], switches, LWS_ARRAY_SIZE(switches));
+		return 0;
+	}
+
+
+	signal(SIGINT, sigint_handler);
+
+	test = !!lws_cmdline_option(argc, argv, switches[LWS_SW_T].sw);
+
+	lwsl_user("LWS minimal ws client rx [-d <logs>] [-t (test)]\n");
+
+	lws_context_info_defaults(&info, NULL);
+	lws_cmdline_option_handle_builtin(argc, argv, &info);
+	info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+	info.port = CONTEXT_PORT_NO_LISTEN; /* we do not run any server */
+	info.protocols = protocols;
+	info.timeout_secs = 10;
+	info.connect_timeout_secs = 30;
+#if defined(LWS_WITH_MBEDTLS) || defined(USE_WOLFSSL) || defined(LWS_WITH_OPENHITLS)
+	/*
+	 * OpenSSL uses the system trust store.  mbedTLS has to be told which
+	 * CA to trust explicitly.
+	 */
+	info.client_ssl_ca_filepath = "./libwebsockets.org.cer";
+#endif
+
+	/*
+	 * since we know this lws context is only ever going to be used with
+	 * one client wsis / fds / sockets at a time, let lws know it doesn't
+	 * have to use the default allocations for fd tables up to ulimit -n.
+	 * It will just allocate for 1 internal and 1 (+ 1 http2 nwsi) that we
+	 * will use.
+	 */
+	info.fd_limit_per_thread = 1 + 1 + 1;
+
+	context = lws_create_context(&info);
+	if (!context) {
+		lwsl_err("lws init failed\n");
+		return 1;
+	}
+
+	memset(&i, 0, sizeof i); /* otherwise uninitialized garbage */
+	i.context = context;
+	i.port = 443;
+	i.address = "libwebsockets.org";
+
+	if ((p = lws_cmdline_option(argc, argv, switches[LWS_SW_SERVER].sw)))
+		i.address = p;
+
+	if ((p = lws_cmdline_option(argc, argv, switches[LWS_SW_PORT].sw)))
+		{
+			int __pt = atoi(p);
+			if (__pt < 0 || __pt > 65535) {
+				lwsl_err("Port %d is outside valid 16-bit range\n", __pt);
+				return 1;
+			}
+			i.port = (uint16_t)__pt;
+		}
+
+	i.path = "/";
+	i.host = i.address;
+	i.origin = i.address;
+	i.ssl_connection = LCCSCF_USE_SSL;
+
+	if (lws_cmdline_option(argc, argv, switches[LWS_SW_L].sw))
+		i.ssl_connection |= LCCSCF_ALLOW_SELFSIGNED;
+
+	i.protocol = protocols[0].name; /* "dumb-increment-protocol" */
+	i.pwsi = &client_wsi;
+
+	lws_client_connect_via_info(&i);
+
+	while (n >= 0 && client_wsi && !interrupted)
+		n = lws_service(context, 0);
+
+	lws_context_destroy(context);
+
+	lwsl_user("Completed %s\n", rx_seen > 10 ? "OK" : "Failed");
+
+	return rx_seen > 10;
+}

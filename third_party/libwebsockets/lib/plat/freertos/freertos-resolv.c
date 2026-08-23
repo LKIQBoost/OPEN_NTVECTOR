@@ -1,0 +1,93 @@
+/*
+ * libwebsockets - small server side websockets and web server implementation
+ *
+ * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
+#include "private-lib-core.h"
+#include "private-lib-async-dns.h"
+
+#if defined(LWS_WITH_ESP32)
+#include <lwip/dns.h>
+#endif
+
+#if defined(LWS_WITH_SYS_ASYNC_DNS)
+int
+lws_plat_asyncdns_get_server(struct lws_context *context, int index,
+			     lws_sockaddr46 *sa46)
+{
+#if defined(LWS_WITH_ESP32)
+	const ip_addr_t *dns;
+#else
+	uint32_t ipv4;
+#endif
+
+#if defined(LWS_WITH_ESP32)
+	if (index > 2)
+		return -1;
+
+	dns = dns_getserver(index);
+	if (!dns || ip_addr_isany(dns))
+		return -1;
+
+	memset(sa46, 0, sizeof(*sa46));
+#if defined(LWIP_IPV6) && LWIP_IPV6
+#if defined(LWS_WITH_IPV6)
+	if (IP_IS_V6(dns)) {
+		sa46->sa4.sin_family = AF_INET6;
+		memcpy(&sa46->sa6.sin6_addr, ip_2_ip6(dns)->addr, 16);
+	} else
+#endif
+	{
+		sa46->sa4.sin_family = AF_INET;
+		sa46->sa4.sin_addr.s_addr = ip_2_ip4(dns)->addr;
+	}
+#else
+	sa46->sa4.sin_family = AF_INET;
+	sa46->sa4.sin_addr.s_addr = dns->addr;
+#endif
+
+	return 0;
+#else
+	if (index > 0)
+		return -1;
+
+	FreeRTOS_GetAddressConfiguration(NULL, NULL, NULL, &ipv4);
+
+	memset(sa46, 0, sizeof(*sa46));
+	sa46->sa4.sin_family = AF_INET;
+	sa46->sa4.sin_addr.s_addr = ipv4;
+
+	return 0;
+#endif
+}
+
+#endif
+
+int
+lws_plat_ntpclient_config(struct lws_context *context)
+{
+	lws_system_blob_heap_append(lws_system_get_blob(context,
+				    LWS_SYSBLOB_TYPE_NTP_SERVER, 0),
+				    (const uint8_t *)"pool.ntp.org", 13);
+
+	return 0;
+}

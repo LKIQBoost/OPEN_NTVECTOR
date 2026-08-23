@@ -1,0 +1,2496 @@
+/*
+ * libwebsockets - small server side websockets and web server implementation
+ *
+ * Copyright (C) 2010 - 2026 Andy Green <andy@warmcat.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ * This is a shared WebRTC protocol plugin that handles signaling (WS),
+ * DTLS, SRTP, and RTP packetization.
+ */
+
+#define LWS_DLL 1
+#define _GNU_SOURCE
+#include <libwebsockets.h>
+
+#include <string.h>
+#include <stdlib.h>
+#ifndef _WIN32
+#include <arpa/inet.h>
+#endif
+#include <ctype.h>
+#include <errno.h>
+#include <unistd.h>
+#include <assert.h>
+
+#include <libwebsockets/lws-rtp.h>
+#include <libwebsockets/lws-srtp.h>
+#include <libwebsockets/lws-stun.h>
+
+#include "protocol_lws_webrtc.h"
+#include <stdarg.h>
+
+static void
+webrtc_pss_log(struct pss_webrtc *pss, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	_lws_logv(LLL_NOTICE, fmt, ap);
+	va_end(ap);
+
+	if (pss && pss->connection_log && pss->connection_log_len < (64 * 1024) - 1) {
+		va_start(ap, fmt);
+		int n = vsnprintf(pss->connection_log + pss->connection_log_len,
+				  (64 * 1024) - pss->connection_log_len,
+				  fmt, ap);
+		va_end(ap);
+		if (n > 0)
+			pss->connection_log_len += (size_t)n;
+	}
+}
+
+static void
+webrtc_pss_err(struct pss_webrtc *pss, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	_lws_logv(LLL_ERR, fmt, ap);
+	va_end(ap);
+
+	if (pss && pss->connection_log && pss->connection_log_len < (64 * 1024) - 1) {
+		va_start(ap, fmt);
+		int n = vsnprintf(pss->connection_log + pss->connection_log_len,
+				  (64 * 1024) - pss->connection_log_len,
+				  fmt, ap);
+		va_end(ap);
+		if (n > 0)
+			pss->connection_log_len += (size_t)n;
+	}
+}
+
+static int
+lws_webrtc_foreach_session(struct vhd_webrtc *vhd, lws_webrtc_session_iter_cb cb, void *user)
+{
+	lws_start_foreach_dll(struct lws_dll2 *, d, lws_dll2_get_head(&vhd->sessions)) {
+		struct pss_webrtc *s = lws_container_of(d, struct pss_webrtc, list);
+		if (cb(s, user))
+			return 1;
+	} lws_end_foreach_dll(d);
+
+	return 0;
+}
+
+static void *
+lws_webrtc_get_user_data(struct pss_webrtc *pss)
+{
+	return pss->user_data;
+}
+
+static void
+lws_webrtc_set_user_data(struct pss_webrtc *pss, void *data)
+{
+	pss->user_data = data;
+}
+
+static int
+lws_webrtc_send_pli(struct pss_webrtc *pss);
+
+static struct lws_vhost *
+lws_webrtc_get_vhost(struct vhd_webrtc *vhd)
+{
+	return vhd->vhost;
+}
+
+static struct lws_context *
+lws_webrtc_get_context(struct vhd_webrtc *vhd)
+{
+	return vhd->context;
+}
+
+void
+lws_webrtc_media_ref(struct lws_webrtc_peer_media *media)
+{
+	if (!media) return;
+	/* In a real multi-threaded system this should be atomic, but for now we'll do:
+	 * Since `refcount` updates happen on the LWS event loop primarily, it's safe. */
+	media->refcount++;
+}
+
+void
+lws_webrtc_media_unref(struct lws_webrtc_peer_media **pmedia)
+{
+	struct lws_webrtc_peer_media *media = *pmedia;
+	if (!media) return;
+	media->refcount--;
+	if (media->refcount == 0) {
+#if defined(LWS_HAVE_PTHREAD_H)
+		if (media->txpacer)
+			lws_txp_destroy(&media->txpacer);
+#endif
+		pthread_mutex_destroy(&media->lock_tx);
+		free(media);
+	}
+	*pmedia = NULL;
+}
+
+static struct lws_webrtc_peer_media *lws_webrtc_get_media(struct pss_webrtc *pss) {
+	return pss ? pss->media : NULL;
+}
+
+static uint8_t lws_webrtc_get_video_pt(struct pss_webrtc *pss) { return pss->media ? pss->media->pt_video : 0; }
+static uint8_t lws_webrtc_get_video_pt_h264(struct pss_webrtc *pss) { return pss->media ? pss->media->pt_video_h264 : 0; }
+static uint8_t lws_webrtc_get_video_pt_av1(struct pss_webrtc *pss) { return pss->media ? pss->media->pt_video_av1 : 0; }
+static uint16_t lws_webrtc_get_seq_video(struct pss_webrtc *pss) { return pss->media ? pss->media->last_seq_video : 0; }
+static uint8_t lws_webrtc_get_audio_pt(struct pss_webrtc *pss) { return pss->media ? pss->media->pt_audio : 0; }
+
+static void
+lws_webrtc_set_on_media(struct vhd_webrtc *vhd, lws_webrtc_on_media_cb cb)
+{
+	vhd->on_media = cb;
+}
+
+static int
+webrtc_tx_pacer_cb(void *user, const uint8_t *buf, size_t len)
+{
+	struct lws_webrtc_peer_media *media = (struct lws_webrtc_peer_media *)user;
+
+	if (!media || !media->wsi_udp || !media->has_peer_sa46)
+		return -1;
+
+	int fd = (int)(lws_intptr_t)lws_get_socket_fd(media->wsi_udp);
+	if (fd >= 0) {
+		if (sendto((lws_sockfd_type)(lws_intptr_t)fd, (const char *)buf, LWS_POSIX_LENGTH_CAST(len), 0,
+					(const struct sockaddr *)&media->peer_sa46, media->peer_sa46.sa4.sin_family == AF_INET6 ? (socklen_t)sizeof(media->peer_sa46.sa6) : (socklen_t)sizeof(media->peer_sa46.sa4)) < (int)len) {
+			if (errno != EAGAIN && errno != EWOULDBLOCK && errno != ENOBUFS) {
+				lwsl_err("%s: UDP sendto failed: %d (%s)\n", __func__, errno, strerror(errno));
+			} else {
+				media->telemetry.txpacer_drops++;
+			}
+		} else {
+			if (!media->sent_first_rtp) {
+				lwsl_notice("%s: Sent FIRST RTP packet to peer via Pacer\n", __func__);
+				media->sent_first_rtp = 1;
+			}
+		}
+	}
+	return 0;
+}
+
+static void
+rtp_packet_tx_cb(void *priv, const uint8_t *pkt, size_t len, int marker)
+{
+
+	struct lws_webrtc_peer_media *media = (struct lws_webrtc_peer_media *)priv;
+	uint8_t protected_pkt[2048 + LWS_PRE];
+	uint8_t *p = protected_pkt + LWS_PRE;
+	size_t protected_len = len;
+
+	(void)marker;
+
+	if (!media || !media->wsi_udp || !media->has_peer_sa46)
+		return;
+
+	memcpy(p, pkt, len);
+	if (marker) p[1] |= 0x80;
+
+	if (lws_srtp_protect(&media->srtp_ctx_tx, p, &protected_len, 2048)) {
+		lwsl_err("%s: SRTP protect failed\n", __func__);
+		return;
+	}
+
+#if defined(LWS_HAVE_PTHREAD_H)
+	if (media->txpacer) {
+		uint8_t *heap_buf = malloc(protected_len);
+		if (heap_buf) {
+			memcpy(heap_buf, p, protected_len);
+			if (lws_txp_append(media->txpacer, heap_buf, protected_len) < 0) {
+				media->telemetry.txpacer_drops++;
+			}
+		}
+		return;
+	}
+#endif
+
+	/*
+	 * Non-blocking send. If we get EAGAIN/ENOBUFS, we must drop the packet
+	 * to avoid blocking the event loop or spinning.
+	 */
+	int fd = (int)(lws_intptr_t)lws_get_socket_fd(media->wsi_udp);
+	if (fd >= 0) {
+		if (sendto((lws_sockfd_type)(lws_intptr_t)fd, (const char *)p, LWS_POSIX_LENGTH_CAST(protected_len), 0,
+					(const struct sockaddr *)&media->peer_sa46, media->peer_sa46.sa4.sin_family == AF_INET6 ? (socklen_t)sizeof(media->peer_sa46.sa6) : (socklen_t)sizeof(media->peer_sa46.sa4)) < (int)protected_len) {
+			if (errno != EAGAIN && errno != EWOULDBLOCK && errno != ENOBUFS) {
+				lwsl_err("%s: UDP sendto failed: %d (%s)\n", __func__, errno, strerror(errno));
+			} else {
+				media->telemetry.txpacer_drops++;
+			}
+			/* Else: dropped (EAGAIN/ENOBUFS) */
+		} else {
+			if (!media->sent_first_rtp) {
+				lwsl_notice("%s: Sent FIRST RTP packet to peer\n", __func__);
+				media->sent_first_rtp = 1;
+			}
+		}
+	} else {
+		if (!media->sent_first_rtp) {
+			lwsl_notice("%s: Sent FIRST RTP packet to peer\n", __func__);
+			media->sent_first_rtp = 1;
+		}
+		if (len > 50 && media->sent_first_video < 10) {
+			lwsl_notice("%s: Sent Video RTP pkt %d to peer (len %zu, marker %d)\n", __func__, media->sent_first_video, protected_len, marker);
+			media->sent_first_video++;
+		}
+	}
+}
+
+/*
+ * Public API for the plugin to be used by other components via pvo or similar.
+ * Since this is a plugin, we might need a way to export these or use them
+ * through the protocol private data.
+ */
+
+
+
+static int
+lws_webrtc_send_video(struct lws_webrtc_peer_media *media, const uint8_t *buf, size_t len, int codec, uint32_t pts)
+{
+	/* We no longer use rtp_tx_tracker with pss here since rtp_packet_tx_cb expects a tracker with pss.
+	 * Wait, rtp_packet_tx_cb expects `tracker->pss`. Let's pass `media` instead.
+	 * Let's rewrite rtp_packet_tx_cb_tracker. */
+	int is_av1 = 0;
+	uint8_t pt = 0;
+
+	if (!media || !media->handshake_done)
+		return 0;
+
+	if (codec == LWS_WEBRTC_CODEC_AV1) {
+		is_av1 = 1;
+		pt = media->pt_video_av1;
+	} else {
+		is_av1 = 0;
+		pt = media->pt_video_h264;
+	}
+
+	if (!pt) {
+		/* Participant doesn't support this codec */
+		return 0;
+	}
+
+	pthread_mutex_lock(&media->lock_tx);
+
+	if (media->sent_first_video < 10)
+		lwsl_notice("%s: Outgoing video session %p, len %zu, PT %u, SSRC %u, Codec %d\n",
+				__func__, media, len, pt, media->ssrc_video, codec);
+
+	if (!media->rtp_ts_offset_set) {
+		/* Lock the incoming master PTS to our randomized session timeline */
+		media->rtp_ts_offset = media->rtp_ctx_video.ts - pts;
+		media->rtp_ts_offset_set = 1;
+		lwsl_notice("%s: Session %p, Base TS %u, Master PTS %u, Sync Offset %u\n",
+				__func__, media, media->rtp_ctx_video.ts, pts, media->rtp_ts_offset);
+	}
+
+	media->rtp_ctx_video.ts = pts + media->rtp_ts_offset;
+
+	// static int ts_tick = 0;
+	// if (ts_tick++ % 100 == 0)
+	// 	lwsl_notice("%s: Session %p, Codec %d, Master PTS %u -> Calced RTP TS %u (Handshake Done: %d)\n",
+	// 		__func__, pss, codec, pts, pss->rtp_ctx_video.ts, pss->handshake_done);
+
+	if (is_av1) {
+		const uint8_t *src = buf, *end = buf + len;
+		media->rtp_ctx_video.pt = pt;
+
+		static int av1_rx_cnt = 0;
+		if (av1_rx_cnt++ % 50 == 0) {
+			char hex[128], *ph = hex;
+			size_t dlen = (len > 32 ? 32 : len);
+			for (size_t i = 0; i < dlen; i++)
+				ph += lws_snprintf(ph, 4, "%02x ", buf[i]);
+			lwsl_notice("%s: Incoming AV1 Frame: len %zu, hex: %s\n", __func__, len, hex);
+		}
+		/* Lookahead scan: find the last valid OBU that we will actually transmit.
+		 * We need this to correctly set the RTP 'marker' bit, which must be on
+		 * the last packet of the last transmitted OBU of the Temporal Unit.
+		 */
+		const uint8_t *last_valid_obu = NULL;
+		const uint8_t *scan = buf;
+		while (scan < end) {
+			uint8_t oh = *scan;
+			int has_size = (oh & 0x02);
+			const uint8_t *obu_start = scan;
+			size_t pl = 0;
+			scan++;
+			if (oh & 0x04 && scan < end) scan++;
+			if (has_size && scan < end) {
+				const uint8_t *ts = scan;
+				size_t tr = (size_t)(end - scan);
+				uint32_t s = 0; int shift = 0;
+				while (tr > 0) {
+					uint8_t b = *ts++; tr--;
+					s |= (uint32_t)(b & 0x7f) << shift;
+					if (!(b & 0x80)) break;
+					shift += 7;
+				}
+				scan = ts; pl = s;
+			} else if (!has_size) {
+				pl = (size_t)(end - scan);
+			}
+			uint8_t type = (oh >> 3) & 0x0f;
+
+			// Debug: Print OBU type
+			static int obu_log_limit = 0;
+			if (obu_log_limit++ < 100) {
+				lwsl_notice("%s: AV1 OBU Type %u, len %zu, has_size %d\n", __func__, type, pl, has_size);
+			}
+
+			if (type != 2 && type != 5 && type != 15)
+				last_valid_obu = obu_start;
+
+			if (pl > (size_t)(end - scan))
+				pl = (size_t)(end - scan);
+			scan += pl;
+		}
+
+		/* Parse Annex B OBUs from buf */
+		while (src < end) {
+			uint8_t oh = *src;
+			int has_size = (oh & 0x02);
+			const uint8_t *ps = NULL;
+			size_t pl = 0;
+
+			const uint8_t *obu_start = src;
+			src++; /* Header */
+			if (oh & 0x04 && src < end) src++; /* Extension */
+
+			if (has_size && src < end) {
+				const uint8_t *ts = src;
+				size_t tr = (size_t)(end - src);
+				uint32_t s = 0;
+				int shift = 0;
+				while (tr > 0) {
+					uint8_t b = *ts++; tr--;
+					s |= (uint32_t)(b & 0x7f) << shift;
+					if (!(b & 0x80)) break;
+					shift += 7;
+				}
+				src = ts;
+				pl = s;
+			} else if (!has_size) {
+				pl = (size_t)(end - src);
+			}
+
+			if (pl > (size_t)(end - src)) pl = (size_t)(end - src);
+
+			ps = src;
+			uint8_t stack_obu[4096], *tmp_obu = NULL;
+			uint8_t oh_no_size = (uint8_t)(oh & 0xfd);
+			size_t tl = 1 + (oh & 0x04 ? 1 : 0);
+
+			if (tl + pl <= sizeof(stack_obu)) {
+				tmp_obu = stack_obu;
+			} else {
+				tmp_obu = malloc(tl + pl);
+			}
+
+			if (tmp_obu) {
+				tmp_obu[0] = oh_no_size;
+				if (oh & 0x04) tmp_obu[1] = obu_start[1];
+
+				uint8_t type = (tmp_obu[0] >> 3) & 0x0f;
+				if (type == 2 || type == 5 || type == 15) {
+					/* RFC 9436: OBU type 2 (Temporal Delimiter) SHOULD be removed.
+					 * OBU type 5 (Metadata) and 15 (Padding) can also confuse some decoders. */
+					if (tmp_obu != stack_obu) free(tmp_obu);
+					src += pl;
+					continue;
+				}
+
+				// lwsl_notice("%s: Sending AV1 OBU type %d, len %zu (marker %d), hex: %02x %02x %02x %02x\n",
+				//	__func__, type, pl, (obu_start == last_valid_obu),
+				//	tmp_obu[0], tl > 1 ? tmp_obu[1] : 0, tmp_obu[tl], tmp_obu[tl+1]);
+
+				memcpy(tmp_obu + tl, ps, pl);
+				lws_rtp_av1_packetize(&media->rtp_ctx_video, tmp_obu, tl + pl, (obu_start == last_valid_obu), LWS_RTP_MTU_DEFAULT, rtp_packet_tx_cb, media);
+				if (tmp_obu != stack_obu) free(tmp_obu);
+			}
+
+			src += pl;
+		}
+	} else {
+		const uint8_t *p = buf, *end = buf + len;
+		const uint8_t *nal_start = NULL;
+
+		media->rtp_ctx_video.pt = pt;
+
+		while (p < end) {
+			const uint8_t *next_nal = NULL;
+			/* Find this NAL start */
+			if (p + 3 < end && p[0] == 0 && p[1] == 0 && p[2] == 1) {
+				nal_start = p + 3;
+			} else if (p + 4 < end && p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 1) {
+				nal_start = p + 4;
+			} else {
+				p++;
+				continue;
+			}
+
+			/* Find next NAL start */
+			const uint8_t *q = nal_start;
+			while (q + 3 < end) {
+				if (q[0] == 0 && q[1] == 0 && (q[2] == 1 || (q[2] == 0 && q[3] == 1))) {
+					next_nal = q;
+					break;
+				}
+				q++;
+			}
+
+			size_t nal_len = next_nal ? (size_t)(next_nal - nal_start) : (size_t)(end - nal_start);
+			uint8_t type = nal_start[0] & 0x1f;
+			int last = !next_nal;
+
+			if (type == 7 || type == 8 || type == 5 || (media->sent_first_video % 30 == 0))
+				lwsl_debug("%s: Outgoing H264 NAL type %u, len %zu, SSRC %u, PT %u (last %d)\n", __func__, type, nal_len, media->ssrc_video, pt, last);
+
+			if (type == 7 && nal_len <= sizeof(media->sps)) {
+				memcpy(media->sps, nal_start, nal_len);
+				media->sps_len = nal_len;
+			} else if (type == 8 && nal_len <= sizeof(media->pps)) {
+				memcpy(media->pps, nal_start, nal_len);
+				media->pps_len = nal_len;
+			} else if (type == 5) {
+				lws_usec_t now = lws_now_usecs();
+				if (now - media->last_sps_pps_ts > 1 * LWS_US_PER_SEC) {
+					if (media->sps_len)
+						lws_rtp_h264_packetize(&media->rtp_ctx_video, media->sps, media->sps_len, 0, LWS_RTP_MTU_DEFAULT, rtp_packet_tx_cb, media);
+					if (media->pps_len)
+						lws_rtp_h264_packetize(&media->rtp_ctx_video, media->pps, media->pps_len, 0, LWS_RTP_MTU_DEFAULT, rtp_packet_tx_cb, media);
+					media->last_sps_pps_ts = now;
+				}
+			}
+
+			lws_rtp_h264_packetize(&media->rtp_ctx_video, nal_start, nal_len, last, LWS_RTP_MTU_DEFAULT, rtp_packet_tx_cb, media);
+
+			if (next_nal)
+				p = next_nal;
+			else
+				p = end;
+		}
+	}
+
+	/* Increment timestamp: 90000Hz / 30fps = 3000 (Global for all codecs) */
+	media->rtp_ctx_video.ts += 3000;
+
+	// if (media->sent_first_video < 20) {
+	//	lwsl_notice("%s: Sent frame (len %zu, packets %d, Codec %d, PT %u, TS %u)\n",
+	//		__func__, len, tracker.count, codec, media->rtp_ctx_video.pt, media->rtp_ctx_video.ts);
+	// }
+
+	media->sent_first_video++;
+	if (media->sent_first_video > 1000) media->sent_first_video = 100; /* throttle but stay tracking */
+
+	pthread_mutex_unlock(&media->lock_tx);
+
+	return 0;
+}
+
+static int
+lws_webrtc_send_audio(struct lws_webrtc_peer_media *media, const uint8_t *buf, size_t len, uint32_t timestamp)
+{
+	uint8_t pkt[1514 + LWS_PRE];
+	uint8_t *p = pkt + LWS_PRE;
+	size_t pkt_len = LWS_RTP_HEADER_LEN + len;
+
+	if (!media || !media->handshake_done)
+		return 0;
+
+	pthread_mutex_lock(&media->lock_tx);
+
+	if (timestamp != 0) {
+		if (!media->rtp_ts_audio_offset_set) {
+			media->rtp_ts_audio_offset = media->rtp_ctx_audio.ts - timestamp;
+			media->rtp_ts_audio_offset_set = 1;
+		}
+		media->rtp_ctx_audio.ts = timestamp + media->rtp_ts_audio_offset;
+	}
+
+	lws_rtp_write_header(&media->rtp_ctx_audio, p, 0); /* Marker=0 for audio */
+	memcpy(p + LWS_RTP_HEADER_LEN, buf, len);
+
+	if (timestamp == 0)
+		media->rtp_ctx_audio.ts += 960; /* Use fallback for 20ms if PTS omitted */
+
+	rtp_packet_tx_cb(media, p, pkt_len, 0);
+
+	media->sent_first_audio = 1;
+
+	pthread_mutex_unlock(&media->lock_tx);
+
+	return 0;
+}
+
+static int
+lws_webrtc_send_text(struct pss_webrtc *pss, const char *buf, size_t len)
+{
+	if (lws_buflist_append_segment(&pss->buflist, (const uint8_t *)buf, len) < 0)
+		return -1;
+
+	lws_callback_on_writable(pss->wsi_ws);
+
+	return (int)len;
+}
+
+static int
+lws_webrtc_send_pli(struct pss_webrtc *pss)
+{
+	struct lws_webrtc_peer_media *media = pss ? pss->media : NULL;
+	uint8_t pli[128 + LWS_PRE];
+	uint8_t *p = pli + LWS_PRE;
+
+	if (!media || !media->wsi_udp || !media->handshake_done)
+		return 0;
+
+	if (!media->ssrc_peer_video) return 0;
+
+	/* RTCP PLI: Vers=2, P=0, FMT=1, PT=206, Len=2 (12 bytes) */
+	p[0] = 0x81; p[1] = 206; p[2] = 0; p[3] = 2;
+	/* SSRC of sender */
+	p[4] = (uint8_t)(media->ssrc_video >> 24); p[5] = (uint8_t)(media->ssrc_video >> 16);
+	p[6] = (uint8_t)(media->ssrc_video >> 8);  p[7] = (uint8_t)media->ssrc_video;
+	/* SSRC of media source (browser) */
+	p[8] = (uint8_t)(media->ssrc_peer_video >> 24); p[9] = (uint8_t)(media->ssrc_peer_video >> 16);
+	p[10] = (uint8_t)(media->ssrc_peer_video >> 8); p[11] = (uint8_t)media->ssrc_peer_video;
+
+	size_t len = 12;
+
+	pthread_mutex_lock(&media->lock_tx);
+	if (lws_srtp_protect_rtcp(&media->srtp_ctx_tx, p, &len, sizeof(pli) - LWS_PRE) == 0) {
+		int fd = (int)(lws_intptr_t)lws_get_socket_fd(media->wsi_udp);
+		if (fd >= 0) {
+			lwsl_notice("%s: Sending PLI request for SSRC %u\n", __func__, media->ssrc_peer_video);
+			if (sendto((lws_sockfd_type)(lws_intptr_t)fd, (const char *)p, LWS_POSIX_LENGTH_CAST(len), 0, (const struct sockaddr *)&media->peer_sa46, media->peer_sa46.sa4.sin_family == AF_INET6 ? (socklen_t)sizeof(media->peer_sa46.sa6) : (socklen_t)sizeof(media->peer_sa46.sa4)) < 0) {
+				lwsl_err("%s: PLI sendto failed: errno %d\n", __func__, errno);
+			}
+		}
+	}
+	pthread_mutex_unlock(&media->lock_tx);
+
+	return 0;
+}
+
+static int
+lws_webrtc_create_offer(struct pss_webrtc *pss)
+{
+	struct vhd_webrtc *vhd;
+	const struct lws_protocols *prot = lws_vhost_name_to_protocol(lws_get_vhost(pss->wsi_ws), "lws-webrtc");
+	if (!prot) return -1;
+	vhd = (struct vhd_webrtc *)lws_protocol_vh_priv_get(lws_get_vhost(pss->wsi_ws), prot);
+	char json_buf[LWS_PRE + 8192], *p = &json_buf[LWS_PRE];
+	char audio_m[2048], video_m[2048], candidates[1024] = "";
+	size_t n_sdp;
+
+	pss->is_client = 0;
+
+	if (!vhd) return -1;
+
+	/* Initialize Server DTLS */
+	if (!pss->handshake_started) {
+		struct lws_gendtls_creation_info ci;
+		memset(&ci, 0, sizeof(ci));
+		ci.context = vhd->context;
+		ci.mode = LWS_GENDTLS_MODE_SERVER;
+		ci.mtu = 1100;
+		ci.use_srtp = "SRTP_AES128_CM_SHA1_80";
+		if (lws_gendtls_create(&pss->dtls_ctx, &ci)) return -1;
+		lws_gendtls_set_cert_mem(&pss->dtls_ctx, vhd->cert_mem, vhd->cert_len);
+		lws_gendtls_set_key_mem(&pss->dtls_ctx, vhd->key_mem, vhd->key_len);
+		pss->media->wsi_udp = vhd->wsi_udp;
+		pss->handshake_started = 1;
+	}
+
+	/* Default PTs for Offer */
+	pss->media->pt_audio = 111;
+	pss->media->pt_video_h264 = 102;
+	pss->media->pt_video_av1 = 104;
+	pss->media->pt_video = pss->media->pt_video_h264; /* Default to H264 */
+
+	pss->media->rtp_ctx_video.ts = (uint32_t)(lws_now_usecs() * 9 / 100);
+	pss->media->rtp_ctx_audio.ts = (uint32_t)(lws_now_usecs() * 48 / 1000);
+
+	lws_rtp_init(&pss->media->rtp_ctx_video, pss->media->ssrc_video, pss->media->pt_video);
+	lws_rtp_init(&pss->media->rtp_ctx_audio, pss->media->ssrc_audio, pss->media->pt_audio);
+
+	/* Candidates */
+	if (vhd->external_ip[0]) {
+		lws_snprintf(candidates, sizeof(candidates),
+				"a=candidate:1 1 udp 2130706431 %s %u typ host generation 0\\r\\n",
+				vhd->external_ip, vhd->udp_port);
+	} else {
+		lws_snprintf(candidates, sizeof(candidates),
+				"a=candidate:1 1 udp 2130706431 127.0.0.1 %u typ host generation 0\\r\\n",
+				vhd->udp_port);
+	}
+
+	/* Video Section */
+	lws_snprintf(video_m, sizeof(video_m),
+			"m=video %u UDP/TLS/RTP/SAVPF %u %u\\r\\n"
+			"c=IN IP4 0.0.0.0\\r\\n"
+			"a=rtcp-mux\\r\\n"
+			"a=ice-ufrag:%s\\r\\n"
+			"a=ice-pwd:%s\\r\\n"
+			"a=fingerprint:sha-256 %s\\r\\n"
+			"a=setup:passive\\r\\n"
+			"a=mid:1\\r\\n"
+			"a=sendonly\\r\\n"
+			"a=msid:lws-stream lws-track-video\\r\\n"
+			"a=rtpmap:%u H264/90000\\r\\n"
+			"a=fmtp:%u level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e02a\\r\\n"
+			"a=rtpmap:%u AV1/90000\\r\\n"
+			"a=fmtp:%u profile=0;level-idx=5;tier=0\\r\\n"
+			"a=rtcp-fb:%u nack\\r\\n"
+			"a=rtcp-fb:%u nack pli\\r\\n"
+			"a=rtcp-fb:%u nack\\r\\n"
+			"a=rtcp-fb:%u nack pli\\r\\n"
+			"a=ssrc:%u cname:lws-video\\r\\n"
+			"a=ssrc:%u msid:lws-stream lws-track-video\\r\\n"
+			"%s"
+			"a=end-of-candidates\\r\\n",
+		vhd->udp_port, pss->media->pt_video_h264, pss->media->pt_video_av1,
+		pss->ice_ufrag, pss->ice_pwd, vhd->fingerprint,
+		pss->media->pt_video_h264, pss->media->pt_video_h264,
+		pss->media->pt_video_av1, pss->media->pt_video_av1,
+		pss->media->pt_video_h264, pss->media->pt_video_h264,
+		pss->media->pt_video_av1, pss->media->pt_video_av1,
+		pss->media->ssrc_video, pss->media->ssrc_video, candidates);
+
+	/* Audio Section */
+	lws_snprintf(audio_m, sizeof(audio_m),
+			"m=audio %u UDP/TLS/RTP/SAVPF %u\\r\\n"
+			"c=IN IP4 0.0.0.0\\r\\n"
+			"a=rtcp-mux\\r\\n"
+			"a=ice-ufrag:%s\\r\\n"
+			"a=ice-pwd:%s\\r\\n"
+			"a=fingerprint:sha-256 %s\\r\\n"
+			"a=setup:passive\\r\\n"
+			"a=mid:0\\r\\n"
+			"a=sendonly\\r\\n"
+			"a=msid:lws-stream lws-track-audio\\r\\n"
+			"a=rtpmap:%u opus/48000/2\\r\\n"
+			"a=fmtp:%u maxplaybackrate=48000;sprop-stereo=0;stereo=0;useinbandfec=0;maxaveragebitrate=20000\\r\\n"
+			"a=ssrc:%u cname:lws-audio\\r\\n"
+			"a=ssrc:%u msid:lws-stream lws-track-audio\\r\\n"
+			"%s"
+			"a=end-of-candidates\\r\\n",
+			vhd->udp_port, pss->media->pt_audio,
+			pss->ice_ufrag, pss->ice_pwd, vhd->fingerprint,
+			pss->media->pt_audio, pss->media->pt_audio,
+			pss->media->ssrc_audio, pss->media->ssrc_audio, candidates);
+
+	n_sdp = (size_t)lws_snprintf(p, 8192,
+			"{\"type\":\"offer\",\"sdp\":\"v=0\\r\\no=- 123456 2 IN IP4 %s\\r\\ns=-\\r\\nt=0 0\\r\\na=msid-semantic: WMS lws-stream\\r\\na=ice-lite\\r\\na=group:BUNDLE 0 1\\r\\n%s%s\"}",
+			vhd->external_ip[0] ? vhd->external_ip : "127.0.0.1", audio_m, video_m);
+
+	webrtc_pss_log(pss, "Generated SDP OFFER (%zu bytes)\n%s\n", n_sdp, p);
+	if (write(2, "\n--- START SDP OFFER ---\n", 25) < 0 ||
+	    write(2, p, n_sdp) < 0 ||
+	    write(2, "\n--- END SDP OFFER ---\n\n", 25) < 0) {
+		webrtc_pss_err(pss, "Failed writing SDP offer to stderr\n");
+		return -1;
+	}
+
+	if (lws_buflist_append_segment(&pss->buflist, (const uint8_t *)p, n_sdp) < 0)
+		return -1;
+	lws_callback_on_writable(pss->wsi_ws);
+
+	return 0;
+}
+
+/* STUN Binding Request generator for hole punching */
+static int
+lws_webrtc_stun_req_pack(struct pss_webrtc *pss, uint8_t *buf, size_t len, uint8_t *tid)
+{
+	uint8_t *start = buf, *p = buf + 20;
+	uint32_t magic = LWS_STUN_MAGIC_COOKIE;
+	char username[128];
+	int user_len;
+	struct lws_genhmac_ctx hmac_ctx;
+	uint8_t hmac[20];
+	uint32_t fp;
+
+	/* Header: Type 0x0001 (Binding Request) */
+	lws_ser_wu16be(buf, 0x0001);
+	/* Length (filled later) */
+	lws_ser_wu16be(buf + 2, 0);
+	/* Magic Cookie */
+	lws_ser_wu32be(buf + 4, magic);
+	/* Transaction ID */
+	memcpy(buf + 8, tid, 12);
+
+	/* 1. USERNAME (0x0006): remote_ufrag:local_ufrag */
+	user_len = lws_snprintf(username, sizeof(username), "%s:%s", pss->ice_ufrag_remote, pss->ice_ufrag);
+	if (user_len > 0) {
+		lws_ser_wu16be(p, LWS_STUN_ATTR_USERNAME);
+		lws_ser_wu16be(p + 2, (uint16_t)user_len);
+		memcpy(p + 4, username, (size_t)user_len);
+		p += 4 + user_len;
+		/* Padding to 4 bytes */
+		while ((p - start) & 3) *p++ = 0;
+	}
+
+	/* 2. PRIORITY (0x0024) */
+	lws_ser_wu16be(p, 0x0024);
+	lws_ser_wu16be(p + 2, 4);
+	lws_ser_wu32be(p + 4, 1845494271); /* Type preference 110, Local pref 65535, Component 255 */
+	p += 8;
+
+	/*
+	 * CRITICAL: We MUST NOT include ICE-CONTROLLING (0x802A) here!
+	 * Since our server is ice-lite, sending ICE-CONTROLLING is a fatal protocol
+	 * violation and modern Chrome/Firefox will aggressively abort the ICE connection.
+	 */
+
+	/* 3. MESSAGE-INTEGRITY (0x0008) */
+	/* Should use remote password */
+	if (pss->ice_pwd_remote[0]) {
+		uint16_t msg_len = (uint16_t)(p - start - 20 + 24); /* Current len + attribute header + HMAC (20) */
+		lws_ser_wu16be(start + 2, msg_len);
+
+		if (lws_genhmac_init(&hmac_ctx, LWS_GENHMAC_TYPE_SHA1, (uint8_t *)pss->ice_pwd_remote, strlen(pss->ice_pwd_remote)) ||
+				lws_genhmac_update(&hmac_ctx, start, (size_t)(p - start)) ||
+				lws_genhmac_destroy(&hmac_ctx, hmac)) {
+			lwsl_err("%s: HMAC failed\n", __func__);
+			return -1;
+		}
+
+		lws_ser_wu16be(p, 0x0008);
+		lws_ser_wu16be(p + 2, 20);
+		memcpy(p + 4, hmac, 20);
+		p += 24;
+	}
+
+	/* 4. FINGERPRINT (0x8028) */
+	{
+		uint16_t msg_len = (uint16_t)(p - start - 20 + 8); /* Current len + attribute header + CRC (4) */
+		lws_ser_wu16be(start + 2, msg_len);
+
+		fp = lws_crc32(0, start, (size_t)(p - start));
+		fp ^= LWS_STUN_FINGERPRINT_XOR;
+
+		lws_ser_wu16be(p, 0x8028);
+		lws_ser_wu16be(p + 2, 4);
+		lws_ser_wu32be(p + 4, fp);
+		p += 8;
+	}
+
+	/* Update Header Length (Payload length) */
+	lws_ser_wu16be(start + 2, (uint16_t)(p - start - 20));
+
+	return (int)(p - start);
+}
+
+
+
+
+	static int
+handle_candidate(struct pss_webrtc *pss, struct vhd_webrtc *vhd, const char *cand)
+{
+	char ip_str[64];
+	int port = 0;
+	struct lws_tokenize ts;
+
+	/*
+	 * Format: candidate:1 1 udp <prio> <IP> <PORT> ...
+	 * We need to handle "candidate:1" or "candidate" "1" depending on tokenizer.
+	 * Let's just look for "udp" then take the next 3 tokens: priority, IP, port.
+	 */
+	memset(&ts, 0, sizeof(ts));
+	ts.len = strlen(cand);
+	lws_tokenize_init(&ts, cand, LWS_TOKENIZE_F_NO_FLOATS | LWS_TOKENIZE_F_MINUS_NONTERM | LWS_TOKENIZE_F_DOT_NONTERM);
+
+	int state = 0;
+
+	while (lws_tokenize(&ts) != LWS_TOKZE_ENDED) {
+		lwsl_notice("%s: Token: '%.*s' (len %d, type %d), state %d\n", __func__, (int)ts.token_len, ts.token, (int)ts.token_len, ts.e, state);
+		if (state == 0 && ts.token_len == 3 && !strncmp(ts.token, "udp", 3)) {
+			state = 1; /* Found Protocol udp */
+		} else if (state == 1) {
+			/* Priority */
+			state = 2;
+		} else if (state == 2) {
+			/* IP Address */
+			if (ts.token_len < sizeof(ip_str)) {
+				lws_strncpy(ip_str, ts.token, sizeof(ip_str));
+				state = 3;
+			} else {
+				return -1;
+			}
+		} else if (state == 3) {
+			/* Port */
+			port = atoi(ts.token);
+			state = 5;
+			break;
+		}
+	}
+
+	if (state == 5 && port > 0) {
+		webrtc_pss_log(pss, "Found ICE Candidate: %s:%d\n", ip_str, port);
+
+		if (lws_sa46_parse_numeric_address(ip_str, &pss->media->peer_sa46) < 0)
+			return -1;
+		sa46_sockport(&pss->media->peer_sa46, htons((uint16_t)port));
+		pss->media->has_peer_sa46 = 1;
+
+		/* Send STUN Binding Request to punch hole (spec compliant) */
+		uint8_t stun[2048];
+		uint8_t tid[12];
+
+		if (!pss->media->wsi_udp) {
+			lwsl_err("%s: Error: pss->media->wsi_udp is NULL!\n", __func__);
+			return -1;
+		}
+
+		lws_get_random(vhd->context, tid, 12);
+		int n = lws_webrtc_stun_req_pack(pss, stun, sizeof(stun), tid);
+		if (n > 0) {
+			int fd = (int)(lws_intptr_t)lws_get_socket_fd(pss->media->wsi_udp);
+			if (fd >= 0) {
+				if (sendto((lws_sockfd_type)(lws_intptr_t)fd, (const char *)stun, (size_t)n, 0,
+						(const struct sockaddr *)&pss->media->peer_sa46, pss->media->peer_sa46.sa4.sin_family == AF_INET6 ? (socklen_t)sizeof(pss->media->peer_sa46.sa6) : (socklen_t)sizeof(pss->media->peer_sa46.sa4)) < 0) {
+					webrtc_pss_err(pss, "STUN Binding sendto failed: errno %d\n", errno);
+				}
+			}
+			webrtc_pss_log(pss, "Sent STUN Binding Request to %s:%d\n", ip_str, port);
+		} else {
+			webrtc_pss_err(pss, "STUN req pack failed: %d\n", n);
+		}
+
+
+		return 0;
+	}
+
+	return 0;
+}
+
+static void
+lws_webrtc_parse_sdp_codecs(struct pss_webrtc *pss, const char *sdp_clean)
+{
+	/* Reset PSS PTs */
+	pss->media->pt_audio = 0;
+	pss->media->pt_video_h264 = 0;
+	pss->media->pt_video_av1 = 0;
+	pss->media->pt_video = 0;
+
+	char mid_audio[32] = "0", mid_video[32] = "1";
+	int audio_first = 0;
+
+	/* Quick scan for order using strstr as it's efficient for this high-level check */
+	const char *p_audio = strstr(sdp_clean, "m=audio");
+	const char *p_video = strstr(sdp_clean, "m=video");
+
+	if (p_audio && p_video && p_audio < p_video)
+		audio_first = 1;
+
+	(void)audio_first; /* suppress unused-but-set-variable */
+
+	char *p_scan = (char *)sdp_clean;
+	int in_audio = 0;
+	int in_video = 0;
+
+	/* H.264 PT Map */
+	uint8_t h264_pt_map[128];
+	memset(h264_pt_map, 0, sizeof(h264_pt_map));
+
+	/* Pass 1: Build H.264 PT Map from rtpmap */
+	char *p_pass1 = (char *)sdp_clean;
+	while (*p_pass1) {
+		char *eol = (char *)strchr(p_pass1, '\n');
+		size_t line_len = eol ? (size_t)(eol - p_pass1) : strlen(p_pass1);
+		if (line_len > 0 && p_pass1[line_len-1] == '\r') line_len--;
+
+		/* We only care about a=rtpmap here */
+		if (line_len > 9 && !strncmp(p_pass1, "a=rtpmap:", 9)) {
+			char line[256]; /* Sufficient for rtpmap */
+			if (line_len < sizeof(line)) {
+				memcpy(line, p_pass1, line_len);
+				line[line_len] = '\0';
+
+				struct lws_tokenize ts;
+				lws_tokenize_init(&ts, line, LWS_TOKENIZE_F_NO_FLOATS | LWS_TOKENIZE_F_MINUS_NONTERM | LWS_TOKENIZE_F_SLASH_NONTERM);
+				ts.len = line_len;
+
+				/* Skip "a=rtpmap:" part by finding first integer */
+				int pt = -1;
+				while (lws_tokenize(&ts) != LWS_TOKZE_ENDED) {
+					if (ts.token_len > 0 && isdigit(ts.token[0])) {
+						pt = atoi(ts.token);
+						break; /* Found PT */
+					}
+				}
+
+				if (pt != -1 && pt < 128) {
+					/* Next token should be Codec/Rate */
+					if (lws_tokenize(&ts) == LWS_TOKZE_TOKEN) {
+						if (!strncasecmp(ts.token, "H264/90000", 10)) {
+							h264_pt_map[pt] = 1;
+						}
+					}
+				}
+			}
+		}
+
+		if (!eol) break;
+		p_pass1 = eol + 1;
+	}
+
+	/* Pass 2: Main Parsing */
+	while (*p_scan) {
+		char *eol = (char *)strchr(p_scan, '\n');
+		size_t line_len = eol ? (size_t)(eol - p_scan) : strlen(p_scan);
+		if (line_len > 0 && p_scan[line_len-1] == '\r') line_len--;
+
+		/* Create separate buffer for line to tokenize safely */
+		char line[1024];
+		if (line_len < sizeof(line)) {
+			memcpy(line, p_scan, line_len);
+			line[line_len] = '\0';
+
+			if (!strncmp(line, "m=audio", 7)) { in_audio = 1; in_video = 0; }
+			else if (!strncmp(line, "m=video", 7)) { in_audio = 0; in_video = 1; }
+
+			if (in_audio && !strncmp(line, "a=mid:", 6)) {
+				lws_strncpy(mid_audio, line + 6, sizeof(mid_audio));
+			}
+			if (in_video && !strncmp(line, "a=mid:", 6)) {
+				lws_strncpy(mid_video, line + 6, sizeof(mid_video));
+			}
+
+			/* Parse RTP Maps and FMTPs */
+			/* a=rtpmap:<pt> <codec>/<rate> */
+			if (!strncmp(line, "a=rtpmap:", 9)) {
+				struct lws_tokenize ts;
+				lws_tokenize_init(&ts, line, LWS_TOKENIZE_F_NO_FLOATS | LWS_TOKENIZE_F_MINUS_NONTERM | LWS_TOKENIZE_F_SLASH_NONTERM);
+				ts.len = line_len;
+
+				/* Skip "a=rtpmap:" part by finding first integer */
+				int pt = -1;
+				while (lws_tokenize(&ts) != LWS_TOKZE_ENDED) {
+					if (ts.token_len > 0 && isdigit(ts.token[0])) {
+						pt = atoi(ts.token);
+						break; /* Found PT */
+					}
+				}
+
+				if (pt != -1) {
+					/* Next token should be Codec/Rate */
+					if (lws_tokenize(&ts) == LWS_TOKZE_TOKEN) {
+						if (!strncasecmp(ts.token, "H264/90000", 10)) {
+							/* We found H264. Map already populated in Pass 1. */
+						} else if (!strncasecmp(ts.token, "AV1/90000", 9)) {
+							pss->media->pt_video_av1 = (uint8_t)pt;
+						} else if (!strncasecmp(ts.token, "VP9/90000", 9)) {
+						} else if (!strncasecmp(ts.token, "opus/48000", 10)) {
+							pss->media->pt_audio = (uint8_t)pt;
+						}
+					}
+				}
+			}
+
+			/* a=fmtp:<pt> ... */
+			if (!strncmp(line, "a=fmtp:", 7)) {
+				struct lws_tokenize ts;
+				lws_tokenize_init(&ts, line, LWS_TOKENIZE_F_NO_FLOATS | LWS_TOKENIZE_F_MINUS_NONTERM | LWS_TOKENIZE_F_EQUALS_NONTERM);
+				ts.len = line_len;
+
+				int pt = -1;
+				/* Find PT first */
+				while (lws_tokenize(&ts) != LWS_TOKZE_ENDED) {
+					if (ts.token_len > 0 && isdigit(ts.token[0])) {
+						pt = atoi(ts.token);
+						break;
+					}
+				}
+
+				if (pt != -1) {
+					/* Check if this is H264 Mode 1 */
+					if (!pss->media->pt_video_h264) {
+						int is_mode_1 = 0;
+						while (lws_tokenize(&ts) != LWS_TOKZE_ENDED) {
+							if (ts.token_len == 18 && !strncmp(ts.token, "packetization-mode", 18)) {
+								/* Next token should be = then 1 */
+								if (lws_tokenize(&ts) == LWS_TOKZE_DELIMITER && ts.token[0] == '=') {
+									if (lws_tokenize(&ts) == LWS_TOKZE_INTEGER && ts.token[0] == '1') {
+										is_mode_1 = 1;
+									}
+								}
+							}
+						}
+
+						if (is_mode_1) {
+							pss->media->pt_video_h264 = (uint8_t)pt;
+						} else {
+							/* Only accept if we verified it is H264 via rtpmap */
+							if (pt < 128 && h264_pt_map[pt]) {
+								/* If we haven't found a better one (Mode 1), use this */
+								if (!pss->media->pt_video_h264)
+									pss->media->pt_video_h264 = (uint8_t)pt;
+							}
+						}
+					}
+
+					/* Capture FMTP for Audio/Video */
+					if (pt == pss->media->pt_audio) {
+						if (strlen(line) - 7 > 0) {
+							const char *fmtp_val = strchr(line, ' '); /* Skip a=fmtp:<pt> */
+							if (fmtp_val) {
+								while (*fmtp_val == ' ') fmtp_val++;
+								lws_strncpy(pss->media->fmtp_audio, fmtp_val, sizeof(pss->media->fmtp_audio));
+							}
+						}
+					} else if (pt == pss->media->pt_video_av1 || pt == pss->media->pt_video_h264) {
+						if (strlen(line) - 7 > 0) {
+							const char *fmtp_val = strchr(line, ' ');
+							if (fmtp_val) {
+								while (*fmtp_val == ' ') fmtp_val++;
+								if (pt == pss->media->pt_video_h264)
+									lws_strncpy(pss->media->fmtp_video_h264, fmtp_val, sizeof(pss->media->fmtp_video_h264));
+								else
+									lws_strncpy(pss->media->fmtp_video_av1, fmtp_val, sizeof(pss->media->fmtp_video_av1));
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (!eol) break;
+		p_scan = eol + 1;
+	}
+
+	/* Defaults */
+	if (pss->media->pt_audio == 0) pss->media->pt_audio = 111;
+	if (pss->media->pt_video_h264 == 0) pss->media->pt_video_h264 = 0; /* No H264 found */
+
+	/* Preference: H264 > AV1 */
+	pss->media->pt_video = pss->media->pt_video_h264 ? pss->media->pt_video_h264 : pss->media->pt_video_av1;
+	if (pss->media->pt_video == 0) pss->media->pt_video = 126; /* Fallback? */
+
+	webrtc_pss_log(pss, "Negotiated PTs: Audio=%u, Video=%u (H264=%u, AV1=%u)\n",
+			pss->media->pt_audio, pss->media->pt_video, pss->media->pt_video_h264, pss->media->pt_video_av1);
+}
+
+static int
+handle_answer(struct lws *wsi, struct pss_webrtc *pss, struct vhd_webrtc *vhd, const char *in, size_t len)
+
+{
+	lwsl_notice("%s: Matched 'answer'\n", __func__);
+
+	/* Unescape JSON similar to handle_offer */
+	size_t sdp_len = len;
+	char *sdp_clean = calloc(1, sdp_len + 1);
+	if (!sdp_clean) return -1;
+
+	const char *src = (const char *)in;
+	const char *src_end = src + len;
+	char *dst = sdp_clean;
+
+	while (src < src_end) {
+		if (*src == '\\' && (src + 1 < src_end)) {
+			if (src[1] == 'r') { src += 2; *dst++ = '\r'; }
+			else if (src[1] == 'n') { src += 2; *dst++ = '\n'; }
+			else if (src[1] == '"') { src += 2; *dst++ = '"'; }
+			else *dst++ = *src++;
+		} else {
+			*dst++ = *src++;
+		}
+	}
+	*dst = '\0';
+
+	char *p = sdp_clean;
+	while (*p) {
+		char *eol = (char *)strchr(p, '\n');
+		size_t line_len = eol ? (size_t)(eol - p) : strlen(p);
+		if (line_len > 0 && p[line_len-1] == '\r') line_len--;
+
+		if (line_len > 12 && !strncmp(p, "a=ice-ufrag:", 12)) {
+			if (line_len - 12 < sizeof(pss->ice_ufrag_remote)) {
+				memcpy(pss->ice_ufrag_remote, p + 12, line_len - 12);
+				pss->ice_ufrag_remote[line_len - 12] = '\0';
+				lwsl_notice("  Remote ICE Ufrag: %s\n", pss->ice_ufrag_remote);
+			}
+		} else if (line_len > 10 && !strncmp(p, "a=ice-pwd:", 10)) {
+			if (line_len - 10 < sizeof(pss->ice_pwd_remote)) {
+				memcpy(pss->ice_pwd_remote, p + 10, line_len - 10);
+				pss->ice_pwd_remote[line_len - 10] = '\0';
+				lwsl_notice("  Remote ICE Pwd: %s\n", pss->ice_pwd_remote);
+			}
+		} else if (line_len > 22 && !strncmp(p, "a=fingerprint:sha-256 ", 22)) {
+			if (line_len - 22 < sizeof(pss->fingerprint_remote)) {
+				memcpy(pss->fingerprint_remote, p + 22, line_len - 22);
+				pss->fingerprint_remote[line_len - 22] = '\0';
+				lwsl_notice("  Remote Fingerprint: %s\n", pss->fingerprint_remote);
+			}
+		} else if (line_len > 12 && !strncmp(p, "a=candidate:", 12)) {
+			/* Create a null-terminated string for this line to pass to tokenizer */
+			char line_copy[1024];
+			if (line_len < sizeof(line_copy)) {
+				memcpy(line_copy, p, line_len);
+				line_copy[line_len] = '\0';
+				handle_candidate(pss, vhd, line_copy);
+			}
+		}
+
+		if (!eol) break;
+		p = eol + 1;
+	}
+
+	lws_webrtc_parse_sdp_codecs(pss, sdp_clean);
+
+	free(sdp_clean);
+
+	return 0;
+}
+
+static int
+handle_offer(struct lws *wsi, struct pss_webrtc *pss, struct vhd_webrtc *vhd, const char *in, size_t len)
+{
+	lwsl_user("Matched 'offer', generating answer\n");
+
+	/* Unescape JSON */
+	size_t sdp_len = len;
+	char *sdp_clean = calloc(1, sdp_len + 1);
+	if (!sdp_clean) {
+		webrtc_pss_err(pss, "OOM unescaping SDP JSON\n");
+		return -1;
+	}
+
+	const char *src = (const char *)in;
+	const char *src_end = src + len;
+	char *dst = sdp_clean;
+
+	while (src < src_end) {
+		if (*src == '\\' && (src + 1 < src_end)) {
+			if (src[1] == 'r') { src += 2; *dst++ = '\r'; }
+			else if (src[1] == 'n') { src += 2; *dst++ = '\n'; }
+			else if (src[1] == '"') { src += 2; *dst++ = '"'; }
+			else *dst++ = *src++;
+		} else {
+			*dst++ = *src++;
+		}
+	}
+	*dst = '\0';
+
+	if (write(2, sdp_clean, strlen(sdp_clean)) < 0) {
+		webrtc_pss_err(pss, "Failed writing SDP offer to log\n");
+		free(sdp_clean);
+		return -1;
+	}
+
+	/* Reset PSS PTs */
+	if (!pss->media) {
+		pss->media = calloc(1, sizeof(struct lws_webrtc_peer_media));
+		if (pss->media) {
+			pss->media->refcount = 1;
+			pthread_mutex_init(&pss->media->lock_tx, NULL);
+#if defined(LWS_HAVE_PTHREAD_H)
+			lws_txp_info_t txp_i;
+			memset(&txp_i, 0, sizeof(txp_i));
+			txp_i.user = pss->media;
+			txp_i.tx_cb = webrtc_tx_pacer_cb;
+			txp_i.target_rate_bps = 50000000; /* 50 Mbps limit */
+			txp_i.interval_us = 2000;      /* 2ms ticks */
+			txp_i.max_buflist_bytes = 2 * 1024 * 1024; /* 2MB max queue */
+			pss->media->txpacer = lws_txp_create(&txp_i);
+#endif
+		}
+	}
+
+	if (!pss->media) {
+		free(sdp_clean);
+		return -1;
+	}
+
+	pss->media->pt_audio = 0;
+	pss->media->pt_video_h264 = 0;
+	pss->media->pt_video_av1 = 0;
+	pss->media->pt_video = 0;
+
+	char mid_audio[32] = "0", mid_video[32] = "1";
+	int audio_first = 0;
+
+	/* Quick scan for order using strstr as it's efficient for this high-level check */
+	const char *p_audio = strstr(sdp_clean, "m=audio");
+	const char *p_video = strstr(sdp_clean, "m=video");
+
+	if (p_audio && p_video && p_audio < p_video)
+		audio_first = 1;
+
+	lwsl_notice("%s: SDP audio_first=%d\n", __func__, audio_first);
+
+	char *p_scan = sdp_clean;
+	int in_audio = 0;
+	int in_video = 0;
+
+	/* H.264 PT Map */
+	uint8_t h264_pt_map[128];
+	memset(h264_pt_map, 0, sizeof(h264_pt_map));
+
+	/* Pass 1: Build H.264 PT Map from rtpmap */
+	char *p_pass1 = sdp_clean;
+	while (*p_pass1) {
+		char *eol = (char *)strchr(p_pass1, '\n');
+		size_t line_len = eol ? (size_t)(eol - p_pass1) : strlen(p_pass1);
+		if (line_len > 0 && p_pass1[line_len-1] == '\r') line_len--;
+
+		/* We only care about a=rtpmap here */
+		if (line_len > 9 && !strncmp(p_pass1, "a=rtpmap:", 9)) {
+			char line[256]; /* Sufficient for rtpmap */
+			if (line_len < sizeof(line)) {
+				memcpy(line, p_pass1, line_len);
+				line[line_len] = '\0';
+
+				struct lws_tokenize ts;
+				lws_tokenize_init(&ts, line, LWS_TOKENIZE_F_NO_FLOATS | LWS_TOKENIZE_F_MINUS_NONTERM | LWS_TOKENIZE_F_SLASH_NONTERM);
+				ts.len = line_len;
+
+				/* Skip "a=rtpmap:" part by finding first integer */
+				int pt = -1;
+				while (lws_tokenize(&ts) != LWS_TOKZE_ENDED) {
+					if (ts.token_len > 0 && isdigit(ts.token[0])) {
+						pt = atoi(ts.token);
+						break; /* Found PT */
+					}
+				}
+
+				if (pt != -1 && pt < 128) {
+					/* Next token should be Codec/Rate */
+					if (lws_tokenize(&ts) == LWS_TOKZE_TOKEN) {
+						if (!strncasecmp(ts.token, "H264/90000", 10)) {
+							h264_pt_map[pt] = 1;
+						}
+					}
+				}
+			}
+		}
+
+		if (!eol) break;
+		p_pass1 = eol + 1;
+	}
+
+	/* Pass 2: Main Parsing */
+	while (*p_scan) {
+		char *eol = (char *)strchr(p_scan, '\n');
+		size_t line_len = eol ? (size_t)(eol - p_scan) : strlen(p_scan);
+		if (line_len > 0 && p_scan[line_len-1] == '\r') line_len--;
+
+		/* Create separate buffer for line to tokenize safely */
+		char line[1024];
+		if (line_len < sizeof(line)) {
+			memcpy(line, p_scan, line_len);
+			line[line_len] = '\0';
+
+			if (!strncmp(line, "m=audio", 7)) { in_audio = 1; in_video = 0; }
+			else if (!strncmp(line, "m=video", 7)) { in_audio = 0; in_video = 1; }
+
+			if (in_audio && !strncmp(line, "a=mid:", 6)) {
+				lws_strncpy(mid_audio, line + 6, sizeof(mid_audio));
+			}
+			if (in_video && !strncmp(line, "a=mid:", 6)) {
+				lws_strncpy(mid_video, line + 6, sizeof(mid_video));
+			}
+
+			/* Parse RTP Maps and FMTPs */
+			/* a=rtpmap:<pt> <codec>/<rate> */
+			if (!strncmp(line, "a=rtpmap:", 9)) {
+				struct lws_tokenize ts;
+				lws_tokenize_init(&ts, line, LWS_TOKENIZE_F_NO_FLOATS | LWS_TOKENIZE_F_MINUS_NONTERM | LWS_TOKENIZE_F_SLASH_NONTERM);
+				ts.len = line_len;
+
+				/* ... (rest of main loop) ... */
+
+				/* Skip "a=rtpmap:" part by finding first integer */
+				int pt = -1;
+				while (lws_tokenize(&ts) != LWS_TOKZE_ENDED) {
+					if (ts.token_len > 0 && isdigit(ts.token[0])) {
+						pt = atoi(ts.token);
+						break; /* Found PT */
+					}
+				}
+
+				if (pt != -1) {
+					/* Next token should be Codec/Rate */
+					if (lws_tokenize(&ts) == LWS_TOKZE_TOKEN) {
+						lwsl_warn("  SDP Parsing: PT %d -> Token '%.*s'\n", pt, (int)ts.token_len, ts.token);
+						if (!strncasecmp(ts.token, "H264/90000", 10)) {
+							/* We found H264. Map already populated in Pass 1. */
+						} else if (!strncasecmp(ts.token, "AV1/90000", 9)) {
+							pss->media->pt_video_av1 = (uint8_t)pt;
+							lwsl_info("  Found AV1 PT: %d\n", pt);
+						} else if (!strncasecmp(ts.token, "VP9/90000", 9)) {
+							lwsl_warn("  Found VP9 PT: %d. We DO NOT support VP9! Please use H264 or AV1.\n", pt);
+						} else if (!strncasecmp(ts.token, "opus/48000", 10)) {
+							pss->media->pt_audio = (uint8_t)pt;
+							lwsl_info("  Found Opus PT: %d\n", pt);
+						}
+					}
+				}
+			}
+
+			/* a=fmtp:<pt> ... */
+			if (!strncmp(line, "a=fmtp:", 7)) {
+				struct lws_tokenize ts;
+				lws_tokenize_init(&ts, line, LWS_TOKENIZE_F_NO_FLOATS | LWS_TOKENIZE_F_MINUS_NONTERM | LWS_TOKENIZE_F_EQUALS_NONTERM);
+				ts.len = line_len;
+
+				int pt = -1;
+				/* Find PT first */
+				while (lws_tokenize(&ts) != LWS_TOKZE_ENDED) {
+					if (ts.token_len > 0 && isdigit(ts.token[0])) {
+						pt = atoi(ts.token);
+						break;
+					}
+				}
+
+				if (pt != -1) {
+					/* Check if this is H264 Mode 1 */
+					if (!pss->media->pt_video_h264) {
+						int is_mode_1 = 0;
+						while (lws_tokenize(&ts) != LWS_TOKZE_ENDED) {
+							if (ts.token_len == 18 && !strncmp(ts.token, "packetization-mode", 18)) {
+								/* Next token should be = then 1 */
+								if (lws_tokenize(&ts) == LWS_TOKZE_DELIMITER && ts.token[0] == '=') {
+									if (lws_tokenize(&ts) == LWS_TOKZE_INTEGER && ts.token[0] == '1') {
+										is_mode_1 = 1;
+									}
+								}
+							}
+						}
+
+						if (is_mode_1) {
+							pss->media->pt_video_h264 = (uint8_t)pt;
+							lwsl_info("  Found H264 PT %d (Mode 1)\n", pt);
+						} else {
+							/* Only accept if we verified it is H264 via rtpmap */
+							if (pt < 128 && h264_pt_map[pt]) {
+								lwsl_warn("  Found H264 PT %d (Mode 0 / Implicit). Accepting.\n", pt);
+								/* If we haven't found a better one (Mode 1), use this */
+								if (!pss->media->pt_video_h264)
+									pss->media->pt_video_h264 = (uint8_t)pt;
+							}
+						}
+					}
+
+					/* Capture FMTP for Audio/Video */
+					if (pt == pss->media->pt_audio) {
+						if (strlen(line) - 7 > 0) {
+							const char *fmtp_val = strchr(line, ' '); /* Skip a=fmtp:<pt> */
+							if (fmtp_val) {
+								while (*fmtp_val == ' ') fmtp_val++;
+								lws_strncpy(pss->media->fmtp_audio, fmtp_val, sizeof(pss->media->fmtp_audio));
+							}
+						}
+					} else if (pt == pss->media->pt_video_av1 || pt == pss->media->pt_video_h264) {
+						if (strlen(line) - 7 > 0) {
+							const char *fmtp_val = strchr(line, ' ');
+							if (fmtp_val) {
+								while (*fmtp_val == ' ') fmtp_val++;
+								if (pt == pss->media->pt_video_h264)
+									lws_strncpy(pss->media->fmtp_video_h264, fmtp_val, sizeof(pss->media->fmtp_video_h264));
+								else
+									lws_strncpy(pss->media->fmtp_video_av1, fmtp_val, sizeof(pss->media->fmtp_video_av1));
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (!eol) break;
+		p_scan = eol + 1;
+	}
+
+	webrtc_pss_log(pss, "Extracted MIDs: Audio='%s', Video='%s'\n", mid_audio, mid_video);
+
+	/* Defaults */
+	if (pss->media->pt_audio == 0) pss->media->pt_audio = 111;
+	if (pss->media->pt_video_h264 == 0) pss->media->pt_video_h264 = 0; /* No H264 found */
+
+	/* Preference: H264 > AV1 */
+	pss->media->pt_video = pss->media->pt_video_h264 ? pss->media->pt_video_h264 : pss->media->pt_video_av1;
+	if (pss->media->pt_video == 0) pss->media->pt_video = 126; /* Fallback? */
+
+	webrtc_pss_log(pss, "Negotiated PTs: Audio=%u, Video=%u (H264=%u, AV1=%u)\n",
+			pss->media->pt_audio, pss->media->pt_video, pss->media->pt_video_h264, pss->media->pt_video_av1);
+
+	free(sdp_clean);
+
+	/* Sync RTP contexts */
+	lws_rtp_init(&pss->media->rtp_ctx_video, pss->media->ssrc_video, pss->media->pt_video);
+	lws_rtp_init(&pss->media->rtp_ctx_audio, pss->media->ssrc_audio, pss->media->pt_audio);
+
+	/* Reset DTLS if needed */
+	if (pss->handshake_started) {
+		lwsl_notice("%s: Existing handshake detected on Offer. Resetting DTLS state.\n", __func__);
+		lws_gendtls_destroy(&pss->dtls_ctx);
+		pss->handshake_started = 0;
+		if (pss->media) pss->media->handshake_done = 0;
+	}
+
+	if (!pss->handshake_started) {
+		struct lws_gendtls_creation_info ci;
+		memset(&ci, 0, sizeof(ci));
+		ci.context = vhd->context;
+		ci.mode = pss->is_client ? LWS_GENDTLS_MODE_CLIENT : LWS_GENDTLS_MODE_SERVER;
+		ci.mtu = 1100;
+		ci.use_srtp = "SRTP_AES128_CM_SHA1_80";
+		if (lws_gendtls_create(&pss->dtls_ctx, &ci)) return -1;
+		lws_gendtls_set_cert_mem(&pss->dtls_ctx, vhd->cert_mem, vhd->cert_len);
+		lws_gendtls_set_key_mem(&pss->dtls_ctx, vhd->key_mem, vhd->key_len);
+		pss->handshake_started = 1;
+		pss->media->wsi_udp = vhd->wsi_udp;
+	}
+
+	/* Generate Answer */
+	char audio_m[2048], video_m[2048], candidates[1024] = "";
+	int c_idx = 1;
+	size_t n_sdp;
+
+#if defined(LWS_WITH_NETLINK)
+	lws_start_foreach_dll(struct lws_dll2 *, d,
+			lws_dll2_get_head(lws_routing_table_get(vhd->context))) {
+		lws_route_t *rou = lws_container_of(d, lws_route_t, list);
+		char ads[64];
+
+		if (rou->src.sa4.sin_family == AF_INET && rou->source_ads) {
+			lws_sa46_write_numeric_address(&rou->src, ads, sizeof(ads));
+			if (strcmp(ads, "127.0.0.1") && !(char *)strstr(candidates, ads)) {
+				lws_snprintf(candidates + strlen(candidates),
+						sizeof(candidates) - strlen(candidates),
+						"a=candidate:%d 1 udp %u %s %u typ host generation 0\\r\\n",
+						c_idx++, 2130706431u, ads, vhd->udp_port);
+			}
+		}
+	} lws_end_foreach_dll(d);
+#endif
+
+	if (vhd->external_ip[0] && !(char *)strstr(candidates, vhd->external_ip)) {
+		lws_snprintf(candidates + strlen(candidates),
+				sizeof(candidates) - strlen(candidates),
+				"a=candidate:%d 1 udp %u %s %u typ host generation 0\\r\\n",
+				c_idx++, 2130706431u, vhd->external_ip, vhd->udp_port);
+	} else if (!vhd->external_ip[0]) {
+		/* If no external IP is configured, we must provide at least our local interface IP */
+		char local_ip[46];
+		struct sockaddr_storage ss;
+		socklen_t slen = sizeof(ss);
+		lws_strncpy(local_ip, "127.0.0.1", sizeof(local_ip));
+		if (pss->wsi_ws && !getsockname((int)lws_get_socket_fd(pss->wsi_ws), (struct sockaddr *)&ss, &slen)) {
+			if (ss.ss_family == AF_INET)
+				inet_ntop(AF_INET, &((struct sockaddr_in *)&ss)->sin_addr, local_ip, sizeof(local_ip));
+			else if (ss.ss_family == AF_INET6)
+				inet_ntop(AF_INET6, &((struct sockaddr_in6 *)&ss)->sin6_addr, local_ip, sizeof(local_ip));
+		}
+		if (!(char *)strstr(candidates, local_ip)) {
+			lws_snprintf(candidates + strlen(candidates),
+					sizeof(candidates) - strlen(candidates),
+					"a=candidate:%d 1 udp %u %s %u typ host generation 0\\r\\n",
+					c_idx++, 2130706431u, local_ip, vhd->udp_port);
+		}
+	}
+
+	char pt_list[64] = "";
+	char rtpmap_lines[512] = "";
+
+	if (pss->media->pt_video_h264) {
+		char b[16], c[256];
+		lws_snprintf(b, sizeof(b), "%u ", pss->media->pt_video_h264);
+		strncat(pt_list, b, sizeof(pt_list) - strlen(pt_list) - 1);
+
+		lws_snprintf(c, sizeof(c), "a=rtpmap:%u H264/90000\\r\\n", pss->media->pt_video_h264);
+		strncat(rtpmap_lines, c, sizeof(rtpmap_lines) - strlen(rtpmap_lines) - 1);
+
+		if (pss->media->fmtp_video_h264[0])
+			lws_snprintf(c, sizeof(c), "a=fmtp:%u %s\\r\\n", pss->media->pt_video_h264, pss->media->fmtp_video_h264);
+		else
+			lws_snprintf(c, sizeof(c), "a=fmtp:%u level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e02a\\r\\n", pss->media->pt_video_h264);
+		strncat(rtpmap_lines, c, sizeof(rtpmap_lines) - strlen(rtpmap_lines) - 1);
+
+		lws_snprintf(c, sizeof(c), "a=rtcp-fb:%u nack\\r\\na=rtcp-fb:%u nack pli\\r\\n", pss->media->pt_video_h264, pss->media->pt_video_h264);
+		strncat(rtpmap_lines, c, sizeof(rtpmap_lines) - strlen(rtpmap_lines) - 1);
+	}
+
+	if (pss->media->pt_video_av1) {
+		char b[16], c[256];
+		lws_snprintf(b, sizeof(b), "%u ", pss->media->pt_video_av1);
+		strncat(pt_list, b, sizeof(pt_list) - strlen(pt_list) - 1);
+
+		lws_snprintf(c, sizeof(c), "a=rtpmap:%u AV1/90000\\r\\n", pss->media->pt_video_av1);
+		strncat(rtpmap_lines, c, sizeof(rtpmap_lines) - strlen(rtpmap_lines) - 1);
+
+		if (pss->media->fmtp_video_av1[0])
+			lws_snprintf(c, sizeof(c), "a=fmtp:%u %s\\r\\n", pss->media->pt_video_av1, pss->media->fmtp_video_av1);
+		else
+			lws_snprintf(c, sizeof(c), "a=fmtp:%u profile=0;level-idx=5;tier=0\\r\\n", pss->media->pt_video_av1);
+		strncat(rtpmap_lines, c, sizeof(rtpmap_lines) - strlen(rtpmap_lines) - 1);
+
+		lws_snprintf(c, sizeof(c), "a=rtcp-fb:%u nack\\r\\na=rtcp-fb:%u nack pli\\r\\n", pss->media->pt_video_av1, pss->media->pt_video_av1);
+		strncat(rtpmap_lines, c, sizeof(rtpmap_lines) - strlen(rtpmap_lines) - 1);
+	}
+
+	if (pt_list[0] && pt_list[strlen(pt_list) - 1] == ' ')
+		pt_list[strlen(pt_list) - 1] = '\0';
+
+	lws_snprintf(video_m, sizeof(video_m),
+			"m=video %u UDP/TLS/RTP/SAVPF %s\\r\\n"
+			"c=IN IP4 %s\\r\\n"
+			"a=rtcp-mux\\r\\n"
+			"a=ice-ufrag:%s\\r\\n"
+			"a=ice-pwd:%s\\r\\n"
+			"a=fingerprint:sha-256 %s\\r\\n"
+			"a=setup:%s\\r\\n"
+			"a=mid:%s\\r\\n"
+			"a=sendrecv\\r\\n"
+			"a=msid:lws-stream lws-track-video\\r\\n"
+			"%s"
+			"a=rtcp-fb:* goog-remb\\r\\n"
+			"a=rtcp-fb:* transport-cc\\r\\n"
+			"a=ssrc:%u cname:lws-video\\r\\n"
+			"a=ssrc:%u msid:lws-stream lws-track-video\\r\\n"
+			"%s"
+			"a=end-of-candidates\\r\\n",
+		vhd->udp_port, pt_list[0] ? pt_list : "0", vhd->external_ip[0] ? vhd->external_ip : "127.0.0.1",
+		pss->ice_ufrag, pss->ice_pwd, vhd->fingerprint,
+		pss->is_client ? "active" : "passive",
+		mid_video,
+		rtpmap_lines,
+		pss->media->ssrc_video, pss->media->ssrc_video, candidates);
+
+	/* Prepare Audio FMTP */
+	char fmtp_audio[256] = "";
+	if (pss->media->fmtp_audio[0]) {
+		lws_snprintf(fmtp_audio, sizeof(fmtp_audio), "a=fmtp:%u %s;stereo=1;sprop-stereo=1;useinbandfec=1;maxplaybackrate=48000\\r\\n", pss->media->pt_audio, pss->media->fmtp_audio);
+	} else {
+		lws_snprintf(fmtp_audio, sizeof(fmtp_audio), "a=fmtp:%u maxplaybackrate=48000;sprop-stereo=1;stereo=1;useinbandfec=1;maxaveragebitrate=24000\\r\\n", pss->media->pt_audio);
+	}
+
+	lws_snprintf(audio_m, sizeof(audio_m),
+			"m=audio %u UDP/TLS/RTP/SAVPF %u\\r\\n"
+			"c=IN IP4 %s\\r\\n"
+			"a=rtcp-mux\\r\\n"
+			"a=ice-ufrag:%s\\r\\n"
+			"a=ice-pwd:%s\\r\\n"
+			"a=fingerprint:sha-256 %s\\r\\n"
+			"a=setup:%s\\r\\n"
+			"a=mid:%s\\r\\n"
+			"a=sendrecv\\r\\n"
+			"a=msid:lws-stream lws-track-audio\\r\\n"
+			"a=rtpmap:%u opus/48000/2\\r\\n"
+			"%s"
+			"a=ssrc:%u cname:lws-audio\\r\\n"
+			"a=ssrc:%u msid:lws-stream lws-track-audio\\r\\n"
+			"%s"
+			"a=end-of-candidates\\r\\n",
+			vhd->udp_port, pss->media->pt_audio, vhd->external_ip[0] ? vhd->external_ip : "127.0.0.1", pss->ice_ufrag, pss->ice_pwd, vhd->fingerprint,
+			pss->is_client ? "active" : "passive",
+			mid_audio, pss->media->pt_audio,
+			fmtp_audio,
+			pss->media->ssrc_audio, pss->media->ssrc_audio, candidates);
+
+	lwsl_notice("%s: Generated Audio FMTP for PT %u\n", __func__, pss->media->pt_audio);
+	char local_ip[46];
+	struct sockaddr_storage ss;
+	socklen_t slen = sizeof(ss);
+	lws_strncpy(local_ip, vhd->external_ip[0] ? vhd->external_ip : "127.0.0.1", sizeof(local_ip));
+
+	if (!vhd->external_ip[0] && wsi && !getsockname((int)lws_get_socket_fd(wsi), (struct sockaddr *)&ss, &slen)) {
+		if (ss.ss_family == AF_INET)
+			inet_ntop(AF_INET, &((struct sockaddr_in *)&ss)->sin_addr, local_ip, sizeof(local_ip));
+		else if (ss.ss_family == AF_INET6)
+			inet_ntop(AF_INET6, &((struct sockaddr_in6 *)&ss)->sin6_addr, local_ip, sizeof(local_ip));
+	}
+
+	char *json_out = malloc(LWS_PRE + 8192);
+	if (!json_out) return -1;
+	char *p = json_out + LWS_PRE;
+
+	n_sdp = (size_t)lws_snprintf(p, 8192,
+			"{\"type\":\"answer\",\"sdp\":\"v=0\\r\\no=- 123456 2 IN IP4 %s\\r\\ns=-\\r\\nt=0 0\\r\\na=msid-semantic: WMS lws-stream\\r\\na=ice-lite\\r\\na=group:BUNDLE %s %s\\r\\n%s%s\"}",
+			local_ip,
+			audio_first ? mid_audio : mid_video, audio_first ? mid_video : mid_audio,
+			audio_first ? audio_m : video_m, audio_first ? video_m : audio_m);
+
+	webrtc_pss_log(pss, "Generated SDP ANSWER (%zu bytes)\n%s\n", n_sdp, p);
+	if (write(2, "\n--- START SDP ANSWER ---\n", 26) < 0 ||
+	    write(2, p, n_sdp) < 0 ||
+	    write(2, "\n--- END SDP ANSWER ---\n\n", 25) < 0) {
+		webrtc_pss_err(pss, "Failed writing SDP answer to log\n");
+		free(json_out);
+		return -1;
+	}
+
+	if (lws_buflist_append_segment(&pss->buflist, (const uint8_t *)p, n_sdp) < 0) {
+		free(json_out);
+		return -1;
+	}
+
+	if (pss->wsi_ws)
+		lws_callback_on_writable(pss->wsi_ws);
+
+	free(json_out);
+
+	return 0;
+}
+
+
+int
+lws_shared_webrtc_callback(struct lws *wsi, enum lws_callback_reasons reason,
+		void *user, void *in, size_t len, struct vhd_webrtc *vhd)
+{
+	const struct lws_protocol_vhost_options *pvo = (const struct lws_protocol_vhost_options *)in;
+	struct pss_webrtc *pss = (struct pss_webrtc *)user;
+	size_t alen;
+	const char *val;
+
+	//if (reason == LWS_CALLBACK_SERVER_WRITEABLE)
+	//	lwsl_notice("%s: ENTERING (reason %d) vhd=%p, pss=%p\n", __func__, reason, vhd, pss);
+
+	if (!vhd)
+		return 0;
+	if (!pss && reason != LWS_CALLBACK_PROTOCOL_INIT && reason != LWS_CALLBACK_PROTOCOL_DESTROY)
+		return 0;
+
+	switch (reason) {
+		case LWS_CALLBACK_PROTOCOL_INIT:
+			if (lws_cmdline_option_cx(lws_get_context(wsi), "--lws-stub"))
+				return 0;
+			/* VHD is managed by the application extension now */
+
+			if (!vhd->context) vhd->context = lws_get_context(wsi);
+			if (!vhd->vhost) vhd->vhost = lws_get_vhost(wsi);
+			if (!vhd->udp_port) vhd->udp_port = 7682;
+
+			if (!pvo)
+				return 0;
+
+			while (pvo) {
+				lwsl_notice("%s: Received PVO '%s' = '%s'\n", __func__, pvo->name, pvo->value ? pvo->value : "(null)");
+				if (!strcmp(pvo->name, "external-ip"))
+					lws_strncpy(vhd->external_ip, pvo->value, sizeof(vhd->external_ip));
+				if (!strcmp(pvo->name, "udp-port"))
+					vhd->udp_port = (uint16_t)atoi(pvo->value);
+				if (!strcmp(pvo->name, "lws-webrtc-ops")) {
+					struct lws_webrtc_ops *ops = (struct lws_webrtc_ops *)(uintptr_t)pvo->value;
+					if (ops) {
+						ops->abi_version        = LWS_WEBRTC_OPS_ABI_VERSION;
+						ops->send_video         = lws_webrtc_send_video;
+						ops->send_audio         = lws_webrtc_send_audio;
+						ops->send_text          = lws_webrtc_send_text;
+						ops->media_ref          = lws_webrtc_media_ref;
+						ops->media_unref        = lws_webrtc_media_unref;
+						ops->get_media          = lws_webrtc_get_media;
+						ops->send_pli           = lws_webrtc_send_pli;
+						ops->foreach_session    = lws_webrtc_foreach_session;
+						ops->shared_callback    = lws_shared_webrtc_callback;
+						ops->get_user_data      = lws_webrtc_get_user_data;
+						ops->set_user_data      = lws_webrtc_set_user_data;
+						ops->get_context        = lws_webrtc_get_context;
+						ops->get_vhost          = lws_webrtc_get_vhost;
+						ops->set_on_media       = lws_webrtc_set_on_media;
+						ops->get_video_pt       = lws_webrtc_get_video_pt;
+						ops->get_audio_pt       = lws_webrtc_get_audio_pt;
+						ops->get_video_pt_h264  = lws_webrtc_get_video_pt_h264;
+						ops->get_video_pt_av1   = lws_webrtc_get_video_pt_av1;
+						ops->get_seq_video      = lws_webrtc_get_seq_video;
+						ops->create_offer       = lws_webrtc_create_offer;
+						lwsl_notice("%s: Populated lws-webrtc-ops (ABI %d)\n", __func__, LWS_WEBRTC_OPS_ABI_VERSION);
+					}
+				}
+				pvo = pvo->next;
+			}
+
+			/* Generate Identity */
+			if (vhd->cert_mem) {
+				lwsl_notice("%s: Identity already exists\n", __func__);
+				break;
+			}
+
+			lwsl_notice("%s: Generating self-signed certificate (this may take a few seconds)...\n", __func__);
+			lws_usec_t t1 = lws_now_usecs();
+			if (lws_x509_create_self_signed(vhd->context, &vhd->cert_mem, &vhd->cert_len,
+						&vhd->key_mem, &vhd->key_len,
+						vhd->external_ip, 2048)) {
+				lwsl_err("%s: Cert generation failed\n", __func__);
+				return -1;
+			}
+			lwsl_notice("%s: Cert generation took %lldms\n", __func__, (long long)(lws_now_usecs() - t1) / 1000);
+
+			{
+				uint8_t hash[32];
+				struct lws_genhash_ctx hash_ctx;
+				if (!lws_genhash_init(&hash_ctx, LWS_GENHASH_TYPE_SHA256) &&
+						!lws_genhash_update(&hash_ctx, vhd->cert_mem, vhd->cert_len) &&
+						!lws_genhash_destroy(&hash_ctx, hash)) {
+					for (int i = 0; i < 32; i++)
+						lws_snprintf(vhd->fingerprint + (i * 3), 4, "%02X%c", hash[i], i == 31 ? '\0' : ':');
+				}
+			}
+
+			vhd->wsi_udp = lws_create_adopt_udp(vhd->vhost,
+					NULL, vhd->udp_port, LWS_CAUDP_BIND,
+					"lws-webrtc-udp", NULL, NULL, NULL, NULL, NULL);
+			if (!vhd->wsi_udp) {
+				lwsl_err("%s: UDP socket creation failed\n", __func__);
+				return -1;
+			}
+			lwsl_notice("%s: lws-webrtc initialized with external-ip '%s' and udp_port %u\n", __func__, vhd->external_ip, vhd->udp_port);
+			lwsl_notice("%s: Certificate Fingerprint: %s\n", __func__, vhd->fingerprint);
+			return 0;
+
+		case LWS_CALLBACK_CLIENT_ESTABLISHED:
+		case LWS_CALLBACK_ESTABLISHED:
+			pss->wsi_ws = wsi;
+			if (!pss->connection_log) {
+				pss->connection_log = malloc(64 * 1024);
+				if (pss->connection_log)
+					pss->connection_log[0] = '\0';
+				pss->connection_log_len = 0;
+			}
+			if (!pss->media) {
+				pss->media = calloc(1, sizeof(struct lws_webrtc_peer_media));
+				if (!pss->media) return -1;
+				pss->media->refcount = 1; /* PSS owns one reference */
+				pthread_mutex_init(&pss->media->lock_tx, NULL);
+
+#if defined(LWS_HAVE_PTHREAD_H)
+				lws_txp_info_t txp_i;
+				memset(&txp_i, 0, sizeof(txp_i));
+				txp_i.user = pss->media;
+				txp_i.tx_cb = webrtc_tx_pacer_cb;
+				txp_i.target_rate_bps = 50000000; /* 50 Mbps limit */
+				txp_i.interval_us = 2000;      /* 2ms ticks */
+				txp_i.max_buflist_bytes = 2 * 1024 * 1024; /* 2MB max queue */
+				pss->media->txpacer = lws_txp_create(&txp_i);
+#endif
+			}
+			pss->media->wsi_udp = vhd->wsi_udp; /* Critical: Session needs UDP handle */
+			lws_dll2_clear(&pss->list);
+			lws_dll2_add_tail(&pss->list, &vhd->sessions);
+			pss->media->ssrc_video = (uint32_t)lws_now_usecs();
+			pss->media->ssrc_audio = pss->media->ssrc_video ^ 0xFFFFFFFF;
+			pss->last_tu_id = -1;
+			pss->media->pt_audio = 111;
+			pss->media->sent_first_audio = 0;
+
+			{
+				uint8_t rand[16];
+				char *pp = pss->ice_pwd;
+				int n;
+
+				lws_get_random(vhd->context, rand, 4);
+				lws_snprintf(pss->ice_ufrag, sizeof(pss->ice_ufrag),
+						"%02X%02X%02X%02X", rand[0], rand[1], rand[2], rand[3]);
+
+				lws_get_random(vhd->context, rand, 16);
+				for (n = 0; n < 16; n++)
+					pp += lws_snprintf(pp, (size_t)(pss->ice_pwd + sizeof(pss->ice_pwd) - pp),
+							"%02X", rand[n]);
+			}
+			return 0;
+
+		case LWS_CALLBACK_CLIENT_RECEIVE:
+		case LWS_CALLBACK_RECEIVE:
+			lwsl_debug("%s: LWS_CALLBACK_RECEIVE: len %d\n", __func__, (int)len);
+			if (len > 0) {
+				char dump[64];
+				size_t l = len > 63 ? 63 : len;
+				memcpy(dump, in, l);
+				dump[l] = '\0';
+				lwsl_debug("%s: payload: %s\n", __func__, dump);
+			}
+			//lwsl_user("LWS_CALLBACK_RECEIVE: %.*s\n", (int)len, (const char *)in);
+			if (lws_json_simple_find((const char *)in, len, "\"type\":", &alen))
+				val = lws_json_simple_find((const char *)in, len, "\"type\":", &alen);
+			else
+				val = NULL;
+
+			// if (val) lwsl_notice("lws_json_simple_find returned: '%.*s' (len %d)\n", (int)alen, val, (int)alen);
+			// else lwsl_notice("lws_json_simple_find returned NULL\n");
+
+			if ((val && alen >= 7 && !strncmp(val, "\"offer\"", 7)) ||
+					(val && alen >= 5 && !strncmp(val, "offer", 5))) {
+				handle_offer(wsi, pss, vhd, (const char *)in, len);
+			} else if ((val && alen >= 8 && !strncmp(val, "\"answer\"", 8)) ||
+					(val && alen >= 6 && !strncmp(val, "answer", 6))) {
+				handle_answer(wsi, pss, vhd, (const char *)in, len);
+			}
+			break;
+
+		case LWS_CALLBACK_HTTP_FILE_COMPLETION:
+			// return -1; /* falling through to close transaction inside dummy cb leads to delays */
+			break;
+
+		case LWS_CALLBACK_CLIENT_WRITEABLE:
+		case LWS_CALLBACK_SERVER_WRITEABLE:
+			{
+				uint8_t *buf;
+				size_t xlen;
+
+
+				// lwsl_err("%s: WRITEABLE callback! Draining buffer...\n", __func__);
+				// lwsl_notice("%s: WRITEABLE callback! Checking buflist %p\n", __func__, &pss->buflist);
+
+				while ((xlen = lws_buflist_next_segment_len(&pss->buflist, &buf))) {
+					// lwsl_notice("%s: Found segment len %zu\n", __func__, xlen);
+					uint8_t *p = malloc(LWS_PRE + xlen);
+					int m;
+
+					if (!p) {
+						lwsl_err("%s: OOM in WRITEABLE (len %zu)\n", __func__, xlen);
+						return -1;
+					}
+					memcpy(p + LWS_PRE, buf, xlen);
+
+					m = lws_write(wsi, p + LWS_PRE, xlen, LWS_WRITE_TEXT);
+					// lwsl_notice("%s: lws_write returned %d\n", __func__, m);
+					if (m < 0) {
+						lwsl_err("%s: lws_write failed with %d (len %zu). Closing.\n", __func__, m, xlen);
+						free(p);
+						return -1; // Close connection
+					}
+
+					/*
+					 * Actually, if lws_write returns < xlen, it usually means backpressure
+					 * and it has buffered what it could.
+					 *
+					 * If we unconditionally consume the segment from buflist, we assume LWS took it all
+					 * (even if buffered internally).
+					 */
+
+					lws_buflist_use_segment(&pss->buflist, xlen);
+					free(p); /* We can free p because lws_write copies or buffers */
+
+					if (lws_buflist_next_segment_len(&pss->buflist, NULL)) {
+						lws_callback_on_writable(wsi);
+					}
+				}
+				// if (count) lwsl_notice("%s: Sent %d buffered messages\n", __func__, count);
+				break;
+			}
+
+		case LWS_CALLBACK_CLOSED:
+			lwsl_notice("%s: LWS_CALLBACK_CLOSED\n", __func__);
+			if (pss->connection_log) {
+				free(pss->connection_log);
+				pss->connection_log = NULL;
+			}
+			if (!lws_dll2_is_detached(&pss->list))
+				lws_dll2_remove(&pss->list);
+			if (pss->handshake_started) {
+				lws_gendtls_destroy(&pss->dtls_ctx);
+				pss->handshake_started = 0;
+			}
+			lws_buflist_destroy_all_segments(&pss->buflist);
+			break;
+
+		case LWS_CALLBACK_PROTOCOL_DESTROY:
+			if (vhd) {
+				free(vhd->cert_mem); free(vhd->key_mem);
+			}
+			break;
+
+		default:
+			break;
+	}
+
+	return lws_callback_http_dummy(wsi, reason, user, in, len);
+}
+
+/* Helper: Find session by peer address */
+	static struct pss_webrtc *
+webrtc_find_session(struct vhd_webrtc *vhd, const struct sockaddr_in *sin)
+{
+	lws_start_foreach_dll(struct lws_dll2 *, d, vhd->sessions.head) {
+		struct pss_webrtc *s = lws_container_of(d, struct pss_webrtc, list);
+		if (s->media && s->media->has_peer_sa46) {
+			uint32_t stored_a = 0;
+			uint16_t stored_p = 0;
+			if (s->media->peer_sa46.sa4.sin_family == AF_INET) {
+				stored_a = s->media->peer_sa46.sa4.sin_addr.s_addr;
+				stored_p = s->media->peer_sa46.sa4.sin_port;
+			} else {
+				memcpy(&stored_a, &s->media->peer_sa46.sa6.sin6_addr.s6_addr[12], 4);
+				stored_p = s->media->peer_sa46.sa6.sin6_port;
+			}
+			if (stored_a == sin->sin_addr.s_addr && stored_p == sin->sin_port)
+				return s;
+		}
+	} lws_end_foreach_dll(d);
+	return NULL;
+}
+
+/* Helper: Handle STUN packets */
+	static int
+webrtc_handle_stun(struct lws *wsi, struct vhd_webrtc *vhd, struct pss_webrtc **ppss,
+		const struct sockaddr_in *sin, uint8_t *in, size_t len)
+{
+	struct pss_webrtc *pss = *ppss;
+	uint8_t *p = (uint8_t *)in;
+	uint16_t type = (uint16_t)((p[0] << 8) | p[1]);
+	char ads[64];
+	const struct lws_udp *udp_desc = lws_get_udp(wsi);
+
+	lws_sa46_write_numeric_address((lws_sockaddr46 *)sin, ads, sizeof(ads));
+
+	if (type == 0x0101) { /* Binding Success Response */
+		webrtc_pss_log(pss, "Received STUN Binding Success Response from %s:%u\n", "peer", ntohs(sin->sin_port));
+		return 0;
+	}
+
+	if (type != LWS_STUNREQ_BINDING)
+		return 0;
+
+	/* If we don't know the PSS yet (NAT), try to find it via USERNAME */
+	int found_username = 0;
+	if (!pss) {
+		/* Parse attributes to find USERNAME */
+		size_t i = 20;
+		while (i + 4 <= len) {
+			uint16_t attr_type = (uint16_t)((p[i] << 8) | p[i + 1]);
+			uint16_t attr_len = (uint16_t)((p[i + 2] << 8) | p[i + 3]);
+
+			if (attr_type == LWS_STUN_ATTR_USERNAME) { /* USERNAME */
+				found_username = 1;
+				if (i + 4 + attr_len > len)
+					break;
+
+				char username[128];
+				if (attr_len >= sizeof(username))
+					break;
+
+				memcpy(username, p + i + 4, attr_len);
+				username[attr_len] = '\0';
+
+				/* Format is DestUfrag:SrcUfrag */
+				char *colon = (char *)strchr(username, ':');
+				if (colon) {
+					*colon = '\0';
+					const char *u_dest = username; // Server Ufrag (Ours)
+					const char *u_src = colon + 1; // Client Ufrag (Theirs)
+
+					lws_start_foreach_dll(struct lws_dll2 *, d, vhd->sessions.head) {
+						struct pss_webrtc *s = lws_container_of(d, struct pss_webrtc, list);
+						// Match first part against our ufrag
+						if (!strcmp(s->ice_ufrag, u_dest)) {
+							pss = s;
+							webrtc_pss_log(pss, "Mapped ICE identity to Peer IP '%s:%s'\n", u_dest, u_src);
+							if (pss->media) {
+								/* Save original sa46 for outbound sendto */
+								pss->media->peer_sa46 = udp_desc->sa46;
+								pss->media->has_peer_sa46 = 1;
+							}
+							*ppss = s;
+							break;
+						} else {
+							webrtc_pss_log(s, "STUN Mapping Miss: packet ufrag '%s' != our ufrag '%s'\n", u_dest, s->ice_ufrag);
+						}
+					} lws_end_foreach_dll(d);
+				}
+				break; /* Found USERNAME or malformed */
+			}
+			i += 4 + attr_len;
+			i = (i + 3) & ~3u; /* Align to 4 bytes */
+		}
+
+		if (!pss) {
+			lws_start_foreach_dll(struct lws_dll2 *, d, vhd->sessions.head) {
+				struct pss_webrtc *s = lws_container_of(d, struct pss_webrtc, list);
+				webrtc_pss_log(s, "Received STUN packet that could not be mapped (found_username=%d)\n", found_username);
+			} lws_end_foreach_dll(d);
+			return 0;
+		}
+	}
+
+	// lwsl_notice("%s: Incoming STUN Request from %s:%u session %p\n", __func__, ads, ntohs(sin->sin_port), pss);
+	uint8_t out[512];
+	int n_stun = lws_stun_validate_and_reply(wsi, (uint8_t *)in, len, out, sizeof(out), pss->ice_pwd, sin);
+	if (n_stun > 0) {
+		if (udp_desc) {
+			if (pss->media) {
+				pss->media->peer_sa46 = udp_desc->sa46;
+				pss->media->has_peer_sa46 = 1;
+			}
+
+			int fd = (int)(lws_intptr_t)lws_get_socket_fd(wsi);
+			if (fd >= 0) {
+				socklen_t slen = udp_desc->sa46.sa4.sin_family == AF_INET6 ? (socklen_t)sizeof(udp_desc->sa46.sa6) : (socklen_t)sizeof(udp_desc->sa46.sa4);
+				lwsl_user(">>> STUN RESPONSE (%d bytes) TO %s:%u <<<\n", n_stun, ads, ntohs(sin->sin_port));
+				lwsl_hexdump_user(out, (size_t)n_stun);
+				webrtc_pss_log(pss, "Sent STUN Response (%d bytes) successfully.\n", n_stun);
+				ssize_t sent = sendto((lws_sockfd_type)(lws_intptr_t)fd, (const char *)out, (size_t)n_stun, 0, (const struct sockaddr *)&udp_desc->sa46, slen);
+				if (sent < 0) {
+					webrtc_pss_err(pss, "STUN sendto failed: errno %d\n", errno);
+				} else if (sent != n_stun) {
+					webrtc_pss_err(pss, "STUN sendto partial %ld of %d\n", (long)sent, n_stun);
+				}
+
+				/*
+				 * Trigger DTLS Client Hello now that we have proven connectivity
+				 * via a successful STUN Request/Response cycle.
+				 */
+				if (pss->is_client && pss->handshake_started && pss->media && !pss->media->handshake_done) {
+					uint8_t dummy;
+					lws_gendtls_get_rx(&pss->dtls_ctx, &dummy, 1);
+					uint8_t out_dtls[2048];
+					int _tx_len;
+					while ((_tx_len = lws_gendtls_get_tx(&pss->dtls_ctx, out_dtls, sizeof(out_dtls))) > 0) {
+						lwsl_notice("%s: Sending Initial DTLS ClientHello (%d bytes) to %s:%u\n",
+								__func__, _tx_len, ads, ntohs(sin->sin_port));
+						if (sendto((lws_sockfd_type)(lws_intptr_t)fd, (const char *)out_dtls, (size_t)_tx_len, 0,
+								(const struct sockaddr *)&udp_desc->sa46, slen) < 0) {
+							webrtc_pss_err(pss, "DTLS ClientHello sendto failed: errno %d\n", errno);
+						}
+					}
+				}
+			}
+		}
+
+	} else {
+		webrtc_pss_err(pss, "STUN validation failed (bad credentials or format)\n");
+	}
+
+	return 0;
+}
+
+/* Helper: Handle DTLS packets */
+	static int
+webrtc_handle_dtls(struct lws *wsi, struct pss_webrtc *pss, const struct sockaddr_in *sin,
+		uint8_t *in, size_t len)
+{
+	if (!pss || !pss->handshake_started || !pss->media)
+		return 0;
+
+	webrtc_pss_log(pss, "Incoming DTLS packet (%zu bytes)\n", len);
+
+	if (lws_gendtls_put_rx(&pss->dtls_ctx, (uint8_t *)in, len) == 0) {
+		/* Drive state machine by reading */
+		uint8_t rx_dump[2048];
+		while (lws_gendtls_get_rx(&pss->dtls_ctx, rx_dump, sizeof(rx_dump)) > 0);
+		/* Check if we need to send anything */
+		uint8_t out[2048];
+		int _tx_len;
+		int _fd = (int)(lws_intptr_t)lws_get_socket_fd(wsi);
+		while ((_tx_len = lws_gendtls_get_tx(&pss->dtls_ctx, out, sizeof(out))) > 0) {
+			lwsl_notice("%s: Sending DTLS Reply (%d bytes)\n", __func__, _tx_len);
+			if (_fd >= 0) {
+				if (sendto((lws_sockfd_type)(lws_intptr_t)_fd, (const char *)out, (size_t)_tx_len, 0, (const struct sockaddr *)&pss->media->peer_sa46, pss->media->peer_sa46.sa4.sin_family == AF_INET6 ? (socklen_t)sizeof(pss->media->peer_sa46.sa6) : (socklen_t)sizeof(pss->media->peer_sa46.sa4)) < 0) {
+					webrtc_pss_err(pss, "DTLS reply sendto failed: errno %d\n", errno);
+				}
+			}
+		}
+
+		if (!pss->media->handshake_done && lws_gendtls_handshake_done(&pss->dtls_ctx)) {
+			pss->media->handshake_done = 1;
+			webrtc_pss_log(pss, "DTLS Handshake DONE! Cipher: %s\n", lws_gendtls_get_srtp_profile(&pss->dtls_ctx));
+
+			/* Initialize SRTP */
+			uint8_t k[60];
+			if (lws_gendtls_export_keying_material(&pss->dtls_ctx, "EXTRACTOR-dtls_srtp", 19, NULL, 0, k, 60) == 0) {
+				if (pss->is_client) {
+					/* Client Mode: TX using Client Keys (0/32), RX using Server Keys (16/46) */
+					lwsl_notice("%s: SRTP Client Mode: TX=Client keys, RX=Server keys\n", __func__);
+					lws_srtp_init(&pss->media->srtp_ctx_tx, LWS_SRTP_PROFILE_AES128_CM_HMAC_SHA1_80, k + 0, k + 32);
+					lws_srtp_init(&pss->media->srtp_ctx_rx, LWS_SRTP_PROFILE_AES128_CM_HMAC_SHA1_80, k + 16, k + 46);
+				} else {
+					/* Server Mode: TX using Server Keys (16/46), RX using Client Keys (0/32) */
+					lwsl_notice("%s: SRTP Server Mode: TX=Server keys, RX=Client keys\n", __func__);
+					lws_srtp_init(&pss->media->srtp_ctx_tx, LWS_SRTP_PROFILE_AES128_CM_HMAC_SHA1_80, k + 16, k + 46);
+					lws_srtp_init(&pss->media->srtp_ctx_rx, LWS_SRTP_PROFILE_AES128_CM_HMAC_SHA1_80, k + 0, k + 32);
+				}
+
+				lws_rtp_init(&pss->media->rtp_ctx_video, pss->media->ssrc_video, pss->media->pt_video);
+				lws_rtp_init(&pss->media->rtp_ctx_audio, pss->media->ssrc_audio, pss->media->pt_audio);
+				lwsl_notice("%s: SRTP/RTP contexts initialized: Video SSRC %u (PT %u), Audio SSRC %u (PT %u)\n",
+						__func__, pss->media->ssrc_video, pss->media->pt_video, pss->media->ssrc_audio, pss->media->pt_audio);
+
+				/* Successful connection, free the debug log to save heap */
+				if (pss->connection_log) {
+					free(pss->connection_log);
+					pss->connection_log = NULL;
+					pss->connection_log_len = 0;
+				}
+			}
+		}
+	} else {
+		lwsl_err("%s: lws_gendtls_put_rx failed\n", __func__);
+		pss->media->telemetry.dtls_errors++;
+	}
+
+	return 0;
+}
+
+/* Helper: Handle RTP/RTCP packets */
+	static int
+webrtc_handle_rtp_rtcp(struct lws *wsi, struct vhd_webrtc *vhd, struct pss_webrtc *pss,
+		const struct sockaddr_in *sin, uint8_t *in, size_t len)
+{
+	(void)wsi; (void)sin;
+	uint8_t *p = (uint8_t *)in;
+
+	if (!pss || !pss->media || !pss->media->handshake_done) return 0;
+
+	uint8_t pt_raw = p[1];
+
+	/*
+	 * Check for valid RTCP Payload Types (200-215) per RFC 5761.
+	 * This range includes SR(200), RR(201), SDES(202), BYE(203), APP(204),
+	 * RTPFB(205), PSFB(206 - e.g. PLI), XR(207), AVB(208), etc.
+	 *
+	 * Everything else in this range (< 200) is treated as RTP.
+	 */
+	if (pt_raw >= 200 && pt_raw <= 215) { /* RTCP */
+		size_t rtcp_len = len;
+		int ret = lws_srtp_unprotect_rtcp(&pss->media->srtp_ctx_rx, (uint8_t *)in, &rtcp_len);
+		if (ret == 0) {
+			size_t offset = 0;
+			/* RTCP packets are usually sent as compound packets. Loop through all. */
+			while (offset + 4 <= rtcp_len) {
+				uint8_t *rtcp_p = (uint8_t *)in + offset;
+				uint8_t fmt = rtcp_p[0] & 0x1F;
+				uint8_t pt = rtcp_p[1];
+				uint16_t pkt_len_words = (uint16_t)((rtcp_p[2] << 8) | rtcp_p[3]);
+				size_t pkt_len = (size_t)(pkt_len_words + 1) * 4;
+
+				if (offset + pkt_len > rtcp_len || pkt_len == 0) {
+					/* Truncated or invalid length */
+					break;
+				}
+
+				if (pt == 206 && fmt == 1) {
+					/* Received PLI! */
+					lwsl_notice("%s: Received RTCP PLI from peer\n", __func__);
+					if (vhd->on_media && pss && pss->wsi_ws) {
+						/* Proxy this up to the mixer plugin using tid=206, marker=1 */
+						vhd->on_media(pss->wsi_ws, 206, rtcp_p, pkt_len, 1, 0);
+					}
+				}
+				offset += pkt_len;
+			}
+		}
+	} else { /* RTP */
+		size_t rtp_len = len;
+		int ret = lws_srtp_unprotect_rtp(&pss->media->srtp_ctx_rx, (uint8_t *)in, &rtp_len);
+		if (ret == 0 && vhd->on_media) {
+			uint32_t ssrc = (uint32_t)((p[8] << 24) | (p[9] << 16) | (p[10] << 8) | p[11]);
+			uint8_t pkt_pt = pt_raw & 0x7f;
+#if 0
+			/* Log incoming packet types intermittently */
+			if ((p[2] << 8 | p[3]) % 100 == 0) {
+				lwsl_notice("%s: Inbound RTP pkt_pt=%u (Expected Audio=%u, Video=%u, vH264=%u, vAV1=%u)\n",
+						__func__, pkt_pt, pss->media->pt_audio, pss->media->pt_video, pss->media->pt_video_h264, pss->media->pt_video_av1);
+			}
+#endif
+
+			/* Check for sequence number gaps on video tracks */
+			if (pkt_pt == pss->media->pt_video || pkt_pt == pss->media->pt_video_h264 || pkt_pt == pss->media->pt_video_av1) {
+				uint16_t seq = (uint16_t)((p[2] << 8) | p[3]);
+				if (pss->media->seq_valid_video) {
+					uint16_t expected = (uint16_t)(pss->media->last_seq_video + 1);
+					if (seq != expected) {
+						int16_t diff = (int16_t)(seq - expected);
+						if (diff > 0) {
+							uint32_t dropped = (uint16_t)(seq - expected);
+							pss->media->telemetry.rtp_drops_video += dropped;
+							lwsl_notice("%s: RTP Drop (Video): Got seq %u, Expected %u (Gap %d)\n",
+								__func__, seq, expected, (int)diff);
+
+							/*
+							 * DO NOT SHRED the rest of the frame here! If we drop the fragment with the marker bit,
+							 * the mixer won't flush its buffer, causing multiple frames to merge into one giant
+							 * garbage buffer. This chokes GStreamer's CPU and drops the conference framerate.
+							 * Instead, we let the corrupted fragments flow to GStreamer for error concealment,
+							 * and we instantly request a PLI to heal the stream on the next frame.
+							 */
+
+							if (lws_now_usecs() - pss->last_pli_req_time > 200000) {
+								lwsl_notice("%s: Requesting PLI.\n", __func__);
+								lws_webrtc_send_pli(pss);
+								pss->last_pli_req_time = lws_now_usecs();
+							}
+						} else if (diff < 0) {
+							pss->media->telemetry.rtp_late_video++;
+						}
+					}
+				}
+				pss->media->last_seq_video = seq;
+				pss->media->seq_valid_video = 1;
+			}
+
+			/* Check for sequence number gaps on audio tracks */
+			if (pkt_pt == pss->media->pt_audio) {
+				uint16_t seq = (uint16_t)((p[2] << 8) | p[3]);
+				if (pss->media->seq_valid_audio) {
+					uint16_t expected = (uint16_t)(pss->media->last_seq_audio + 1);
+					if (seq != expected) {
+						int16_t diff = (int16_t)(seq - expected);
+						if (diff > 0) {
+							uint32_t dropped = (uint16_t)(seq - expected);
+							pss->media->telemetry.rtp_drops_audio += dropped;
+						} else if (diff < 0) {
+							pss->media->telemetry.rtp_late_audio++;
+						}
+					}
+				}
+				pss->media->last_seq_audio = seq;
+				pss->media->seq_valid_audio = 1;
+			}
+
+			// Logic from old block for PLI/header culling...
+			size_t offset = LWS_RTP_HEADER_LEN;
+			uint8_t cc = p[0] & 0x0f;
+
+			if (!pss->media->ssrc_peer_video && pkt_pt != pss->media->pt_audio) {
+				if (pkt_pt != pss->media->pt_video)
+					lwsl_notice("%s: PT mismatch (Expected Video %u, got %u), but taking SSRC %u anyway\n", __func__, pss->media->pt_video, pkt_pt, ssrc);
+				pss->media->ssrc_peer_video = ssrc;
+				lwsl_notice("%s: Discovered peer Video SSRC %u, triggering PLI\n", __func__, ssrc);
+				lws_webrtc_send_pli(pss);
+			}
+
+			offset += (cc * 4);
+			if (p[0] & 0x10) { /* X bit */
+				if (rtp_len >= offset + 4) {
+					uint16_t ext_len = (uint16_t)((p[offset + 2] << 8) | p[offset + 3]);
+					offset += 4u + (size_t)(ext_len * 4);
+				}
+			}
+			if (p[0] & 0x20) { /* P bit */
+				if (rtp_len > offset) {
+					uint8_t padding = p[rtp_len - 1];
+					if (rtp_len >= offset + padding) rtp_len -= padding;
+				}
+			}
+
+			if (rtp_len > offset) {
+#if 0
+				static int dbg_fwd = 0;
+				if (dbg_fwd++ % 100 == 0)
+					lwsl_notice("%s: Forwarding RTP to on_media: PT %u, len %zu, ssrc %u\n", __func__, pkt_pt, rtp_len - offset, ssrc);
+#endif
+				/* Forward RTP packet to mixer to reassemble and push to GStreamer */
+				vhd->on_media(pss->wsi_ws, pkt_pt, (uint8_t *)in + offset, rtp_len - offset, !!(p[1] & 0x80), (uint32_t)((p[4] << 24) | (p[5] << 16) | (p[6] << 8) | p[7]));
+			}
+		}
+	}
+	return 0;
+}
+
+	int
+lws_shared_webrtc_udp_callback(struct lws *wsi, enum lws_callback_reasons reason,
+		void *user, void *in, size_t len, struct vhd_webrtc_udp *vhd_u)
+{
+	/*
+	 * For UDP callbacks, we use the passed-in VHD which points back to the
+	 * main "lws-webrtc" protocol VHD.
+	 */
+	struct vhd_webrtc *vhd = vhd_u ? vhd_u->vhd : NULL;
+	struct pss_webrtc *pss = NULL;
+	const struct lws_udp *udp_desc = lws_get_udp(wsi);
+
+
+	if (reason == LWS_CALLBACK_RAW_RX)
+		lwsl_debug("%s: reason %d, vhd %p, len %d\n", __func__, (int)reason, vhd, (int)len);
+
+	if (!vhd && reason != LWS_CALLBACK_PROTOCOL_INIT && reason != LWS_CALLBACK_PROTOCOL_DESTROY)
+		return 0;
+
+	switch (reason) {
+		case LWS_CALLBACK_RAW_ADOPT:
+			lwsl_notice("%s: RAW_ADOPT, increasing SO_SNDBUF\n", __func__);
+			{
+				int sndbuf = 8 * 1024 * 1024;
+				int _fd = (int)(lws_intptr_t)lws_get_socket_fd(wsi);
+				if (_fd >= 0) {
+					if (setsockopt(_fd, SOL_SOCKET, SO_SNDBUF, (const char *)&sndbuf, sizeof(sndbuf)) < 0) {
+						lwsl_err("%s: Failed to scale SO_SNDBUF: %d\n", __func__, errno);
+					}
+					/* Also increase RCVBUF to handle bursty 300KB frames without drops */
+					if (setsockopt(_fd, SOL_SOCKET, SO_RCVBUF, (const char *)&sndbuf, sizeof(sndbuf)) < 0) {
+						lwsl_err("%s: Failed to scale SO_RCVBUF: %d\n", __func__, errno);
+					}
+					
+					int actual_rcvbuf = 0;
+					socklen_t optlen = sizeof(actual_rcvbuf);
+					if (getsockopt(_fd, SOL_SOCKET, SO_RCVBUF, &actual_rcvbuf, &optlen) == 0) {
+						if (actual_rcvbuf < sndbuf) {
+							lwsl_notice("%s: Requested SO_RCVBUF %d, but kernel limited it to %d. "
+									  "If you experience UDP packet drops during bursts, increase "
+									  "system net.core.rmem_max.\n", __func__, sndbuf, actual_rcvbuf);
+						}
+					}
+				}
+			}
+			break;
+
+		case LWS_CALLBACK_RAW_RX:
+			if (!vhd || !udp_desc) return 0;
+
+			/* Create pure IPv4 mapping for logic checks */
+			struct sockaddr_in pure_sin;
+			memset(&pure_sin, 0, sizeof(pure_sin));
+			pure_sin.sin_family = AF_INET;
+
+			if (udp_desc->sa46.sa4.sin_family == AF_INET) {
+				pure_sin.sin_addr.s_addr = udp_desc->sa46.sa4.sin_addr.s_addr;
+				pure_sin.sin_port = udp_desc->sa46.sa4.sin_port;
+			} else {
+				/* AF_INET6 IPv4-mapped address */
+				memcpy(&pure_sin.sin_addr.s_addr, &udp_desc->sa46.sa6.sin6_addr.s6_addr[12], 4);
+				pure_sin.sin_port = udp_desc->sa46.sa6.sin6_port;
+			}
+
+			const struct sockaddr_in *sin = &pure_sin;
+
+			/* Find session by address */
+			pss = webrtc_find_session(vhd, sin);
+
+			if (len > 0) {
+				uint8_t *p = (uint8_t *)in;
+				uint8_t b0 = p[0];
+
+				/* STUN: 0x00 or 0x01 */
+				if (b0 == 0 || b0 == 1) {
+					webrtc_handle_stun(wsi, vhd, &pss, sin, (uint8_t *)in, len);
+				}
+				/* DTLS: 20-63 */
+				else if (b0 >= 20 && b0 <= 63) {
+					webrtc_handle_dtls(wsi, pss, sin, (uint8_t *)in, len);
+				}
+				/* RTP/RTCP: 128-191 */
+				else if (b0 >= 128 && b0 <= 191) {
+					webrtc_handle_rtp_rtcp(wsi, vhd, pss, sin, (uint8_t *)in, len);
+				}
+			}
+			break;
+		default: break;
+	}
+	return 0;
+}
+
+
+	int
+callback_webrtc_udp(struct lws *wsi, enum lws_callback_reasons reason,
+		void *user, void *in, size_t len)
+{
+	struct vhd_webrtc_udp *vhd = (struct vhd_webrtc_udp *)lws_protocol_vh_priv_get(lws_get_vhost(wsi), lws_get_protocol(wsi));
+
+	if (reason == LWS_CALLBACK_PROTOCOL_INIT) {
+		const struct lws_protocols *p;
+
+		if (!in)
+			return 0;
+
+		vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi), lws_get_protocol(wsi), sizeof(struct vhd_webrtc_udp));
+		if (!vhd)
+			return -1;
+
+		p = lws_vhost_name_to_protocol(lws_get_vhost(wsi), "lws-webrtc");
+		if (p)
+			vhd->vhd = (struct vhd_webrtc *)lws_protocol_vh_priv_get(lws_get_vhost(wsi), p);
+
+		if (!vhd->vhd) {
+			lwsl_vhost_warn(lws_get_vhost(wsi), "lws-webrtc: main 'lws-webrtc' vhd not found");
+			/* This might happen if init order is wrong or not on same vhost */
+			return -1;
+		}
+	}
+
+	return lws_shared_webrtc_udp_callback(wsi, reason, user, in, len, vhd);
+}
+
+
+	int
+callback_webrtc(struct lws *wsi, enum lws_callback_reasons reason,
+		void *user, void *in, size_t len)
+{
+	struct vhd_webrtc *vhd = (struct vhd_webrtc *)lws_protocol_vh_priv_get(lws_get_vhost(wsi), lws_get_protocol(wsi));
+
+	if (reason == LWS_CALLBACK_PROTOCOL_INIT) {
+
+		if (!in)
+			return 0;
+
+		lwsl_vhost_notice(lws_get_vhost(wsi), "plugin 'lws-webrtc' PROTOCOL_INIT\n");
+
+		vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi), lws_get_protocol(wsi), sizeof(struct vhd_webrtc));
+		if (!vhd)
+			return -1;
+	}
+
+	return lws_shared_webrtc_callback(wsi, reason, user, in, len, vhd);
+}
+
+static const struct lws_webrtc_ops webrtc_ops = {
+	.abi_version		= LWS_WEBRTC_OPS_ABI_VERSION,
+	.send_video		= lws_webrtc_send_video,
+	.send_audio		= lws_webrtc_send_audio,
+	.send_text		= lws_webrtc_send_text,
+	.media_ref      = lws_webrtc_media_ref,
+	.media_unref    = lws_webrtc_media_unref,
+	.foreach_session	= lws_webrtc_foreach_session,
+	.get_media      = lws_webrtc_get_media,
+	.shared_callback	= lws_shared_webrtc_callback,
+	.get_user_data		= lws_webrtc_get_user_data,
+	.set_user_data		= lws_webrtc_set_user_data,
+	.get_vhost		= lws_webrtc_get_vhost,
+	.get_context		= lws_webrtc_get_context,
+	.set_on_media		= lws_webrtc_set_on_media,
+	.send_pli		= lws_webrtc_send_pli,
+	.get_video_pt		= lws_webrtc_get_video_pt,
+	.get_audio_pt		= lws_webrtc_get_audio_pt,
+	.get_video_pt_h264	= lws_webrtc_get_video_pt_h264,
+	.get_video_pt_av1	= lws_webrtc_get_video_pt_av1,
+	.get_seq_video      = lws_webrtc_get_seq_video,
+};
+
+LWS_VISIBLE const struct lws_protocols webrtc_protocols[] = {
+	{ "lws-webrtc", callback_webrtc, sizeof(struct pss_webrtc), 32768, 0, (void *)&webrtc_ops, 0 },
+	{ "lws-webrtc-udp", callback_webrtc_udp, 0, 2048, 0, NULL, 0 },
+};
+
+#if !defined (LWS_WITH_PLUGINS_BUILTIN)
+/*
+ * The exported lws_plugin_protocol_t struct MUST be named EXACTLY the same as
+ * your plugin's shared object suffix (after removing 'libprotocol_').
+ * lwsws uses this exact string directly in its dlsym() lookup on startup.
+ */
+LWS_VISIBLE const lws_plugin_protocol_t lws_webrtc = {
+	.hdr = {
+		.name = "lws webrtc",
+		._class = "lws_protocol_plugin",
+		.lws_build_hash = LWS_BUILD_HASH,
+		.api_magic = LWS_PLUGIN_API_MAGIC,
+		.priority = 100,
+	},
+	.protocols = webrtc_protocols,
+	.count_protocols = LWS_ARRAY_SIZE(webrtc_protocols),
+	.extensions = NULL,
+	.count_extensions = 0,
+};
+#endif

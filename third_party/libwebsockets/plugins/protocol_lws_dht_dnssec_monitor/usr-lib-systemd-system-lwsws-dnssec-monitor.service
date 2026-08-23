@@ -1,0 +1,10 @@
+[Unit]
+Description=Libwebsockets Web Server
+After=syslog.target
+
+[Service]
+ExecStart=/usr/local/bin/lwsws -c /etc/lwsws-monitor
+ExecReload=/usr/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
