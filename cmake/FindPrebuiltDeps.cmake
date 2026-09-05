@@ -1,12 +1,11 @@
 # FindPrebuiltDeps.cmake → 统一依赖管理
 #
 # 所有依赖从源码编译，一条 cmake 命令搞定:
-#   - OpenSSL / Python 2.7: configure 时自动构建 (缓存在 build/_deps/)
+#   - OpenSSL: configure 时自动构建 (缓存在 build/_deps/)
 #   - jsoncpp / libdatachannel / libwebsockets: add_subdirectory 源码编译
 #
 # Windows 特殊处理:
 #   - OpenSSL: 尝试自动构建，失败则回退到项目自带 .lib
-#   - Python 2.7: 使用项目自带 .lib (VS2015+ Universal CRT 兼容)
 
 set(APP_DIR "${CMAKE_SOURCE_DIR}/application")
 
@@ -16,40 +15,7 @@ set(APP_DIR "${CMAKE_SOURCE_DIR}/application")
 include(cmake/BuildOpenSSL.cmake)
 
 # ============================================================
-# 2. Python 2.7
-# ============================================================
-if(WIN32)
-    # Windows: 使用项目自带的 .lib
-    if(EXISTS "${APP_DIR}/python27.lib")
-        message(STATUS "Python 2.7: using .lib from application/")
-
-        add_library(python27 STATIC IMPORTED GLOBAL)
-        set_target_properties(python27 PROPERTIES
-            IMPORTED_LOCATION "${APP_DIR}/python27.lib"
-            INTERFACE_INCLUDE_DIRECTORIES "${APP_DIR}/include/python2.7/Include"
-        )
-
-        # Python 扩展模块
-        foreach(_pair "_socket;${APP_DIR}/_socket.lib" "select;${APP_DIR}/select.lib" "_ctypes;${APP_DIR}/_ctypes.lib")
-            list(GET _pair 0 _name)
-            list(GET _pair 1 _path)
-            if(EXISTS "${_path}")
-                add_library(python_${_name} STATIC IMPORTED GLOBAL)
-                set_target_properties(python_${_name} PROPERTIES IMPORTED_LOCATION "${_path}")
-            else()
-                add_library(python_${_name} INTERFACE)
-            endif()
-        endforeach()
-    else()
-        message(FATAL_ERROR "Python 2.7 .lib not found at ${APP_DIR}/python27.lib")
-    endif()
-else()
-    # Linux: 自动构建
-    include(cmake/BuildPython27.cmake)
-endif()
-
-# ============================================================
-# 3. jsoncpp (源码编译)
+# 2. jsoncpp (源码编译)
 # ============================================================
 set(JSONCPP_WITH_TESTS OFF CACHE BOOL "" FORCE)
 set(JSONCPP_WITH_POST_BUILD_UNITTEST OFF CACHE BOOL "" FORCE)
@@ -70,7 +36,7 @@ else()
 endif()
 
 # ============================================================
-# 4. libwebsockets (源码编译)
+# 3. libwebsockets (源码编译)
 # ============================================================
 set(LWS_WITH_STATIC ON CACHE BOOL "" FORCE)
 set(LWS_WITH_SHARED OFF CACHE BOOL "" FORCE)
@@ -109,7 +75,7 @@ target_link_libraries(LibWebSocketWrapper PUBLIC websockets_static)
 target_include_directories(LibWebSocketWrapper PRIVATE "${APP_DIR}")
 
 # ============================================================
-# 5. libdatachannel (源码编译, 含 libjuice/srtp2/usrsctp)
+# 4. libdatachannel (源码编译, 含 libjuice/srtp2/usrsctp)
 # ============================================================
 set(NO_MEDIA ON CACHE BOOL "" FORCE)
 set(NO_WEBSOCKET ON CACHE BOOL "" FORCE)
@@ -129,7 +95,7 @@ if(NOT TARGET usrsctp)
 endif()
 
 # ============================================================
-# 6. NtUniSdkBase (Windows-only, optional)
+# 5. NtUniSdkBase (Windows-only, optional)
 # ============================================================
 option(ENABLE_NTUNISDK "Enable NtUniSdk integration (Windows only)" OFF)
 if(ENABLE_NTUNISDK AND WIN32)
