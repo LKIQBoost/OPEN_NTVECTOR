@@ -26,6 +26,10 @@ inline PyObject* PyTextFromGbk(const char* s, Py_ssize_t n) {
 inline PyObject* PyTextFromUtf8(const char* s) {
     return PyUnicode_FromString(s ? s : "");
 }
+inline PyObject* PyTextFromUtf8(const std::string& utf8) {
+    if (utf8.empty()) return PyUnicode_FromString("");
+    return PyUnicode_FromStringAndSize(utf8.data(), (Py_ssize_t)utf8.size());
+}
 // Length variant: never raises on stray bytes (surrogateescape), safe for packet text.
 inline PyObject* PyTextFromUtf8(const char* s, Py_ssize_t n) {
     return PyUnicode_DecodeUTF8(s, n, "surrogateescape");
