@@ -30,7 +30,7 @@ unsigned char CommandRequest::ID()
 
 std::vector<unsigned char> CommandRequest::Serializ()
 {
-    BinaryWriter bw(m_command.size() + m_requestID.size() + m_unknownString.size() + 64);
+    BinaryWriter bw(m_command.size() + m_requestID.size() + 64);
     bw.WriteUInt8(ID());
     bw.WriteStringUTF(m_command);
     bw.WriteVarInt(static_cast<char>(m_commandOrigin));
@@ -47,7 +47,7 @@ std::vector<unsigned char> CommandRequest::Serializ()
         bw.WriteVarInt(m_commandVersion);
     }
 
-    bw.WriteStringUTF(m_unknownString);
+    bw.WriteBool(m_unlimit);
 
     return bw.vect();
 }

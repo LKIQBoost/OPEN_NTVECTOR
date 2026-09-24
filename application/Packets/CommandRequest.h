@@ -49,8 +49,8 @@ public:
     void SetCommandVersion(int value) noexcept { m_commandVersion = value; }
     int GetCommandVersion() const noexcept { return m_commandVersion; }
 
-    void SetUnknownString(std::string value) { m_unknownString = std::move(value); }
-    const std::string& GetUnknownString() const noexcept { return m_unknownString; }
+    void SetUnlimit(bool value) noexcept { m_unlimit = value; }
+    bool GetUnlimit() const noexcept { return m_unlimit; }
 
 private:
     std::string m_command;
@@ -60,5 +60,5 @@ private:
     int64_t m_playerID = -1;
     bool m_internalSource = false;
     int m_commandVersion = 5111808;
-    std::string m_unknownString;
+    bool m_unlimit = false;
 };
