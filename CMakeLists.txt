@@ -31,6 +31,11 @@ set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
 add_subdirectory(application/include/zlib-1.3.1 EXCLUDE_FROM_ALL)
 
+# 静态 CPython 3.12 核心库(替代官方 python312.lib → 运行时不再需要 python312.dll)。
+# 必须排在 zlib 之后:核心里的 binascii.c 带 USE_ZLIB_CRC32 需要 zlib.h/zconf.h,
+# 而 zconf.h 是 zlib 子项目在 configure 期生成到 build/ 里的。
+include(cmake/BuildPython312.cmake)
+
 # SLikeNet (魔改版 RakNet)
 # 只构建静态库，跳过示例和 DLL
 set(SLIKENET_ENABLE_DLL OFF CACHE BOOL "" FORCE)

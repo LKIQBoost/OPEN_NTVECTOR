@@ -38,7 +38,7 @@
 参数类型错误仍使用 Python 标准的 `TypeError`，参数数值或长度不合法时使用
 `ValueError`。这样可以区分“调用方式错误”和“底层接口/协议失败”。
 
-类型桩统一安装到运行时的 `python312/Lib/site-packages`，开发环境也可以直接将
+类型桩统一安装到运行时的 `source/Lib/site-packages`，开发环境也可以直接将
 `application/PythonAPI/Stubs` 加入 IDE 的额外类型检查路径。
 
 状态查询使用 `None` 表示信息不存在或尚未从服务器收到。空列表、坐标零值和实体 ID

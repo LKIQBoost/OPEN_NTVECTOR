@@ -51,3 +51,11 @@ __pycache__/
 
 # Archives
 *.zip
+
+# CPython static core build artifacts.
+# Generated in-tree by cmake/BuildPython312.cmake via PCbuild/_freeze_module.vcxproj:
+# the python.org source tarball ships only README.txt in these two directories,
+# the real content is produced at configure time.
+third_party/Python-3.12.2/Python/frozen_modules/*.h
+third_party/Python-3.12.2/Python/deepfreeze/deepfreeze.c
+third_party/Python-3.12.2/PCbuild/obj/

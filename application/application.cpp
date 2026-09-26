@@ -1,5 +1,8 @@
 // application.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
-#define Py_ENABLE_SHARED     // link against python312.dll (dynamic embedding)
+// 注意:Python 的链接方式(Py_ENABLE_SHARED / Py_NO_ENABLE_SHARED)**不要**在这里
+// 定义 —— 必须由 CMake 统一提供(见 application/CMakeLists.txt),否则本 TU
+// 会和其余 TU 取到不同的 pyconfig.h 分支,轻则 dllimport 找不到符号,重则
+// 数据结构布局不一致。
 //#define Linker_NtUniSdk
 
 //#define Linker_EnvSdk

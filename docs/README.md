@@ -23,11 +23,16 @@
 
 | 平台 | 要求 |
 |------|------|
-| **Windows**（主平台） | Visual Studio 2026（MSVC 14.51）、CMake 4.x、Python 3.12.2 开发安装（用于链接） |
+| **Windows**（主平台） | Visual Studio 2026（MSVC，需 `v145` 工具集）、CMake 4.x、**宿主 Python ≥ 3.10**（仅 configure 期用） |
 | **Linux x86_64** | 历史支持（clang / gcc）；Py3 迁移后暂以 Windows 为主，构建脚本待更新 |
 | **Android ARM64** | 历史支持（Termux 原生编译）；同上待更新 |
 
-> Python 3.12 开发安装路径（链接用）：`C:/Users/admin/AppData/Local/Programs/Python/Python312`。
+> **不再需要本机 python.org 开发安装来链接** —— 解释器核心从仓库内的
+> `third_party/Python-3.12.2` 编出。但 configure 期需要一个 ≥ 3.10 的宿主 Python 跑
+> `Tools/build/deepfreeze.py` 生成冻结模块；未指定时自动探测，也可用
+> `-DNTVECTOR_PY_HOST=<python.exe>` 显式指定。
+> 工具集/SDK 可用 `-DNTVECTOR_PY_TOOLSET=v145`、`-DNTVECTOR_PY_WINSDK=10.0.26100.0` 覆盖；
+> `-DNTVECTOR_PY_REBUILD=ON` 强制重建静态核心。
 > 从 Windows 交叉编译 Linux x86_64 使用 `cmake/toolchains/linux-clang-x86_64.cmake`（clang + lld，需提供目标 sysroot）——迁移后尚未回归验证。
 
 ## 构建（Windows）
@@ -45,21 +50,25 @@ cmake --build build --config Release
 
 ### 部署
 
-实际运行位置为 **`D:/Game/Minecraft/Vector/`** —— 把新 `Program.exe` 连同 Python 运行时一起复制过去：
+实际运行位置为 **`D:/Game/Minecraft/Vector/`**：
 
 ```
 D:/Game/Minecraft/Vector/
-├── Program.exe          ← Py3 版（新）
-├── python312.dll        ← Python 3.12 DLL（在 exe 根目录，import-lib 加载）
-├── python3.dll, vcruntime140*.dll
-├── python312/           ← 27MB 裁剪标准库
-│   ├── Lib/             ← 纯标准库（已去 __pycache__/test/tkinter）
-│   ├── Lib/site-packages/ ← umsgpack.py、RC4.py、chacha/、raknet/、*.pyi 类型桩
-│   └── DLLs/            ← 全部 .pyd 模块
-├── source/              ← 框架（init.py 加载插件/处理 RPC 校验；proton.py 解析数据包；redirect.py 遗留）
+├── Program.exe          ← CPython 3.12 核心静态链在里面，不需要 python312.dll
+├── source/              ← 运行环境
+│   ├── Lib/             ← 标准库（已去 __pycache__/test/tkinter）
+│   │   └── site-packages/ ← 第三方库装这里；含 umsgpack.py、RC4.py、chacha/、raknet/、*.pyi 类型桩
+│   ├── init.py          ← 框架：加载插件 / 处理 RPC 反作弊校验
+│   ├── proton.py        ← 解析数据包
+│   └── redirect.py      ← 遗留
 ├── scripts/             ← 插件（每个插件一个目录）
-└── Program_py27.exe     ← 旧 Py2 备份
+└── mc.cfg / client_cfg.json / skin_data.json / skins/ / songs/
 ```
+
+> **没有 `python312.dll` / `python3.dll` / `python312/` 目录** —— 解释器核心静态链在
+> `Program.exe` 里，与 Python 2.7 时代的形态一致（当年是静态 `python27.lib`）。
+> 代价：官方 `.pyd` 动态扩展无法 drop-in，详见
+> [项目架构与 Py3 迁移](项目架构与Py3迁移.md) 第 7 节。
 
 > Linux / Android 的历史构建命令见 [docs/构建项目文档.md](docs/构建项目文档.md)。
 
@@ -69,14 +78,17 @@ D:/Game/Minecraft/Vector/
 NTVECTOR_Platform/
 ├── CMakeLists.txt              # 根 CMake 配置
 ├── application/                # 主程序源码（目标名：Program）
-│   ├── *.cpp / *.h             # 协议、网络、登录、加密、Python 绑定等
-│   ├── PythonRuntime.cpp       # 内嵌 Python 3.12 初始化 / 15 模块注册
-│   ├── include/                # SLikeNet、zlib、pybind11（Python 3.12 头文件来自本机安装）
-│   └── platform/               # 平台相关实现
+│   ├── Core/ Crypto/ Network/ Packets/ NBT/ platform/   # 协议、网络、登录、加密等
+│   ├── Python/                 # PythonRuntime.cpp（解释器初始化 / 模块注册）等
+│   ├── PythonAPI/              # NBT、数据包、game_state 等 pybind11 绑定
+│   └── include/                # SLikeNet、zlib、pybind11、OpenSSL
 ├── cmake/                      # FindPrebuiltDeps / BuildOpenSSL / toolchains 等
+│   ├── BuildPython312.cmake    # configure 期编出静态 CPython 核心库
+│   └── PythonBuiltinModules.cmake  # 编进 exe 的 stdlib C 扩展白名单
 ├── docs/                       # 文档（架构、构建、插件开发）
 ├── third_party/                # 第三方依赖源码（jsoncpp、libdatachannel、libwebsockets…）
-└── Python-2.7.18/              # 旧 Py2 源码树（迁移后仅留参考）
+│   └── Python-3.12.2/          # CPython 源码（用于静态核心；含 `PCbuild` 工程）
+└── tools/                      # 辅助脚本与原生测试
 ```
 
 ## 依赖
@@ -85,7 +97,7 @@ NTVECTOR_Platform/
 
 | 库 | 版本 | 构建方式 |
 |----|------|----------|
-| Python | 3.12.2 | 使用本机开发安装链接 `python312.lib`；运行时部署 exe 旁 `python312/` |
+| Python | 3.12.2 | 从 `third_party/Python-3.12.2` 编出**静态**核心库（`cmake/BuildPython312.cmake`，configure 期完成并缓存），链进 `Program.exe`；运行时无需 `python312.dll` |
 | OpenSSL | 3.5.0 | cmake 配置期自动构建；Windows 失败时回退到项目自带 `.lib` |
 | jsoncpp | 1.9.6 | `add_subdirectory` |
 | libdatachannel | 最新 | `add_subdirectory`（含 libjuice、libsrtp、usrsctp） |
@@ -93,7 +105,9 @@ NTVECTOR_Platform/
 | SLikeNet | 定制（RakNet 魔改） | `add_subdirectory` |
 | zlib | 1.3.1 | `add_subdirectory` |
 
-> 加第三方 Python 库：`pip install <pkg> --target "D:\Game\Minecraft\Vector\python312\Lib\site-packages"`。
+> 加第三方 Python 库：`pip install <pkg> --target "D:\Game\Minecraft\Vector\source\Lib\site-packages"`。
+> 只支持 **纯 Python** wheel（`py3-none-any`）。带平台 tag 的 wheel（`numpy`/`Pillow` 那种
+> `cp312-...-win_amd64`）不能用——原因见 [项目架构与 Py3 迁移](项目架构与Py3迁移.md) 第 7 节。
 
 ## 内嵌 Python 模块（15 个）
 
@@ -114,6 +128,23 @@ NTVECTOR_Platform/
 | `easy_utils` | pybind11 加解密 |
 | `_raknet` | RakNet（遗留） |
 | `tan_lobby_game_clicpp_wrapper` | NetherNet（运行时注册） |
+
+## 编进 exe 的 stdlib C 扩展
+
+静态嵌入下没有 `.pyd` 可加载，CPython 3.12 拆出去的那批 stdlib C 扩展必须编进
+`Program.exe` 并注册为 builtin（`cmake/PythonBuiltinModules.cmake` 里的白名单表，
+加一行 + 重编即可增删）：
+
+`_socket` `select` `_queue` `zlib` `_hashlib` `unicodedata` `_overlapped` `_zoneinfo`
+`winsound` `_asyncio` `_uuid` `_multiprocessing` `pyexpat` `_elementtree`
+
+其余大部分（`binascii` / `_struct` / `_json` / `_pickle` / `_random` / `_thread` /
+`_sre` / `_csv` / `_datetime` / `math` / `cmath` / `array` / `mmap` / `signal` /
+`_winapi` / `winreg` / `cjkcodecs` 等 74 个）本来就是核心内建。
+
+`_bz2` / `_lzma` / `_sqlite3` / `_ctypes` / `_decimal` / `_tkinter` 需要额外引入
+第三方源码（libbz2 / liblzma / sqlite3 / libffi / libmpdec+MASM / Tcl-Tk），
+**不在**当前白名单内。
 
 ## 配置文件
 
@@ -167,7 +198,7 @@ NTVECTOR_Platform/
 - `PlayStatus value: 3` = **PlayerSpawn（正常进服）**，不是错误；`0` = 登录成功；`1/2/4/5/6` 才是失败
 - 反作弊封禁"因违规游戏行为，您的账号被禁止进入游戏" = RPC/MCP 校验链有问题（`umsgpack.compatibility`、`triggerBytes` 二进制事件等，详见 [docs/项目架构与Py3迁移.md](docs/项目架构与Py3迁移.md)）
 - 插件开发文档：`D:/Game/Minecraft/Vector/scripts/README.md`（Py3 版）
-- 类型桩（IDE 补全 / 喂给 AI）：`python312/Lib/site-packages/*.pyi`
+- 类型桩（IDE 补全 / 喂给 AI）：`source/Lib/site-packages/*.pyi`
 
 ## 文档
 

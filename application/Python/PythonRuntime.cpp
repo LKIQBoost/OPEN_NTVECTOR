@@ -16,22 +16,29 @@
 #include "MPayWrapper.h"
 extern "C" PyObject* PyInit_easy_utils(void);
 
-// Point PYTHONHOME at the bundled python312/ directory next to Program.exe
-// (CommunityBot-style deployment). Without this the embedded interpreter
-// cannot find its stdlib once the exe is copied elsewhere.
+// Stdlib C extensions compiled into this exe (declarations + AppendStdlibInittab).
+// Generated at configure time from the table in cmake/PythonBuiltinModules.cmake.
+#include "ntvector_python_builtin_inittab.inc"
+
+// Point PYTHONHOME at the bundled source/ directory next to Program.exe.
+// The stdlib lives in source/Lib/: getpath.py looks for the landmark
+// "Lib\os.py" under the prefix on Windows (Modules/getpath.py:193-194), and a
+// missing DLLs/ directory is explicitly tolerated (getpath.py:610-614).
+// The interpreter core is statically linked into Program.exe, so there is no
+// python312.dll and no DLLs/ directory to point at.
 static void SetPythonHome()
 {
 #ifdef _WIN32
     char exe[MAX_PATH] = { 0 };
     DWORD n = GetModuleFileNameA(NULL, exe, MAX_PATH);
-    // Full stdlib runtime is deployed in python312/ next to the exe
-    // (python312/Lib + python312/DLLs + python312/Lib/site-packages).
-    // python312.dll stays in the exe dir (import-lib loading).
-    std::string home = "python312";
+    // Runtime layout next to the exe:
+    //   source/Lib                <- stdlib
+    //   source/Lib/site-packages  <- pip --target installs land here
+    std::string home = "source";
     if (n > 0) {
         std::string p(exe);
         size_t s = p.find_last_of("\\/");
-        if (s != std::string::npos) home = p.substr(0, s) + "\\python312";
+        if (s != std::string::npos) home = p.substr(0, s) + "\\source";
     }
     std::wstring whome;
     int wlen = MultiByteToWideChar(CP_ACP, 0, home.c_str(), -1, NULL, 0);
@@ -348,6 +355,8 @@ void PythonRuntime::startUp()
 	Logger::getInstance().log(LOG_INFO, "Python Initialize.");
 	LOG(LOG_SCRIPTING, "[PythonRuntime] startUp - Calling Py_Initialize()");
 	SetPythonHome();
+	// Must precede Py_Initialize(): the builtin import table is read during it.
+	AppendStdlibInittab();
 	Py_Initialize();
 	// Py3: the GIL is auto-initialized; release it so worker threads can acquire it.
 	PyEval_SaveThread();
@@ -404,6 +413,13 @@ void PythonRuntime::startUp()
 
 			std::string sunshine_path = m_script_path + "sunshine/";
 			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)sunshine_path.c_str());
+
+			// Clearing sys.path above also drops the stdlib search paths. The
+			// statically linked core resolves them from PYTHONHOME at startup
+			// only, so they must be restored explicitly or every stdlib import
+			// fails. Appended last so a bundled vanilla.mcp/lib/ still wins.
+			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)"./source/Lib");
+			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)"./source/Lib/site-packages");
 		}
 		if (Params::logger)
 			PyRun_SimpleStringFlags("print(sys.path)", nullptr);
@@ -463,7 +479,7 @@ void PythonRuntime::startUp()
 			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)scripts_path.c_str());
 
 			// site-packages so third-party libraries (requests, etc.) are importable.
-			std::string site_path = "./python312/Lib/site-packages";
+			std::string site_path = "./source/Lib/site-packages";
 			PythonRuntime::runMethod(sys_path, "append", src, 0, "(s)", (void*)site_path.c_str());
 		}
 		if (Params::logger)
@@ -480,8 +496,12 @@ void PythonRuntime::startUp()
 void PythonRuntime::initModules()
 {
     // Python 3: each PyInit_X() creates the module; RegisterModule puts it
-    // into sys.modules so `import name` works. socket/select/ctypes are no
-    // longer registered here - Python 3.12 provides them from its stdlib.
+    // into sys.modules so `import name` works. Only this project's own modules
+    // are registered here. Stdlib C extensions are a separate matter: the
+    // interpreter core is linked statically and no .pyd files exist, so the
+    // ones not built into the core (socket/select/queue/...) are compiled into
+    // this exe and registered with PyImport_AppendInittab() from the generated
+    // AppendStdlibInittab() (see the include at the top of this file).
     LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing api_errors module");
     RegisterModule(PyInit_api_errors(), "api_errors");
     LOG(LOG_SCRIPTING, "[PythonRuntime] initModules - Initializing nbt module");

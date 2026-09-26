@@ -25,25 +25,30 @@
 
 | 项目 | 说明 |
 |------|------|
-| Python 版本 | **3.12.2**（Vector 内置，位于 `python312/` 目录） |
+| Python 版本 | **3.12.2**（解释器核心静态链在 `Program.exe` 里，exe 旁没有 `python312.dll`） |
 | 语法 | 使用 **Python 3** 语法 |
 | 开发模式 | **source 模式**（源码）— 修改 `.py` 文件后自动热重载 |
 | 发布模式 | MCP 模式（遗留，见第 9 节，**仅 source 模式受支持**） |
-| Python 运行时 | `python312/`（Lib 标准库 + DLLs + site-packages），`python312.dll` 在 exe 旁 |
+| Python 运行时 | `source/Lib/`（标准库 + `site-packages/`），由 exe 的 `PYTHONHOME=<exe>\source` 定位 |
 | 插件目录 | `scripts/` — 所有插件均放在此目录下 |
 
-> **不要**修改 `source/` 下的文件，那是 Vector 运行环境（框架脚本）。
+> **不要**修改 `source/` 下的文件，那是 Vector 运行环境（框架脚本 + 标准库）。
 
 ### 第三方库
 
-Vector 内置完整 Python 3.12 标准库。如需第三方库（`requests`、`numpy` 等）：
+Vector 内置完整 Python 3.12 标准库。如需第三方库：
 
 ```bash
 # 用系统 Python 的 pip 安装到 Vector 的 site-packages：
-pip install requests --target "Vector\python312\Lib\site-packages"
+pip install requests --target "Vector\source\Lib\site-packages"
 ```
 
-或直接把纯 Python 包复制到 `python312/Lib/site-packages/`。插件中直接 `import` 即可。
+或直接把纯 Python 包复制到 `source/Lib/site-packages/`。插件中直接 `import` 即可。
+
+> ⚠️ **只支持纯 Python 包**（wheel 名为 `py3-none-any`）。带平台 tag 的包
+> （`numpy`、`Pillow`、`lxml` 这类 `cp312-...-win_amd64` wheel）装进去也**无法 import**
+> —— 解释器是静态链接的，官方 `.pyd` 加载不了。需要这类库只能编进 exe
+> （见 `cmake/PythonBuiltinModules.cmake`），或按 `Program.lib` 自编 `.pyd`。
 
 ---
 
